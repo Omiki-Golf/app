@@ -27,7 +27,11 @@ test('history backup includes committed WAL data, excludes credentials and resto
     finally { copy.close(); }
     assert.ok(!(await readdir(join(saved, 'latest'))).includes('auth.json'));
     assert.ok(!(await readdir(join(saved, 'latest'))).includes('config.toml'));
-    assert.equal((await stat(saved)).mode & 0o777, 0o700);
+    // Windows does not expose POSIX owner/group permission bits through stat.
+    // Keep the content, credential-exclusion and restore checks on every OS.
+    if (process.platform !== 'win32') {
+      assert.equal((await stat(saved)).mode & 0o777, 0o700);
+    }
     assert.equal(run('--restore').status, 1, 'existing history must be preserved');
     db.close();
     await rm(home, { recursive: true });

@@ -1,4 +1,5 @@
 import { AdminMessages } from './AdminMessages';
+import { AdminCourses } from './AdminCourses';
 import { AdminRounds } from './AdminRounds';
 import { AdminUsers } from './AdminUsers';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -39,7 +40,7 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
   onAccessChanged: () => Promise<void>;
   onChangePassword: () => void;
 }) {
-  const [tab, setTab] = useState<'admins' | 'audit' | 'users' | 'rounds' | 'messages'>('admins');
+  const [tab, setTab] = useState<'admins' | 'audit' | 'users' | 'rounds' | 'messages' | 'courses'>('admins');
   const [admins, setAdmins] = useState<AdminDirectoryEntry[]>([]);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -127,6 +128,7 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
           <button onClick={() => setTab('users')} aria-pressed={tab === 'users'} className="bg-card border border-line rounded-xl px-4 py-3">Usuarios</button>
           <button onClick={() => { setTab('audit'); void refresh(); }} aria-pressed={tab === 'audit'} className={`flex gap-2 items-center rounded-xl px-4 py-3 ${tab === 'audit' ? 'bg-accent text-on-accent' : 'bg-card border border-line'}`}><History size={18} />Actividad</button>
           <button onClick={() => setTab('messages')} aria-pressed={tab === 'messages'} className="bg-card border border-line rounded-xl px-4 py-3">Mensajes</button>
+          <button onClick={() => setTab('courses')} aria-pressed={tab === 'courses'} className={`border border-line rounded-xl px-4 py-3 ${tab === 'courses' ? 'bg-accent text-on-accent' : 'bg-card'}`}>Campos de golf</button>
           <button onClick={onChangePassword} className="text-sm text-accent-ink px-3 py-3">Mi contraseña</button>
           <button disabled={loading || busy} aria-label="Actualizar" title="Actualizar" onClick={() => void refresh()} className="ml-auto flex h-11 w-11 items-center justify-center bg-card border border-line rounded-full disabled:opacity-50"><RefreshCw size={18} /></button>
         </div>
@@ -134,6 +136,7 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
         {error && <p role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl">{error}</p>}
         {message && <p role="status" className="mb-4 bg-accent-soft text-accent-ink border border-accent-ring p-4 rounded-xl">{message}</p>}
 
+        {tab === 'courses' && <AdminCourses />}
         {tab === 'messages' && <AdminMessages />}
         {tab === 'rounds' && <AdminRounds />}
         {tab === 'users' && <AdminUsers />}

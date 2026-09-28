@@ -198,6 +198,13 @@ export const golfService = {
     return data;
   },
 
+  async getRegisteredCourseHoles(courseId: string): Promise<GolfHole[]> {
+    const { data, error } = await supabase.from('golf_holes').select('*')
+      .eq('course_id', courseId).order('hole_number', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
   async getCourseHoleCount(courseId: string): Promise<number> {
     const { data, error } = await supabase
       .from('golf_holes')
