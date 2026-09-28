@@ -1,11 +1,26 @@
 import { useEffect, useState } from 'react';
 import { golfService } from '../../services/golfService';
 import type { GolfCourse, GolfHole, Tee } from '../../types';
+import { lazy, Suspense } from 'react';
+
+const AdminCourseCatalog = lazy(() => import('./AdminCourseCatalog'));
 
 const message = (error: unknown) => error && typeof error === 'object' && 'message' in error
   ? String(error.message) : 'No se han podido cargar los campos.';
 
 export function AdminCourses() {
+  const [view, setView] = useState<'catalog' | 'registered'>('catalog');
+  return <section aria-label="Campos de golf" className="space-y-4">
+    <h2 className="text-xl font-bold">Campos de golf</h2>
+    <div className="flex flex-wrap gap-2">
+      <button onClick={() => setView('catalog')} aria-pressed={view === 'catalog'} className={`border border-line rounded-xl p-3 ${view === 'catalog' ? 'bg-accent text-on-accent' : 'bg-card'}`}>Catálogo para revisar</button>
+      <button onClick={() => setView('registered')} aria-pressed={view === 'registered'} className={`border border-line rounded-xl p-3 ${view === 'registered' ? 'bg-accent text-on-accent' : 'bg-card'}`}>Campos en la aplicación</button>
+    </div>
+    {view === 'catalog' ? <Suspense fallback={<p role="status">Cargando catálogo…</p>}><AdminCourseCatalog /></Suspense> : <RegisteredCourses />}
+  </section>;
+}
+
+function RegisteredCourses() {
   const [courses, setCourses] = useState<GolfCourse[]>([]);
   const [selected, setSelected] = useState('');
   const [search, setSearch] = useState('');
