@@ -1,31 +1,48 @@
-# Dominio de Omiki Golf
+﻿# Dominios de Omiki Golf
 
-La web sigue alojada en el VPS 169.58.89.28. cdmon gestiona el dominio y DNS:
+La aplicación sigue alojada en el VPS 169.58.89.28. cdmon gestiona dominio y DNS:
 
-- `omikigolf.com`: A hacia `169.58.89.28`, TTL 900.
-- `www`: CNAME hacia `omikigolf.com`, TTL 900; nginx redirige a HTTPS sin www.
-- `golf.arinsaldev.com` permanece disponible durante la transición.
+- app.omikigolf.com: A hacia 169.58.89.28, TTL 900; dirección principal.
+- omikigolf.com: A hacia 169.58.89.28, TTL 900.
+- www: CNAME hacia omikigolf.com, TTL 900.
+- Raíz y www redirigen con HTTP 307 y Cache-Control no-store a HTTPS en app, conservando ruta y query. El navegador conserva el fragmento al no incluir uno en Location.
+- golf.arinsaldev.com permanece operativo. No se modifica correo, DNSSEC ni servidores DNS.
 
-El flujo habitual sigue siendo `npm run deploy -- --apply`, desde main validada y subida.
+Cuando exista la web pública, www dejará de redirigir. Ahora no hay una segunda web.
+Las sesiones están aisladas por origen; puede ser necesario entrar de nuevo en app.
+
+## Publicación
+
+Se mantiene `npm run deploy -- --apply`, desde main validada y subida a GitHub.
 El servidor usa `/var/www/miapp/deploy.sh`, instalado desde `scripts/vps/deploy.sh`.
-Ese script copia la configuración versionada `scripts/vps/nginx.conf` antes de construir
-la imagen. Los tres dominios están en VIRTUAL_HOST y LETSENCRYPT_HOST; el proxy y
-el servicio de certificados Docker existentes gestionan HTTPS y renovación.
-No editar la configuración generada del proxy ni reiniciar otros servicios del VPS.
+Este copia `scripts/vps/nginx.conf` antes de construir la imagen. Los cuatro dominios
+figuran en VIRTUAL_HOST y LETSENCRYPT_HOST; el proxy Docker y su servicio de
+certificados gestionan HTTPS y renovación. No editar la configuración generada del
+proxy ni reiniciar otros servicios. El check verifica app, el dominio antiguo y
+ambas redirecciones temporales.
 
-Supabase conserva los usuarios y datos existentes. Site URL y APP_ORIGIN deben ser
-`https://omikigolf.com`. APP_ALLOWED_ORIGINS contiene
-`https://golf.arinsaldev.com,https://omikigolf.com` (coincidencia exacta, sin comodines).
-Los retornos autorizados incluyen la raíz y las query strings `email-confirmed=1`,
-`auth-action=recovery`, `admin-action=setup` y `admin-action=recovery` del dominio nuevo;
-se conservan las entradas antiguas. El helper compartido requiere desplegar
-admin-auth, admin-management y express-messages cuando se modifica.
+## Supabase
 
-La copia anterior de Dockerfile, nginx.conf, deploy.sh y la configuración del contenedor
-se guarda fuera del repositorio en `/root/omiki-domain-backup-20260929`.
-Para revertir el cambio de dominio, restaurar esos archivos y el contenedor con la
-configuración anterior, Site URL y APP_ORIGIN antiguos, y retirar únicamente los dos
-registros DNS nuevos. No tocar DNSSEC, servidores DNS ni correo.
+Se conservan usuarios y datos. Site URL y APP_ORIGIN: https://app.omikigolf.com.
+APP_ALLOWED_ORIGINS: https://golf.arinsaldev.com,https://omikigolf.com.
+APP_ORIGIN también se autoriza por coincidencia exacta; sin comodines CORS.
+Los retornos permitidos añaden la raíz de app y las query strings email-confirmed=1,
+auth-action=recovery, admin-action=setup y admin-action=recovery.
+Se conservan las entradas anteriores para enlaces ya enviados. Las funciones usan
+APP_ORIGIN para nuevos enlaces administrativos; el cliente utiliza su origen actual.
 
-Verificar HTTPS en ambos dominios, redirección de www con ruta/query, login y preflight
-de las tres funciones en ambos orígenes. Los orígenes ajenos deben recibir 403.
+## Verificación y reversión
+
+Validar HTTPS, recursos, login y persistencia de sesión en app; HTTP 200 en el dominio
+antiguo; HTTP 307 del raíz y www conservando ruta, query y fragmento en navegador.
+Verificar preflight y solicitudes de las tres funciones para orígenes permitidos y
+rechazo 403 de orígenes ajenos. No enviar correos reales para pruebas automáticas.
+
+Copia previa al cambio a app: `/root/omiki-app-backup-20260929`, fuera del repositorio,
+con Dockerfile, nginx.conf, deploy.sh, inspección del contenedor y commit anterior.
+Para revertir, publicar el commit previo guardado, restaurar el script remoto y
+su configuración de contenedor, y devolver Site URL y APP_ORIGIN a
+https://omikigolf.com; APP_ALLOWED_ORIGINS mantiene los valores anteriores.
+Las entradas añadidas de retorno y DNS app se pueden conservar durante la revisión;
+no retirar registros ajenos. La copia de la primera transición sigue en
+`/root/omiki-domain-backup-20260929`.
