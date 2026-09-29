@@ -2,11 +2,20 @@ import { AdminMessages } from './AdminMessages';
 import { AdminCourses } from './AdminCourses';
 import { AdminRounds } from './AdminRounds';
 import { AdminUsers } from './AdminUsers';
+import { AdminOverview } from './AdminOverview';
+import { AdminGroups } from './AdminGroups';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { History, Loader2, Plus, RefreshCw, ShieldCheck, Users } from 'lucide-react';
+import { Loader2, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 import { adminService, type AdminAccount, type AdminAuditEntry, type AdminDirectoryEntry } from '../../services/adminService';
 import { NavigationButton } from '../NavigationButton';
 import { ThemeToggle } from '../ThemeToggle';
+
+type Tab = 'overview' | 'users' | 'groups' | 'rounds' | 'messages' | 'courses' | 'audit' | 'admins';
+const sections: { title: string; tabs: { id: Tab; label: string }[] }[] = [
+  { title: 'Análisis', tabs: [{ id: 'overview', label: 'Panel' }] },
+  { title: 'Gestión', tabs: [{ id: 'users', label: 'Jugadores' }, { id: 'groups', label: 'Grupos' }, { id: 'rounds', label: 'Partidas' }, { id: 'messages', label: 'Mensajes' }] },
+  { title: 'Sistema', tabs: [{ id: 'courses', label: 'Campos de golf' }, { id: 'audit', label: 'Actividad' }, { id: 'admins', label: 'Administradores' }] },
+];
 
 const statuses = { active: 'Activo', invited: 'Pendiente de activar', disabled: 'Desactivado' };
 const actions: Record<string, string> = {
@@ -40,7 +49,9 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
   onAccessChanged: () => Promise<void>;
   onChangePassword: () => void;
 }) {
-  const [tab, setTab] = useState<'admins' | 'audit' | 'users' | 'rounds' | 'messages' | 'courses'>('admins');
+  const [tab, setTab] = useState<Tab>('overview');
+  // Player opened from a Panel list; the menu always returns to the plain list.
+  const [focusUser, setFocusUser] = useState<string | undefined>();
   const [admins, setAdmins] = useState<AdminDirectoryEntry[]>([]);
   const [audit, setAudit] = useState<AdminAuditEntry[]>([]);
   const [hasMore, setHasMore] = useState(false);
@@ -110,36 +121,50 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
 
   return (
     <div className="min-h-screen bg-app text-ink p-4 sm:p-6">
-      <main className="max-w-5xl mx-auto">
+      <main className="max-w-6xl mx-auto">
         <header className="flex items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 min-w-0">
             <ShieldCheck className="text-accent-ink shrink-0" size={28} />
             <div className="min-w-0"><h1 className="font-bold text-xl sm:text-2xl">Administración</h1><p className="text-ink-3 truncate">{account.alias}</p></div>
           </div>
           <div className="flex gap-2 items-center">
+            <button onClick={onChangePassword} className="text-sm text-accent-ink px-3 py-3">Mi contraseña</button>
             <ThemeToggle />
             <NavigationButton destination="logout" onClick={() => void onLogout()} />
           </div>
         </header>
 
-        <div className="flex flex-wrap items-center gap-2 mb-5">
-          <button onClick={() => setTab('admins')} aria-pressed={tab === 'admins'} className={`flex gap-2 items-center rounded-xl px-4 py-3 ${tab === 'admins' ? 'bg-accent text-on-accent' : 'bg-card border border-line'}`}><Users size={18} />Administradores</button>
-          <button onClick={() => setTab('rounds')} aria-pressed={tab === 'rounds'} className="bg-card border border-line rounded-xl px-4 py-3">Partidas</button>
-          <button onClick={() => setTab('users')} aria-pressed={tab === 'users'} className="bg-card border border-line rounded-xl px-4 py-3">Usuarios</button>
-          <button onClick={() => { setTab('audit'); void refresh(); }} aria-pressed={tab === 'audit'} className={`flex gap-2 items-center rounded-xl px-4 py-3 ${tab === 'audit' ? 'bg-accent text-on-accent' : 'bg-card border border-line'}`}><History size={18} />Actividad</button>
-          <button onClick={() => setTab('messages')} aria-pressed={tab === 'messages'} className="bg-card border border-line rounded-xl px-4 py-3">Mensajes</button>
-          <button onClick={() => setTab('courses')} aria-pressed={tab === 'courses'} className={`border border-line rounded-xl px-4 py-3 ${tab === 'courses' ? 'bg-accent text-on-accent' : 'bg-card'}`}>Campos de golf</button>
-          <button onClick={onChangePassword} className="text-sm text-accent-ink px-3 py-3">Mi contraseña</button>
-          <button disabled={loading || busy} aria-label="Actualizar" title="Actualizar" onClick={() => void refresh()} className="ml-auto flex h-11 w-11 items-center justify-center bg-card border border-line rounded-full disabled:opacity-50"><RefreshCw size={18} /></button>
-        </div>
+        <div className="lg:grid lg:grid-cols-[12rem_minmax(0,1fr)] lg:gap-6 lg:items-start">
+        <nav aria-label="Secciones de administración" className="mb-5 lg:mb-0 lg:sticky lg:top-4 flex gap-1 overflow-x-auto pb-1 lg:pb-0 lg:grid lg:gap-4 lg:overflow-visible">
+          {sections.map(section => (
+            <div key={section.title} className="flex gap-1 lg:grid lg:gap-0.5">
+              <p className="hidden lg:block text-xs uppercase tracking-wider text-ink-4 px-3 mb-1">{section.title}</p>
+              {section.tabs.map(item => (
+                <button key={item.id} type="button" aria-current={tab === item.id ? 'page' : undefined}
+                  onClick={() => { setTab(item.id); setFocusUser(undefined); if (item.id === 'audit') void refresh(); }}
+                  className={`whitespace-nowrap text-left rounded-xl px-3 py-2.5 text-sm ${tab === item.id ? 'bg-accent text-on-accent font-semibold' : 'text-ink-2 hover:bg-card'}`}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </nav>
+        <div className="min-w-0">
+        {(tab === 'admins' || tab === 'audit') && (
+          <div className="flex justify-end mb-3">
+            <button disabled={loading || busy} aria-label="Actualizar" title="Actualizar" onClick={() => void refresh()} className="flex h-11 w-11 items-center justify-center bg-card border border-line rounded-full disabled:opacity-50"><RefreshCw size={18} /></button>
+          </div>
+        )}
 
         {error && <p role="alert" className="mb-4 bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl">{error}</p>}
         {message && <p role="status" className="mb-4 bg-accent-soft text-accent-ink border border-accent-ring p-4 rounded-xl">{message}</p>}
 
+        {tab === 'overview' && <AdminOverview onOpen={setTab} onOpenUser={id => { setFocusUser(id); setTab('users'); }} />}
+        {tab === 'groups' && <AdminGroups />}
         {tab === 'courses' && <AdminCourses />}
         {tab === 'messages' && <AdminMessages />}
         {tab === 'rounds' && <AdminRounds />}
-        {tab === 'users' && <AdminUsers />}
+        {tab === 'users' && <AdminUsers key={focusUser ?? 'list'} openUserId={focusUser} onExit={() => { setFocusUser(undefined); setTab('overview'); }} />}
         {tab === 'admins' && (
           <section>
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -196,6 +221,9 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
             })} className="bg-card border border-line rounded-xl px-4 py-3">Ver más actividad</button>}
           </section>
         )}
+
+        </div>
+        </div>
 
         {showInvite && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { adminService, type ManagedUser } from "../../services/adminService";
+import {
+  adminService,
+  type ManagedUser,
+  type ManagedUserRow,
+  type UserInsights,
+} from "../../services/adminService";
+import { BarList, Panel, Stat, WeekStrip } from "./AdminCharts";
+import { modeLabels, shortDate, sinceLabel } from "./adminFormat";
 import {
   AVATAR_OPTIONS,
   DEFAULT_AVATAR_URL,
@@ -13,12 +20,16 @@ const errorText = (e: unknown) =>
     : "No se pudo completar la operación.";
 const showDate = (v: string) => new Date(v).toLocaleString("es-ES");
 
-export function AdminUsers() {
+/** `openUserId` opens that player's record directly; going back then calls `onExit`. */
+export function AdminUsers({
+  openUserId,
+  onExit,
+}: { openUserId?: string; onExit?: () => void } = {}) {
   const [search, setSearch] = useState(""),
     [plan, setPlan] = useState(""),
     [blocked, setBlocked] = useState(""),
     [page, setPage] = useState(0);
-  const [users, setUsers] = useState<ManagedUser[]>([]),
+  const [users, setUsers] = useState<ManagedUserRow[]>([]),
     [total, setTotal] = useState(0),
     [selected, setSelected] = useState<ManagedUser | null>(null);
   const [loading, setLoading] = useState(false),
@@ -69,12 +80,16 @@ export function AdminUsers() {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    if (openUserId) void open(openUserId);
+  }, [openUserId]);
   if (selected)
     return (
       <UserDetail
         key={selected.user_id}
         initial={selected}
         onBack={() => {
+          if (openUserId && onExit) return onExit();
           setSelected(null);
           setRevision((v) => v + 1);
         }}
@@ -82,7 +97,7 @@ export function AdminUsers() {
     );
   return (
     <section className="space-y-4">
-      <h2 className="font-bold text-xl">Usuarios</h2>
+      <h2 className="font-bold text-xl">Jugadores</h2>
       <div className="grid sm:grid-cols-3 gap-3">
         <label>
           Buscar
@@ -156,6 +171,16 @@ export function AdminUsers() {
             <span className="block break-all">{u.email}</span>
             <span className="text-sm text-ink-3">
               {u.display_name} {u.read_only ? "· Solo lectura" : ""}
+            </span>
+            <span className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-2 tabular-nums">
+              <span>
+                <b>{u.rounds_played}</b> partidas
+              </span>
+              <span>Última partida: {sinceLabel(u.last_round_at)}</span>
+              <span>
+                <b>{u.groups_count}</b> grupos
+              </span>
+              <span>Último inicio de sesión: {sinceLabel(u.last_sign_in_at)}</span>
             </span>
           </button>
         ))
@@ -314,6 +339,7 @@ function UserDetail({
           </>
         )}
       </dl>
+      <UserUsage userId={user.user_id} />
       <div className="flex flex-wrap gap-3">
         <button
           disabled={busy || !!action || !user.profile}
@@ -545,6 +571,135 @@ function UserDetail({
           </div>
         </form>
       )}
+    </section>
+  );
+}
+function UserUsage({ userId }: { userId: string }) {
+  const [data, setData] = useState<UserInsights | null>(null),
+    [error, setError] = useState("");
+  useEffect(() => {
+    let current = true;
+    setData(null);
+    setError("");
+    adminService
+      .userInsights(userId)
+      .then((d) => current && setData(d))
+      .catch((e) => current && setError(errorText(e)));
+    return () => {
+      current = false;
+    };
+  }, [userId]);
+  if (error)
+    return (
+      <p role="alert" className="text-red-600">
+        {error}
+      </p>
+    );
+  if (!data) return <p role="status">Cargando uso…</p>;
+  const { rounds, invitations_sent: sent } = data;
+  const months = rounds.first_at
+    ? Math.max(1, (Date.now() - new Date(rounds.first_at).getTime()) / 2629800000)
+    : 0;
+  return (
+    <section className="space-y-3">
+      <h3 className="font-bold text-lg">Uso</h3>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stat
+          label="Partidas jugadas"
+          value={rounds.played}
+          detail={`${rounds.group} de grupo · ${rounds.quick} rápidas`}
+        />
+        <Stat
+          label="Partidas al mes"
+          value={
+            months
+              ? (rounds.played / months).toLocaleString("es-ES", {
+                  maximumFractionDigits: 1,
+                })
+              : "—"
+          }
+          detail={`${rounds.last_90} en los últimos 90 días`}
+        />
+        <Stat
+          label="Última partida"
+          value={sinceLabel(rounds.last_at)}
+          detail={shortDate(rounds.last_at)}
+        />
+        <Stat
+          label="Último inicio de sesión"
+          value={sinceLabel(data.last_sign_in_at)}
+          detail="La app mantiene la sesión abierta"
+        />
+      </div>
+      <Panel title="Actividad" note="partidas por semana, últimas 26 semanas">
+        <WeekStrip weeks={data.weekly} />
+      </Panel>
+      <div className="grid md:grid-cols-2 gap-3">
+        <Panel title="Campos y recorridos">
+          <BarList
+            empty="Sin partidas vinculadas a su cuenta."
+            rows={data.courses.map((c) => ({
+              label: [c.course, c.tee, c.holes].filter(Boolean).join(" · "),
+              value: c.count,
+            }))}
+          />
+        </Panel>
+        <Panel title="Modalidades">
+          <BarList
+            empty="Sin partidas vinculadas a su cuenta."
+            rows={data.modes.map((m) => ({
+              label: modeLabels[m.mode] ?? m.mode,
+              value: m.count,
+            }))}
+          />
+        </Panel>
+        <Panel
+          title="Grupos"
+          note={`${data.groups_created} creados · ${data.groups.length} en total`}
+        >
+          {data.groups.length ? (
+            <ul className="grid gap-2 text-sm">
+              {data.groups.map((g) => (
+                <li
+                  key={g.id}
+                  className="flex items-baseline justify-between gap-3"
+                >
+                  <span className="min-w-0 truncate">
+                    {g.name || g.group_code}
+                    {g.owner ? (
+                      <span className="ml-2 text-xs text-accent-ink font-semibold">
+                        Creador
+                      </span>
+                    ) : g.role === "admin" ? (
+                      <span className="ml-2 text-xs text-accent-ink font-semibold">
+                        Administra
+                      </span>
+                    ) : null}
+                    <span className="block text-xs text-ink-3">
+                      {g.members} miembros · última partida suya:{" "}
+                      {sinceLabel(g.last_round_at).toLowerCase()}
+                    </span>
+                  </span>
+                  <span className="tabular-nums font-semibold">{g.rounds}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-3">No pertenece a ningún grupo.</p>
+          )}
+        </Panel>
+        <Panel title="Invitaciones a grupos enviadas">
+          <p className="text-sm tabular-nums">
+            <b>{sent.total}</b> enviadas · {sent.accepted} aceptadas ·{" "}
+            {sent.pending} pendientes
+          </p>
+        </Panel>
+      </div>
+      <p className="text-xs text-ink-3">
+        Solo se cuentan las partidas en las que figura con su cuenta. Las
+        partidas no guardan quién las creó, así que aún no se pueden mostrar
+        las partidas creadas.
+      </p>
     </section>
   );
 }

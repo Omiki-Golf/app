@@ -52,7 +52,70 @@ export interface ManagedRound extends Omit<GolfRound, 'status'> {
  completed_at?: string | null; course_name?: string; players_count?: number; group_name?: string; group_code?: string;
 }
 export interface ManagedRoundDetail {round: ManagedRound; course_name: string; players: RoundPlayer[]; scores: RoundScore[];}
+export interface ManagedUserRow extends ManagedUser {
+ last_sign_in_at: string | null; rounds_played: number; last_round_at: string | null; groups_count: number;
+}
+export type MetricsPeriod = 7 | 30 | 90 | 365;
+export interface CountBy {count: number}
+export interface MetricsOverview {
+ days: MetricsPeriod;
+ users: {total: number; new: number; with_round: number; signed_in: number; plans: Record<PlanType, number>};
+ rounds: {played: number; quick: number; group: number; nine_holes: number; in_progress: number};
+ weekly: {week: string; quick: number; group: number}[];
+ modes: (CountBy & {mode: string})[];
+ courses: (CountBy & {course: string})[];
+ frequency: {weekly: number; few_per_month: number; monthly: number; occasional: number};
+ groups: {total: number; new: number; active: number; avg_members: number | null};
+ invitations: {sent: number; accepted: number; pending_stale: number};
+ attention: {inactive_60: number; never_played: number; expiring_7: number};
+}
+export interface UserInsights {
+ last_sign_in_at: string | null;
+ rounds: {played: number; quick: number; group: number; last_90: number; first_at: string | null; last_at: string | null};
+ weekly: {week: string; count: number}[];
+ courses: (CountBy & {course: string; tee: string | null; holes: string})[];
+ modes: (CountBy & {mode: string})[];
+ groups_created: number;
+ groups: {id: string; name: string | null; group_code: string; role: string | null; joined_at: string | null; owner: boolean; members: number; rounds: number; last_round_at: string | null}[];
+ invitations_sent: {total: number; accepted: number; pending: number};
+}
+export interface ManagedGroup {
+ id: string; name: string | null; group_code: string; created_at: string | null; max_players: number | null; premium_branding: boolean;
+ owner_nick: string | null; members: number; guests: number; rounds: number; rounds_30: number; last_round_at: string | null;
+}
+export interface ManagedGroupDetail {
+ group: {id: string; name: string | null; group_code: string; created_at: string | null; max_players: number | null; premium_branding: boolean; weekend_mode_until: string | null; owner_id: string | null; owner_nick: string | null};
+ members: {user_id: string; nick: string | null; display_name: string | null; role: string; joined_at: string | null; rounds: number}[];
+ guests: number;
+ rounds: {played: number; last_30: number; last_at: string | null};
+ modes: (CountBy & {mode: string})[];
+ courses: (CountBy & {course: string})[];
+ invitations: {pending: number; accepted: number; rejected: number};
+ purchases: {product_type: string; status: string; amount_paid: number; created_at: string; active_until: string | null}[];
+}
+export type AttentionSegment = 'inactive_60' | 'never_played' | 'expiring_7' | 'stale_invitations';
+export interface SegmentRow {
+ user_id: string; nick: string | null; email: string | null;
+ display_name?: string | null; plan?: PlanType; created_at: string; last_sign_in_at?: string | null;
+ last_round_at?: string | null; current_period_end?: string | null;
+ group_id?: string; group_name?: string | null; group_code?: string; invited_by_nick?: string | null;
+}
 export const adminService = {
+ async segment(segment: AttentionSegment): Promise<{total: number; rows: SegmentRow[]}> {
+  const {data,error}=await supabase.rpc('admin_metric_segment',{p_segment:segment}); if(error) throw error; return data;
+ },
+ async overview(days: MetricsPeriod): Promise<MetricsOverview> {
+  const {data,error}=await supabase.rpc('admin_metrics_overview',{p_days:days}); if(error) throw error; return data;
+ },
+ async userInsights(id: string): Promise<UserInsights> {
+  const {data,error}=await supabase.rpc('admin_user_insights',{p_user_id:id}); if(error) throw error; return data;
+ },
+ async groups(search = '', page = 0): Promise<{groups: ManagedGroup[]; total: number}> {
+  const {data,error}=await supabase.rpc('admin_list_groups',{p_search:search,p_page:page}); if(error) throw error; return data;
+ },
+ async group(id: string): Promise<ManagedGroupDetail> {
+  const {data,error}=await supabase.rpc('admin_get_group',{p_group_id:id}); if(error) throw error; return data;
+ },
  async rounds(search = '', status = '', kind = '', page = 0, mode = '', group = ''): Promise<{rounds: ManagedRound[]; total: number}> {
   const {data,error}=await supabase.rpc('admin_list_app_rounds_v2',{p_search:search,p_status:status,p_kind:kind,p_page:page,p_mode:mode,p_group:group}); if(error) throw error; return data;
  },
@@ -62,7 +125,7 @@ export const adminService = {
  async changeRound(round: ManagedRound, action: string, reason: string): Promise<ManagedRoundDetail> {
   const {data,error}=await supabase.rpc('admin_change_app_round',{p_round_id:round.id,p_action:action,p_reason:reason,p_expected:round.updated_at}); if(error) throw error; return data;
  },
- async users(search = '', plan = '', blocked: boolean | null = null, page = 0): Promise<{users: ManagedUser[]; total: number}> {
+ async users(search = '', plan = '', blocked: boolean | null = null, page = 0): Promise<{users: ManagedUserRow[]; total: number}> {
   const {data,error}=await supabase.rpc('admin_list_app_users',{p_search:search,p_plan:plan,p_blocked:blocked,p_page:page});
   if(error) throw error; return data;
  },
