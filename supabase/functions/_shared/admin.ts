@@ -73,16 +73,19 @@ export async function requireAdministrator(req: Request, api: ReturnType<typeof 
 export function serve(handler: (req: Request, api: ReturnType<typeof clients>) => Promise<unknown>) {
   Deno.serve(async req => {
     const origin = Deno.env.get('APP_ORIGIN') || '';
-    const headers = {
-      'Access-Control-Allow-Origin': origin,
+    const allowedOrigins = new Set([origin, ...(Deno.env.get('APP_ALLOWED_ORIGINS') || '').split(',')].map(value => value.trim()).filter(Boolean));
+    const requestOrigin = req.headers.get('Origin');
+    const permitted = !requestOrigin || allowedOrigins.has(requestOrigin);
+    const headers: Record<string, string> = {
       'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Cache-Control': 'no-store',
       'Content-Type': 'application/json',
       'Vary': 'Origin',
     };
+    if (requestOrigin && permitted) headers['Access-Control-Allow-Origin'] = requestOrigin;
     try {
-      if (req.headers.get('Origin') && req.headers.get('Origin') !== origin) throw new HttpError(403, 'Origen no permitido.');
+      if (!permitted) throw new HttpError(403, 'Origen no permitido.');
       if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers });
       const result = await handler(req, clients());
       return new Response(JSON.stringify(result), { headers });
