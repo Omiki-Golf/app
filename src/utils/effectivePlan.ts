@@ -15,7 +15,7 @@ export function effectivePlan(
   )
     return "express";
   return subscription.plan_type === "player" ||
-    subscription.plan_type === "team"
+    subscription.plan_type === "team" || subscription.plan_type === "premium"
     ? subscription.plan_type
     : "express";
 }

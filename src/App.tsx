@@ -1,3 +1,4 @@
+import { supabase } from './services/supabaseClient';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { useReadOnly } from './context/ReadOnlyContext';
 import React, { useState, useEffect } from 'react';
@@ -25,6 +26,8 @@ import MyGroups from './components/MyGroups';
 import { PremiumModal } from './components/PremiumModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
+import { PlayerCheckout } from './components/PlayerCheckout';
+import { playerIntent, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
 import { RegistrationForm } from './components/RegistrationForm';
 import { HomeScreen } from './components/HomeScreen';
 import { ProfileScreen } from './components/ProfileScreen';
@@ -38,7 +41,7 @@ import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
 
-type ViewType = 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'notifications' | 'pro-shop';
+type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'notifications' | 'pro-shop';
 
 interface RoundState {
   round: GolfRound | null;
@@ -68,6 +71,8 @@ function App() {
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
+  const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
     () => new URLSearchParams(window.location.search).get('email-confirmed') === '1'
@@ -100,10 +105,17 @@ function App() {
   const [simulatorUpdating, setSimulatorUpdating] = useState(false);
   const [returnToProfile, setReturnToProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
-  // The database subscription is the single source of truth. The simulator
-  // persists changes in user_subscriptions, so a local plan override can only
-  // leak stale state when switching accounts.
+  // Paid access comes from the server-confirmed database subscription.
   const activePlanType = planType;
+
+  const pendingPlayer = playerIntent(user?.user_metadata || {});
+  const pendingPlayerId = pendingPlayer && user?.user_metadata.player_checkout_acknowledged !== pendingPlayer.id ? pendingPlayer.id : null;
+  useEffect(() => {
+    if (user && pendingPlayerId) {
+      setEmailConfirmed(false);
+      setCurrentView('player-checkout');
+    }
+  }, [user?.id, pendingPlayerId]);
 
   useEffect(() => {
     // Simulator state belongs to a single authenticated user. Keeping it when
@@ -114,7 +126,7 @@ function App() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (currentView === 'my-groups' && !subscriptionLoading && activePlanType !== 'team' && !readOnly) {
+    if (currentView === 'my-groups' && !subscriptionLoading && activePlanType !== 'team' && activePlanType !== 'premium' && !readOnly) {
       setReturnToProfile(false);
       setCurrentView('main');
     }
@@ -172,8 +184,7 @@ function App() {
     setSimulatorUpdating(true);
     setSimulatedPlan(nextPlan);
     try {
-      await userService.setPlanType(user.id, nextPlan, 'simulator');
-      await refreshSubscription();
+      // The simulator only previews labels; paid access is confirmed by Stripe.
     } catch (error) {
       console.error('Error actualizando el plan del simulador:', error);
     } finally {
@@ -810,6 +821,10 @@ function App() {
     </>
   );
 
+  if (currentView === 'player-checkout' && user) {
+    return <PlayerCheckout key={user.id} userId={user.id} onBack={() => setCurrentView('main')} onDone={async () => { await refreshSubscription(); setCurrentGroup(null); setCurrentView('main'); }} />;
+  }
+
   if (emailConfirmed) {
     return (
       <EmailConfirmedScreen
@@ -826,7 +841,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <PlansComparison backDestination={returnToProfile ? 'back' : 'home'}
             onBack={() => backFromProfileSection('main')}
@@ -836,6 +850,12 @@ function App() {
               } else {
                 setCurrentView('registration');
               }
+            }}
+            onRegisterPlan={(plan, period) => {
+              setRegistrationPlan(plan);
+              setRegistrationPeriod(period);
+              if (user) setCurrentView(pendingPlayer ? 'player-checkout' : 'profile');
+              else setCurrentView('registration');
             }}
             onShowAuth={() => openAuth('plans')}
           />
@@ -851,18 +871,12 @@ function App() {
         <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <RegistrationForm
-            planType={activePlanType === 'express' ? 'player' : activePlanType}
+            period={registrationPeriod}
+            plan={registrationPlan}
+            onLogin={() => openAuth('plans')}
             onBack={() => setCurrentView('plans')}
-            onConfirmationAccepted={() => setCurrentView('main')}
-            onRegistered={() => {
-              refreshSubscription();
-              if (user?.id) {
-                setPaymentAmount(299);
-                setPaymentDescription('Suscripcion Player');
-                setShowPayment(true);
-              }
-              setCurrentView('main');
-            }}
+            onConfirmationAccepted={() => openAuth('plans')}
+            onRegistered={() => { setEmailConfirmed(false); setCurrentView('player-checkout'); }}
           />
         </div>
       </>
@@ -1006,11 +1020,13 @@ function App() {
         <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <Auth backDestination={authReturnView === 'main' ? 'home' : 'back'}
-            onAuthSuccess={() => {
+            onShowPlans={() => { setReturnToProfile(false); setCurrentView('plans'); }}
+            onAuthSuccess={async () => {
               setSimulatorEnabled(false);
               setSimulatedPlan(null);
               setAuthReturnView('main');
-              setCurrentView('main');
+              const { data: { user: signedIn } } = await supabase.auth.getUser();
+              setCurrentView(playerIntent(signedIn?.user_metadata || {}) && signedIn?.user_metadata.player_checkout_acknowledged !== playerIntent(signedIn?.user_metadata || {})?.id ? 'player-checkout' : 'main');
             }}
             onBack={() => {
               setCurrentView(authReturnView);
@@ -1054,7 +1070,6 @@ function App() {
           <HomeScreen
             planType={activePlanType}
             isAuthenticated={!!user}
-            userEmail={user?.email}
             profile={profile}
             pendingInvitations={pendingInvitations}
             onQuickPlay={() => setCurrentView('setup')}
@@ -1064,10 +1079,9 @@ function App() {
               setAccessCodeError('');
             }}
             onCreateTeam={() => setCurrentView('team-creation')}
-            onShowPlans={() => setCurrentView('plans')}
             onShowProfile={() => setCurrentView('profile')}
             onShowNotifications={() => setCurrentView('notifications')}
-            onShowAuth={() => openAuth('main')}
+            onShowAuth={() => { setReturnToProfile(false); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}
             simulatorEnabled={simulatorEnabled}
             simulatorUpdating={simulatorUpdating}

@@ -1,196 +1,94 @@
-import { NavigationButton } from './NavigationButton';
 import React, { useState } from 'react';
-import { Zap, User, Users, Check, X, Info, LogIn } from 'lucide-react';
+import { Check, Circle, Crown, Gem, LogIn, User, Users, X, Zap } from 'lucide-react';
 import { PlanType } from '../types';
+import { annualPlanPrice, planCatalog, DisplayPlan } from '../data/planCatalog';
+import { type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
+import { ThemeToggle } from './ThemeToggle';
 
 interface PlansComparisonProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   onSelectPlan: (plan: PlanType) => void;
   onShowAuth?: () => void;
+  onRegisterPlan?: (plan: PaidPlan, period: BillingPeriod) => void;
 }
 
-interface PlanFeature {
-  label: string;
-  express: boolean | string;
-  player: boolean | string;
-  team: boolean | string;
-}
+const styles = {
+  express: { ink: 'text-sky-700 dark:text-sky-400', border: 'border-sky-500', button: 'bg-sky-500 hover:bg-sky-400 text-slate-950', icon: Zap },
+  player: { ink: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500', button: 'bg-emerald-400 hover:bg-emerald-300 text-slate-950', icon: User },
+  team: { ink: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500', button: 'bg-amber-400 hover:bg-amber-300 text-slate-950', icon: Users },
+  premium: { ink: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500', button: 'bg-purple-600 hover:bg-purple-500 text-white', icon: Gem },
+};
+const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 
-const features: PlanFeature[] = [
-  { label: 'Partidas Express', express: '4 gratis', player: 'Ilimitadas', team: 'Ilimitadas' },
-  { label: 'Stableford', express: true, player: true, team: true },
-  { label: 'Modalidad Medal', express: false, player: true, team: true },
-  { label: 'Modalidad Match', express: false, player: true, team: true },
-  { label: 'Modalidad Sindicato', express: false, player: true, team: true },
-  { label: 'Estadisticas en la nube', express: false, player: true, team: true },
-  { label: 'Historial de partidas', express: false, player: true, team: true },
-  { label: 'Crear Teams (grupos)', express: false, player: false, team: true },
-  { label: 'Invitar jugadores por Nick', express: false, player: false, team: true },
-  { label: 'Ligas y clasificaciones de grupo', express: false, player: false, team: true },
-  { label: 'Hoyo 19 (gamificacion)', express: false, player: false, team: true },
-  { label: 'Pro-Shop (ampliaciones)', express: false, player: false, team: true },
-];
-
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, backDestination = 'back', onSelectPlan, onShowAuth }) => {
-  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
-
-  const renderValue = (value: boolean | string) => {
-    if (value === true) return <Check className="w-5 h-5 text-accent-ink mx-auto" />;
-    if (value === false) return <X className="w-5 h-5 text-ink-4 mx-auto" />;
-    return <span className="text-sm font-semibold text-ink-2">{value}</span>;
-  };
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth, onRegisterPlan }) => {
+  const [selected, setSelected] = useState<DisplayPlan>('express');
+  const [annual, setAnnual] = useState(true);
+  const [comingSoon, setComingSoon] = useState(false);
+  const [confirmPlayer, setConfirmPlayer] = useState(false);
+  const plan = planCatalog.find(item => item.id === selected)!;
+  const style = styles[selected];
 
   return (
-    <div className="min-h-screen bg-app transition-colors">
-      <div className="max-w-5xl mx-auto px-4 py-6">
-        <NavigationButton destination={backDestination}
-          onClick={onBack}
-          className="flex items-center gap-2 text-ink-3 hover:text-ink transition-colors mb-6"
-        />
-
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-ink mb-2">Lleva tu golf al siguiente nivel</h1>
-          <p className="text-ink-3">Elige el plan que mejor se adapta a tu juego</p>
+    <main className="min-h-screen bg-app px-4 py-5 sm:py-8">
+      <div className="mx-auto max-w-md rounded-[2rem] border border-line bg-card p-5 shadow-card sm:p-6">
+        <div className="mb-2 flex items-center justify-between">
+          <ThemeToggle />
+          <button type="button" onClick={onBack} aria-label="Cerrar planes" className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-3 hover:bg-card-2"><X size={20} /></button>
         </div>
-
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          {/* Express */}
-          <div className="bg-card rounded-2xl shadow-card p-6 flex flex-col border-2 border-line hover:border-line-2 transition-all">
-            <div className="w-12 h-12 bg-card-2 rounded-full flex items-center justify-center mb-4">
-              <Zap className="w-6 h-6 text-ink-3" />
-            </div>
-            <h2 className="text-xl font-bold text-ink">Express</h2>
-            <p className="text-3xl font-bold text-ink mt-2">Gratis</p>
-            <p className="text-sm text-ink-3 mb-4">Para probar la app</p>
-            <ul className="space-y-2 text-sm text-ink-3 mb-6 flex-1">
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> 4 partidas gratis</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Modalidad Stableford</li>
-              <li className="flex items-center gap-2"><X size={16} className="text-ink-4" /> Sin estadisticas en la nube</li>
-            </ul>
-            <button
-              onClick={() => onSelectPlan('express')}
-              className="w-full bg-card-2 hover:bg-neutral-hover text-ink-2 font-semibold py-3 rounded-xl transition-colors"
-            >
-              Empezar gratis
+        <header className="text-center">
+          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent-ink">Mejora tu juego</span>
+          <h1 className="mt-3 text-2xl font-bold leading-tight text-ink">Lleva tu golf al siguiente nivel</h1>
+          <p className="mt-2 text-xs leading-relaxed text-ink-3">Guarda tus partidas de por vida, analiza tus estadísticas avanzadas y únete a ligas permanentes.</p>
+        </header>
+        <div className="mx-auto mb-5 mt-6 flex max-w-xs rounded-full border border-line bg-card-2 p-1" role="group" aria-label="Periodicidad del plan">
+          {[false, true].map(value => (
+            <button key={String(value)} type="button" aria-pressed={annual === value} onClick={() => { setAnnual(value); setComingSoon(false); }} className={`flex-1 rounded-full px-3 py-2 text-sm font-semibold transition-colors ${annual === value ? 'bg-accent text-on-accent' : 'text-ink-3 hover:text-ink'}`}>
+              {value ? 'Anual' : 'Mensual'}
             </button>
-          </div>
-
-          {/* Player */}
-          <div className="bg-card rounded-2xl shadow-card p-6 flex flex-col border-2 border-accent-ring transition-all">
-            <div className="w-12 h-12 bg-accent-soft rounded-full flex items-center justify-center mb-4">
-              <User className="w-6 h-6 text-accent-ink" />
-            </div>
-            <h2 className="text-xl font-bold text-ink">Player</h2>
-            <p className="text-3xl font-bold text-ink mt-2">2,99&euro;<span className="text-base font-normal text-ink-3">/mes</span></p>
-            <p className="text-sm text-ink-3 mb-4">Para jugadores habituales</p>
-            <ul className="space-y-2 text-sm text-ink-3 mb-6 flex-1">
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Partidas ilimitadas</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Todas las modalidades</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Estadisticas en la nube</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Historial completo</li>
-            </ul>
-            <button
-              onClick={() => setSelectedPlan('player')}
-              className="w-full bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors"
-            >
-               Registrarse
-            </button>
-          </div>
-
-          {/* Team */}
-          <div className="bg-card rounded-2xl shadow-card p-6 flex flex-col border-2 border-amber-400 relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-              RECOMENDADO
-            </div>
-            <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-              <Users className="w-6 h-6 text-amber-600" />
-            </div>
-            <h2 className="text-xl font-bold text-ink">Team</h2>
-            <p className="text-3xl font-bold text-ink mt-2">5,99&euro;<span className="text-base font-normal text-ink-3">/mes</span></p>
-            <p className="text-sm text-ink-3 mb-4">Para grupos y clubes</p>
-            <ul className="space-y-2 text-sm text-ink-3 mb-6 flex-1">
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Todo lo de Player</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Crear Teams</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Invitar por Nick</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Hoyo 19</li>
-              <li className="flex items-center gap-2"><Check size={16} className="text-accent-ink" /> Pro-Shop</li>
-            </ul>
-            <button
-              onClick={() => setSelectedPlan('team')}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-colors"
-            >
-              Registrarse
-            </button>
-          </div>
+          ))}
         </div>
-
-        {/* Feature comparison table */}
-        <div className="bg-card rounded-2xl shadow-card overflow-hidden hidden md:block">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-card-2 border-b border-line">
-                <th className="text-left px-6 py-4 text-sm font-semibold text-ink-2">Caracteristica</th>
-                <th className="px-6 py-4 text-sm font-semibold text-ink-2">Express</th>
-                <th className="px-6 py-4 text-sm font-semibold text-accent-ink">Player</th>
-                <th className="px-6 py-4 text-sm font-semibold text-amber-700">Team</th>
-              </tr>
-            </thead>
-            <tbody>
-              {features.map((f, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-card' : 'bg-card-2'}>
-                  <td className="px-6 py-3 text-sm text-ink-2">{f.label}</td>
-                  <td className="px-6 py-3 text-center">{renderValue(f.express)}</td>
-                  <td className="px-6 py-3 text-center">{renderValue(f.player)}</td>
-                  <td className="px-6 py-3 text-center">{renderValue(f.team)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {selectedPlan && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-card rounded-2xl max-w-md w-full p-6 shadow-card">
-              <div className="flex items-start gap-3 mb-4">
-                <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-                <div>
-                  <h3 className="font-bold text-ink">Has elegido el plan {selectedPlan === 'player' ? 'Player' : 'Team'}</h3>
-                  <p className="text-sm text-ink-3 mt-1">Vamos a crear tu cuenta. Necesitamos algunos datos para configurar tu perfil.</p>
+        <div className="space-y-2">
+          {planCatalog.map(item => {
+            const current = styles[item.id];
+            const Icon = current.icon;
+            const active = selected === item.id;
+            return (
+              <button key={item.id} id={`plan-${item.id}`} type="button" aria-expanded={active} aria-controls="plan-details" onClick={() => { setSelected(item.id); setComingSoon(false); }} className={`w-full rounded-2xl border bg-card-2 p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current ${active ? current.border : 'border-line hover:border-line-2'}`}>
+                <div className="flex items-center gap-2">
+                  <Icon size={20} className={`shrink-0 ${current.ink}`} />
+                  <div className="min-w-0 flex-1">
+                    <h2 className={`text-xs font-bold uppercase ${current.ink}`}>Omiki {item.name}</h2>
+                    <p className="text-[11px] text-ink-3">{item.subtitle}</p>
+                  </div>
+                  {active ? <Check size={18} className={current.ink} /> : <Circle size={16} className="text-ink-4" />}
                 </div>
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setSelectedPlan(null)}
-                  className="flex-1 bg-card-2 hover:bg-neutral-hover text-ink-2 font-semibold py-2.5 rounded-xl transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => onSelectPlan(selectedPlan)}
-                  className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-2.5 rounded-xl transition-colors"
-                >
-                  Continuar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Login link for existing users */}
-        {onShowAuth && (
-          <div className="text-center mt-6 pb-6">
-            <p className="text-sm text-ink-3 mb-2">¿Ya tienes cuenta?</p>
-            <button
-              onClick={onShowAuth}
-              className="inline-flex items-center gap-2 text-accent-ink font-semibold hover:underline transition-colors"
-            >
-              <LogIn size={16} />
-              Iniciar sesión
-            </button>
-          </div>
-        )}
+                <p className="mt-2 font-bold text-ink">{item.monthly === 0 ? '0 €' : money.format(annual ? annualPlanPrice(item.monthly) : item.monthly)}<span className="ml-1 text-xs font-normal text-ink-3">{item.monthly === 0 ? 'Sin registro' : annual ? '/año' : '/mes'}</span></p>
+              </button>
+            );
+          })}
+        </div>
+        {annual && <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-3">Ahorra aproximadamente un 20 % frente al pago mensual.</p>}
+        <section id="plan-details" role="region" aria-labelledby={`plan-${selected}`} className="mt-4 rounded-2xl border border-line bg-card-2 p-4">
+          <h3 className={`flex items-center gap-2 text-xs font-bold uppercase ${style.ink}`}><Crown size={15} className="shrink-0" />{plan.heading}</h3>
+          <ul className="mt-3 space-y-2.5">
+            {plan.features.map(feature => <li key={feature} className="flex items-start gap-2 text-xs leading-relaxed text-ink-2"><Check size={15} className={`mt-0.5 shrink-0 ${style.ink}`} /><span>{feature}</span></li>)}
+          </ul>
+        </section>
+        <button type="button" onClick={() => selected === 'express' ? onSelectPlan('express') : onRegisterPlan ? setConfirmPlayer(true) : setComingSoon(true)} className={`mt-4 w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors ${style.button}`}>{plan.action}</button>
+        {comingSoon && <p role="status" className="mt-3 rounded-xl bg-accent-soft p-3 text-center text-sm font-semibold text-accent-ink">Próximamente</p>}
+        {onShowAuth && <button type="button" onClick={onShowAuth} className="mt-6 flex w-full items-center justify-center gap-2 border-t border-line pt-5 text-sm text-ink-2 hover:text-accent-ink"><LogIn size={18} className="shrink-0" /><span>¿Ya estás registrado? <span className="font-semibold underline">Inicia sesión</span></span></button>}
       </div>
-    </div>
+      {confirmPlayer && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="player-choice-title" onKeyDown={event => { if (event.key === 'Escape') setConfirmPlayer(false); }}>
+        <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 shadow-card">
+          <h2 id="player-choice-title" className="font-bold text-ink">Has elegido el plan {plan.name}</h2>
+          <p className="mt-2 text-sm text-ink-3">Vamos a crear tu cuenta. Necesitamos algunos datos para configurar tu perfil.</p>
+          <div className="mt-5 flex gap-3">
+            <button autoFocus type="button" onClick={() => setConfirmPlayer(false)} className="flex-1 rounded-xl bg-card-2 px-4 py-3 font-semibold text-ink">Cancelar</button>
+            <button type="button" onClick={() => { setConfirmPlayer(false); if (selected !== 'express') onRegisterPlan?.(selected, annual ? 'annual' : 'monthly'); }} className="flex-1 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent">Continuar</button>
+          </div>
+        </div>
+      </div>}
+    </main>
   );
 };

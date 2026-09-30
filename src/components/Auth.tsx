@@ -11,6 +11,7 @@ import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
 
 interface AuthProps {
   onAuthSuccess: (userId: string) => void | Promise<void>;
+  onShowPlans?: () => void;
   recoveryRequested?: boolean;
   onRecoveryComplete?: () => void;
   onBack: () => void;
@@ -19,7 +20,7 @@ interface AuthProps {
 
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
-export default function Auth({ onAuthSuccess, recoveryRequested = false, onRecoveryComplete, onBack, backDestination = 'back' }: AuthProps) {
+export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = false, onRecoveryComplete, onBack, backDestination = 'back' }: AuthProps) {
   const [mode, setMode] = useState<AuthMode>(recoveryRequested ? 'reset-password' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -340,6 +341,12 @@ export default function Auth({ onAuthSuccess, recoveryRequested = false, onRecov
               </div>
             </div>
           </form>
+          {onShowPlans && (
+            <button type="button" onClick={onShowPlans}
+              className="mt-6 w-full rounded-xl border border-line bg-card-2 px-6 py-3 font-semibold text-ink-2 transition-colors hover:bg-neutral-hover">
+              Ver planes
+            </button>
+          )}
         </div>
       </div>
     );

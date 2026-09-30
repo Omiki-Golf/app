@@ -108,7 +108,7 @@ export function AdminUsers() {
             }}
           >
             <option value="">Todos</option>
-            {["express", "player", "team"].map((p) => (
+            {["express", "player", "team", "premium"].map((p) => (
               <option key={p}>{p}</option>
             ))}
           </select>
@@ -463,7 +463,7 @@ function UserDetail({
                     value={plan}
                     onChange={(e) => setPlan(e.target.value as typeof plan)}
                   >
-                    {["express", "player", "team"].map((p) => (
+                    {["express", "player", "team", "premium"].map((p) => (
                       <option key={p}>{p}</option>
                     ))}
                   </select>

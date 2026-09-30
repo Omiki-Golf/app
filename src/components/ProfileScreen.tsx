@@ -1,4 +1,5 @@
 import { NavigationButton } from './NavigationButton';
+import { ThemeToggle } from './ThemeToggle';
 import React, { useState } from 'react';
 import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
@@ -28,7 +29,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onShowGroups,
   onShowSettings,
 }) => {
-  const isTeam = planType === 'team';
+  const isTeam = (planType === 'team' || planType === 'premium');
   const isPlayer = planType === 'player';
 
   const menuItems = [
@@ -57,16 +58,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <div className="bg-card rounded-2xl shadow-card p-6 mb-5">
           <div className="flex items-center gap-4">
             {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="avatar" className="w-16 h-16 rounded-full border-2 border-accent-ring" />
+              <img src={profile.avatar_url} alt="avatar" className="w-16 h-16 shrink-0 rounded-full border-2 border-accent-ring" />
             ) : (
-              <div className="w-16 h-16 bg-accent-soft rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 shrink-0 bg-accent-soft rounded-full flex items-center justify-center">
                 <Settings className="text-accent-ink" size={24} />
               </div>
             )}
-            <div className="flex-1">
-              <h2 className="text-xl font-bold text-ink">{profile?.nick || 'Jugador'}</h2>
-              <p className="text-sm text-ink-3">{profile?.display_name || ''}</p>
-              <div className="flex items-center gap-2 mt-1">
+            <div className="min-w-0 flex-1">
+              <h2 className="break-words text-xl font-bold text-ink">{profile?.nick || 'Jugador'}</h2>
+              <p className="break-words text-sm text-ink-3">{profile?.display_name || ''}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'}`}>
                   {planType}
                 </span>
@@ -75,7 +76,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 )}
               </div>
             </div>
-            {isTeam && <Crown className="text-amber-500" size={24} />}
+            <div className="flex shrink-0 flex-col items-center gap-2">
+              <ThemeToggle />
+              {isTeam && <Crown className="text-amber-500" size={24} />}
+            </div>
           </div>
         </div>
 

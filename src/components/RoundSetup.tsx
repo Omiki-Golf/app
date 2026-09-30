@@ -25,7 +25,7 @@ interface RoundSetupProps {
   currentGroup?: Group | null;
   isGroupCreator?: boolean;
   hasLimitedAccess?: boolean;
-  planType?: 'express' | 'player' | 'team';
+  planType?: 'express' | 'player' | 'team' | 'premium';
   onShowPlans?: () => void;
   onShowNotifications?: () => void;
   notificationCount?: number;

@@ -49,7 +49,7 @@ export interface Group {
   group_type?: string;
 }
 
-export type PlanType = 'express' | 'player' | 'team';
+export type PlanType = 'express' | 'player' | 'team' | 'premium';
 
 export interface UserProfile {
   id: string;
