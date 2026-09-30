@@ -1,11 +1,18 @@
 # Estado para continuar — 30/09/2026
 
+## Sincronización comprobada (30/09/2026, tarde)
+
+- La integración ya está en `main` y subida: `origin/main` = `ceb08de`. Trabajar en `main`; la rama `integrate/local-github-20260930` ya no es necesaria.
+- VPS: `/var/www/miapp` en `ceb08de`, contenedor `lapartideta-app` activo.
+- Supabase: 51 versiones remotas, 0 migraciones nuevas pendientes. `20260930120000_admin_metrics_premium.sql` ya está aplicada; no repetirla.
+- Funciones `stripe-checkout`, `stripe-setup` y `stripe-webhook` publicadas: el código descargado coincide exactamente con `supabase/functions/` de `ceb08de`.
+- Segundo ordenador actualizado por avance rápido (`fac3feb` → `ceb08de`): sin `npm ci` necesario (lockfile sin cambios), sin variables `VITE_` nuevas; TypeScript, 37 pruebas administrativas y build correctos.
+
 ## Integración local y GitHub
 
-- Rama de trabajo: `integrate/local-github-20260930`, basada en `origin/main` (`fac3feb`).
+- Rama de integración original: `integrate/local-github-20260930`, basada en `origin/main` (`fac3feb`), ya incorporada en `main`.
 - Respaldo del trabajo encontrado sin commit: `backup/local-before-integration-20260930`, commit `8bc7ecc`. Conservarlo.
 - Integración inicial: `b4a5780`. Incluye los cinco commits remotos de administración, catálogo y dominios, además de Premium, Stripe Sandbox, interfaz Omiki y Docker/Umbrel locales.
-- `main` local se ha conservado en su posición anterior. Continuar en la rama de integración; no actualizar descartando su trabajo. No se ha subido ningún commit.
 - Se corrigieron las promesas de Web Locks del buzón Express, preservando concurrencia, reintentos e identidad; Stripe admite el dominio principal mediante coincidencia exacta.
 - Se conservaron métricas y opciones Premium de administración. El SQL remoto del 29/09 había eliminado Premium del listado y sus métricas: nueva corrección `20260930120000_admin_metrics_premium.sql`, sin editar migraciones históricas.
 - Los archivos temporales de Supabase que seguían versionados se retiraron del índice, conservándolos en disco y excluidos de Git. `.env.local` y `.local/` siguen excluidos.
@@ -20,12 +27,14 @@
 - Revisión de inicio y selector de planes en navegador con componentes reales y datos simulados, bloqueando red externa. Se verificaron planes y selección Premium. El control del navegador se interrumpió al continuar al registro; la revisión visual completa de registro y administración no está terminada. Su código y pruebas automáticas sí se revisaron.
 - `npm ci` informa 21 avisos de vulnerabilidad de dependencias fijadas. No se actualizaron paquetes ni se ejecutó `npm audit fix`; queda fuera de esta integración.
 
-## Pendientes antes de publicar
+## Pendientes
 
-1. Revisar y aplicar individualmente `20260930120000_admin_metrics_premium.sql` cuando se autorice. Ya probada con PGlite y simulada correctamente. Supabase conserva 50 versiones registradas y esta única migración nueva pendiente; no se aplicó SQL remoto.
-2. Publicar la función `stripe-checkout` actualizada para los dominios nuevos y revisar el retorno de confirmación de correo indicado en `STRIPE_SANDBOX_SETUP.md`.
-3. Completar registro, pago Sandbox con cuenta de prueba, webhook y activación. No se ha realizado ningún pago ni creado cuentas remotas durante esta integración.
-4. Finalizar revisión visual y después integrar la rama validada en `main`, subirla y publicar únicamente cuando se autorice. El despliegue usa `docker/Dockerfile.vps`; Umbrel usa `docker/Dockerfile.umbrel`. El comando de publicación actualiza el script remoto conservando una copia anterior fuera del repositorio; consultar `DOMAIN_SETUP.md`.
+Hechos: migración `20260930120000_admin_metrics_premium.sql` aplicada, funciones Stripe publicadas, `main` subido y desplegado en el VPS.
+
+1. Revisar el retorno de confirmación de correo indicado en `STRIPE_SANDBOX_SETUP.md`.
+2. Completar registro, pago Sandbox con cuenta de prueba, webhook y activación.
+3. Finalizar la revisión visual de registro y administración.
+4. Referencias: el despliegue usa `docker/Dockerfile.vps`; Umbrel usa `docker/Dockerfile.umbrel`. El comando de publicación actualiza el script remoto conservando una copia anterior fuera del repositorio; consultar `DOMAIN_SETUP.md`.
 
 ## Estado histórico — 16/09/2026
 

@@ -8,7 +8,7 @@
 
 ## Supabase
 
-- Destino existente: `sjzivdhzlptxveygmpys` (La Partideta K&F_01). CLI autenticada y enlazada; comprobación del 30/09/2026: 50 versiones remotas. `20260930120000_admin_metrics_premium.sql` está probada y simulada, pendiente de aplicar. No confundir archivos locales con migraciones ya publicadas.
+- Destino existente: `sjzivdhzlptxveygmpys` (La Partideta K&F_01). CLI autenticada y enlazada; comprobación del 30/09/2026: 51 versiones remotas y 0 migraciones nuevas pendientes (`20260930120000_admin_metrics_premium.sql` ya aplicada). No confundir archivos locales con migraciones ya publicadas.
 - Jugadores invitados ya publicados: migraciones `20260918100000_group_guest_players.sql` y `20260919100000_guest_creation_choices.sql` aplicadas y registradas. No repetirlas.
 - `npm run db:status` consulta las migraciones nuevas. `npm run db:migrate -- supabase/migrations/ARCHIVO.sql` muestra una simulación; añadir `--apply` aplica ese archivo y registra la versión.
 - Revisar y probar el SQL antes de aplicar. Una migración nueva debe tener una versión única posterior a `20260917100000` y a las versiones remotas.

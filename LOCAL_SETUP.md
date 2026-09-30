@@ -2,13 +2,10 @@
 
 Desde el 16/09/2026 el ordenador local Windows es el entorno principal. Proyecto: `C:\Users\VORPC\OneDrive\Escritorio\Fede\00-LaPartideta_Test\project`; terminal PowerShell. Codespaces queda como alternativa, descrita en [CODESPACE_SETUP.md](CODESPACE_SETUP.md). La aplicación publicada y Supabase siguen siendo los mismos.
 
-Estado del 30/09/2026: el trabajo combinado está en `integrate/local-github-20260930`,
-basado en `origin/main` (`fac3feb`) y con commits adicionales todavía locales.
-El respaldo original está en `backup/local-before-integration-20260930`.
-Continuar en la rama de integración; `main` local conserva la versión anterior.
-`npm ci`, TypeScript, pruebas y build se han validado. `.env.local` está configurado
-y excluido de Git. El acceso con cuenta y grupo se comprobó en la sesión original;
-no se ha repetido una autenticación real durante esta integración.
+Estado del 30/09/2026: la integración está en `main` (`ceb08de`), subida a GitHub y
+desplegada en el VPS. Trabajar en `main`. El respaldo original se conserva en
+`backup/local-before-integration-20260930`. `npm ci`, TypeScript, pruebas y build
+se han validado. `.env.local` está configurado y excluido de Git.
 Leer primero el estado y los pendientes actuales en `ESTADO_TAREA.md`.
 
 ## Abrir la copia local
@@ -34,7 +31,7 @@ Abrir la dirección que muestra Vite, normalmente `http://localhost:5173`. En lo
 ## Configuración y accesos
 
 - `.env.local` ya está configurado en este ordenador. Si se prepara otra copia, transferir el archivo de forma privada desde un entorno ya configurado. Guardarlo en la carpeta local y comprobar que Git lo excluye. No pegar su contenido en el chat ni subirlo al repositorio.
-- Acceso comprobado el 30/09/2026: CLI autenticada y enlazada, 50 versiones remotas. La nueva corrección `20260930120000_admin_metrics_premium.sql` está probada y simulada, pero pendiente de aplicar; no repetir migraciones ya registradas.
+- Acceso comprobado el 30/09/2026: CLI autenticada y enlazada, 51 versiones remotas y 0 migraciones nuevas pendientes. `20260930120000_admin_metrics_premium.sql` ya está aplicada; no repetir migraciones ya registradas.
 - Para configurar otro ordenador, Supabase sigue siendo `sjzivdhzlptxveygmpys`. Para consultas de migraciones desde el ordenador: `npx supabase login` y `npx supabase link --project-ref sjzivdhzlptxveygmpys`, después `npm run db:status`. Las migraciones de invitados ya aplicadas no se repiten.
 - El alias local `lapartideta-vps` está configurado en `C:\Users\VORPC\.ssh\config` para `root@169.58.89.28`, con la clave propia `~/.ssh/id_ed25519`. El acceso SSH y el contenedor activo se comprobaron el 16/09/2026. No copiar la clave privada del Codespace al repositorio. Solo si la tarea pide publicar, la publicación desde terminal usa `npm run deploy -- --apply`, con el commit validado y subido a `main`.
 - La web de desarrollo utiliza la base real compartida; las pruebas de escritura deben usar PGlite o datos de prueba adecuados.
