@@ -4,8 +4,7 @@ cd /var/www/miapp
 git pull --ff-only origin main
 npm ci
 npm run build
-cp scripts/vps/nginx.conf nginx.conf
-docker build -t lapartideta-golf .
+docker build -f docker/Dockerfile.vps -t lapartideta-golf .
 docker rm -f lapartideta-app || true
 docker run -d --name lapartideta-app --restart unless-stopped \
   --network generated_default \

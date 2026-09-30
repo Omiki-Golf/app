@@ -24,8 +24,11 @@ Solo se admiten claves `sk_test_`; cada servicio comprueba también el identific
 | Team | 5,99 EUR | 57,99 EUR |
 | Premium | 7,99 EUR | 76,99 EUR |
 
-Orígenes permitidos: `http://localhost:5173`, `http://127.0.0.1:5173` y
-`https://golf.arinsaldev.com`. Checkout regresa al origen desde el que se inició.
+Orígenes permitidos en el código integrado: `http://localhost:5173`,
+`http://127.0.0.1:5173`, `https://app.omikigolf.com`, `https://omikigolf.com`
+y `https://golf.arinsaldev.com`, mediante coincidencia exacta. Checkout regresa
+al origen desde el que se inició. La ampliación de dominios del 30/09/2026
+todavía requiere publicar `stripe-checkout`; no se ha cambiado la función remota.
 El frontend local se actualiza con Vite; publicar la web del VPS es una operación
 independiente mediante el flujo de despliegue del repositorio.
 
@@ -75,3 +78,20 @@ Los bloqueos anteriores están resueltos:
 - Ya se puede probar desde la web local con una cuenta de jugador de prueba y la tarjeta `4242 4242 4242 4242`, fecha futura y CVC de tres cifras. El pago completo y la activación posterior quedan pendientes de esa prueba manual. La web del VPS no se ha publicado.
 
 Referencias técnicas: https://supabase.com/docs/guides/functions/auth-headers y https://docs.stripe.com/payments/managed-payments/update-checkout.
+
+## Integración local del 30/09/2026
+
+Se han recuperado los cambios locales y combinado con `origin/main` (`fac3feb`).
+La nueva web principal es `https://app.omikigolf.com`; el dominio raíz redirige allí.
+Las comprobaciones locales de orígenes incluyen dominios permitidos, HTTP no
+autorizado, sufijos maliciosos, rutas y origen vacío. No se han ejecutado los scripts
+que configuran Stripe o crean cuentas remotas durante esta integración.
+
+Antes de verificar el flujo de registro en app, revisar en Supabase que esté
+autorizado el retorno exacto `https://app.omikigolf.com/?email-confirmed=1&player-registration=1`.
+La configuración de dominio documenta el retorno `email-confirmed=1`, pero no
+demuestra que admita esta query adicional. No se ha modificado Auth en esta tarea.
+
+El pago completo con tarjeta de prueba, la llegada del webhook y la activación
+posterior siguen pendientes. Las pruebas locales con PGlite no sustituyen esa
+comprobación. Esta integración no se ha subido a GitHub ni desplegado en el VPS.

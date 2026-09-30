@@ -8,7 +8,7 @@
 
 ## Supabase
 
-- Destino existente: `sjzivdhzlptxveygmpys` (La Partideta K&F_01). La CLI local está autenticada y enlazada; comprobación del 16/09/2026: 46 versiones remotas y 0 migraciones nuevas pendientes.
+- Destino existente: `sjzivdhzlptxveygmpys` (La Partideta K&F_01). CLI autenticada y enlazada; comprobación del 30/09/2026: 50 versiones remotas. `20260930120000_admin_metrics_premium.sql` está probada y simulada, pendiente de aplicar. No confundir archivos locales con migraciones ya publicadas.
 - Jugadores invitados ya publicados: migraciones `20260918100000_group_guest_players.sql` y `20260919100000_guest_creation_choices.sql` aplicadas y registradas. No repetirlas.
 - `npm run db:status` consulta las migraciones nuevas. `npm run db:migrate -- supabase/migrations/ARCHIVO.sql` muestra una simulación; añadir `--apply` aplica ese archivo y registra la versión.
 - Revisar y probar el SQL antes de aplicar. Una migración nueva debe tener una versión única posterior a `20260917100000` y a las versiones remotas.
@@ -20,7 +20,7 @@
 ## VPS
 
 - Alias SSH local: `lapartideta-vps` (`root@169.58.89.28`), configurado en `C:\Users\VORPC\.ssh\config` con la clave propia `~/.ssh/id_ed25519`. Acceso comprobado el 16/09/2026: contenedor activo. Codespaces usa su propia clave `~/.ssh/id_ed25519_lapartideta_vps`.
-- Aplicación en `/var/www/miapp`, contenedor `lapartideta-app`, web `https://golf.arinsaldev.com`.
+- Aplicación en `/var/www/miapp`, contenedor `lapartideta-app`, web principal `https://app.omikigolf.com`; `https://golf.arinsaldev.com` sigue operativo. Ver `DOMAIN_SETUP.md`. Dockerfiles separados para VPS y Umbrel dentro de `docker/`.
 - Consultar estado: `ssh -o BatchMode=yes lapartideta-vps 'docker ps --filter name=lapartideta-app'`.
 - Solo cuando la tarea incluya publicar: validar el código, confirmar y subir los commits destinados a producción, y ejecutar `npm run deploy -- --apply`. `npm run deploy:check` valida sin publicar. El script remoto `/var/www/miapp/deploy.sh` descarga `main` y reinicia el contenedor.
 - Para comprobar accesos o continuar en local no aplicar migraciones ni desplegar. No usar `local-deploy.ps1` como flujo principal; usar los scripts npm del repositorio.

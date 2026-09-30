@@ -14,7 +14,13 @@ export function checkoutIntent(metadata: Record<string, unknown>) {
   return { id: value.id, plan: plan as Plan, period: value.period as Period };
 }
 export function allowedOrigin(origin: string) {
-  return ['http://localhost:5173','http://127.0.0.1:5173','https://golf.arinsaldev.com'].includes(origin);
+  return [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'https://app.omikigolf.com',
+    'https://omikigolf.com',
+    'https://golf.arinsaldev.com',
+  ].includes(origin);
 }
 export function subscriptionStatus(status: string, invoicePaid: boolean) {
   return status === 'active' && invoicePaid ? 'active' : status === 'canceled' ? 'cancelled' : 'expired';

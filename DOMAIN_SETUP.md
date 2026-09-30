@@ -15,11 +15,23 @@ Las sesiones están aisladas por origen; puede ser necesario entrar de nuevo en 
 
 Se mantiene `npm run deploy -- --apply`, desde main validada y subida a GitHub.
 El servidor usa `/var/www/miapp/deploy.sh`, instalado desde `scripts/vps/deploy.sh`.
-Este copia `scripts/vps/nginx.conf` antes de construir la imagen. Los cuatro dominios
+Este compila la web con el entorno privado del VPS y construye la imagen mediante
+`docker/Dockerfile.vps`, que incorpora `dist` y `scripts/vps/nginx.conf`.
+`docker/Dockerfile.umbrel` corresponde al despliegue independiente en Umbrel.
+Los cuatro dominios
 figuran en VIRTUAL_HOST y LETSENCRYPT_HOST; el proxy Docker y su servicio de
 certificados gestionan HTTPS y renovación. No editar la configuración generada del
 proxy ni reiniciar otros servicios. El check verifica app, el dominio antiguo y
 ambas redirecciones temporales.
+
+La integración local del 30/09/2026 cambia el Dockerfile utilizado por el script.
+Cuando se autorice publicar, `npm run deploy -- --apply` descarga `main`, guarda
+el script anterior en `/root/omiki-deploy-before-FECHA.sh` e instala la versión
+integrada de `scripts/vps/deploy.sh` en `/var/www/miapp/deploy.sh` antes de ejecutarla.
+El script remoto antiguo utiliza un Dockerfile no versionado en la raíz. Se
+conserva ese archivo: ambos Dockerfiles nuevos están en `docker/` para evitar
+colisiones al actualizar el repositorio. Esta
+actualización del servidor no se ha realizado durante la integración local.
 
 ## Supabase
 

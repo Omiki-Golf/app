@@ -13,4 +13,12 @@
 !public/**
 !docker/
 !docker/nginx.conf
-!Dockerfile
+!docker/Dockerfile.umbrel
+
+# VPS: static output compiled by scripts/vps/deploy.sh and domain redirects.
+!docker/Dockerfile.vps
+!dist/
+!dist/**
+!scripts/
+!scripts/vps/
+!scripts/vps/nginx.conf

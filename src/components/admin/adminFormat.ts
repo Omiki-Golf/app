@@ -1,7 +1,7 @@
 export const modeLabels: Record<string, string> = {
   stableford: 'Stableford', match: 'Match play', sindicato: 'Sindicato', parejas: 'Parejas',
 };
-export const planLabels: Record<string, string> = { express: 'Express (gratuito)', player: 'ParteePlayer', team: 'ParteeTeam' };
+export const planLabels: Record<string, string> = { express: 'Express (gratuito)', player: 'ParteePlayer', team: 'ParteeTeam', premium: 'Premium' };
 export const shortDate = (value: string | null | undefined) =>
   value ? new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 export const weekLabel = (value: string) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });

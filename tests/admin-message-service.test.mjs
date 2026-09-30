@@ -6,7 +6,7 @@ const source = await readFile(
   new URL("../src/services/messageService.ts", import.meta.url),
   "utf8",
 );
-function service(mock, storage = new Map()) {
+function service(mock, storage = new Map(), browser = {}) {
   const exports = {};
   const js = ts.transpileModule(source, {
     compilerOptions: {
@@ -25,10 +25,52 @@ function service(mock, storage = new Map()) {
             },
           },
     exports,
-    {},
+    browser,
   );
   return exports.messageService;
 }
+
+test("Web Locks shares mailbox provisioning, retries failures and rejects an identity change", async () => {
+  const storage = new Map();
+  let identity = null, registrations = 0, locks = 0, inboxCalls = 0;
+  let release;
+  let gate = new Promise(resolve => { release = resolve; });
+  const api = service({
+    auth: { getSession: async () => ({ data: { session: identity ? { user: { id: identity } } : null } }) },
+    functions: { invoke: async (_, { body }) => {
+      if (body.action === 'register') {
+        registrations++;
+        await gate;
+        return registrations === 1 ? { error: new Error('network') } : { data: { id: 'box' } };
+      }
+      inboxCalls++;
+      return { data: { messages: [], total: 0, unread: 0 } };
+    } },
+  }, storage, { locks: { request: async (name, callback) => {
+    assert.equal(name, 'golf-express-message-box');
+    locks++;
+    return callback();
+  } } });
+  const failures = [assert.rejects(api.inbox(null), /buzón/), assert.rejects(api.inbox(null), /buzón/)];
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(registrations, 1);
+  release();
+  await Promise.all(failures);
+  const original = JSON.parse([...storage.values()][0]).secret;
+  gate = new Promise(resolve => { release = resolve; });
+  const changed = assert.rejects(api.inbox(null), /sesión ha cambiado/);
+  await new Promise(resolve => setImmediate(resolve));
+  identity = 'player';
+  release();
+  await changed;
+  assert.equal(inboxCalls, 0);
+  identity = null;
+  const result = await api.inbox(null);
+  assert.equal(result.boxId, 'box');
+  assert.equal(registrations, 2);
+  assert.equal(locks, 3);
+  assert.equal(JSON.parse([...storage.values()][0]).secret, original);
+});
 
 test("group composer keeps group selection and sender scope separate from resolved recipients", async () => {
   const calls = [];

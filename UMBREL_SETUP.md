@@ -1,6 +1,9 @@
 # La Partideta en Umbrel con Docker Compose
 
 Estos archivos permiten ejecutar la web desde la terminal del equipo Umbrel.
+`docker/Dockerfile.umbrel` y `docker/nginx.conf` son para este uso. El VPS usa
+`docker/Dockerfile.vps` con `scripts/vps/nginx.conf`, que conserva los dominios
+y redirecciones de producción. No intercambiar las dos configuraciones.
 La instalacion manual no registra un icono en la tienda ni en el escritorio de
 Umbrel. La integracion como app de la tienda requiere un paquete adicional;
 consulta la [documentacion oficial](https://github.com/getumbrel/umbrel-apps).
@@ -9,7 +12,7 @@ consulta la [documentacion oficial](https://github.com/getumbrel/umbrel-apps).
 
 1. Copia esta carpeta de proyecto a una carpeta persistente del equipo Umbrel.
    Incluye `src`, `public`, los archivos de configuracion, `package.json`,
-   `package-lock.json`, `Dockerfile`, `.dockerignore`, `docker-compose.yml`
+   `package-lock.json`, `docker/Dockerfile.umbrel`, `.dockerignore`, `docker-compose.yml`
    y `docker/nginx.conf`. No necesitas copiar `node_modules` ni `dist`.
    Usa esta copia local si quieres incluir los cambios aun no subidos a Git.
 2. Transfiere de forma privada tu `.env.local` a esa carpeta, o crea uno con:

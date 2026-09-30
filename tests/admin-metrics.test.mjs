@@ -40,8 +40,10 @@ test("admin metrics: access, played-round rules, attribution through participant
     await db.query("UPDATE auth.users SET encrypted_password='a' WHERE id=$1", [A]);
     await db.exec(await migration("20260911190000_app_user_management.sql"));
     await db.exec(await migration("20260914190000_admin_round_search.sql"));
+    await db.exec(await migration("20260922120000_premium_subscription_plan.sql"));
     await db.exec(await migration("20260929100000_admin_metrics.sql"));
     await db.exec(await migration("20260929110000_admin_metric_segments.sql"));
+    await db.exec(await migration("20260930120000_admin_metrics_premium.sql"));
     await db.exec(`
  INSERT INTO user_profiles(user_id,nick,display_name) VALUES('${P}','PlayerP','Player P'),('${Q}','PlayerQ','Player Q'),('${R}','PlayerR','Player R');
  INSERT INTO user_subscriptions(user_id,plan_type,status,current_period_end) VALUES('${P}','player','active',now()+interval '3 days');
@@ -82,7 +84,7 @@ test("admin metrics: access, played-round rules, attribution through participant
     await as(A);
     await assert.rejects(db.query("SELECT admin_metrics_overview(14)"), /Periodo inválido/);
     const o = await one("SELECT admin_metrics_overview(30) AS d");
-    assert.deepEqual(o.users, { total: 3, new: 1, with_round: 1, signed_in: 1, plans: { express: 2, player: 1, team: 0 } });
+    assert.deepEqual(o.users, { total: 3, new: 1, with_round: 1, signed_in: 1, plans: { express: 2, player: 1, team: 0, premium: 0 } });
     assert.deepEqual(o.rounds, { played: 2, quick: 1, group: 1, nine_holes: 1, in_progress: 1 });
     assert.equal(o.weekly.length, 12);
     assert.equal(o.weekly.reduce((s, w) => s + w.quick + w.group, 0), 2);
@@ -142,6 +144,24 @@ test("admin metrics: access, played-round rules, attribution through participant
     assert.deepEqual([byNick.PlayerP.rounds_played, byNick.PlayerP.groups_count], [2, 1]);
     assert.deepEqual([byNick.PlayerQ.rounds_played, byNick.PlayerQ.last_round_at], [0, null]);
     assert.deepEqual(users.users.map((u) => u.nick), ["PlayerQ", "PlayerP", "PlayerR"]);
+
+    // Applying the latest functions must retain Premium, its usage columns and access rules.
+    await db.exec("RESET ROLE");
+    await db.query("UPDATE user_subscriptions SET plan_type='premium' WHERE user_id=$1", [P]);
+    await as(A);
+    const premium = await one("SELECT admin_list_app_users('', 'premium') AS d");
+    assert.equal(premium.total, 1);
+    assert.equal(premium.users[0].plan, 'premium');
+    assert.deepEqual([premium.users[0].rounds_played, premium.users[0].groups_count], [2, 1]);
+    assert.deepEqual((await one("SELECT admin_metrics_overview(30) AS d")).users.plans, { express: 2, player: 0, team: 0, premium: 1 });
+    assert.equal((await segment('expiring_7')).rows[0].plan, 'premium');
+    await as(P);
+    await assert.rejects(db.query("SELECT admin_list_app_users('', 'premium')"), /denegado/);
+    await db.exec("RESET ROLE");
+    await db.query("UPDATE user_subscriptions SET current_period_end=now()-interval '1 day' WHERE user_id=$1", [P]);
+    await as(A);
+    assert.equal((await one("SELECT admin_list_app_users('', 'premium') AS d")).total, 0);
+    assert.deepEqual((await one("SELECT admin_metrics_overview(30) AS d")).users.plans, { express: 3, player: 0, team: 0, premium: 0 });
   } finally {
     await db.close();
   }

@@ -26,8 +26,12 @@ test('Stripe server catalog matches displayed totals; malformed intents and orig
  }
  for(const patch of [{plan:'__proto__'},{period:'weekly'},{id:'not-a-uuid'}]) assert.throws(()=>checkoutIntent({player_checkout:{id:intent,period:'monthly',...patch}}));
  assert.equal(checkoutIntent({player_checkout:{id:intent,period:'monthly'}}).plan,'player');
- assert.equal(allowedOrigin('https://golf.arinsaldev.com.evil.example'),false);
- assert.equal(allowedOrigin('http://localhost:5173'),true);
+ for (const origin of ['https://app.omikigolf.com', 'https://omikigolf.com', 'https://golf.arinsaldev.com', 'http://localhost:5173', 'http://127.0.0.1:5173']) {
+  assert.equal(allowedOrigin(origin),true,origin);
+ }
+ for (const origin of ['https://golf.arinsaldev.com.evil.example', 'https://app.omikigolf.com.evil.example', 'http://app.omikigolf.com', 'https://www.omikigolf.com', 'https://app.omikigolf.com/path', 'null', '']) {
+  assert.equal(allowedOrigin(origin),false,origin);
+ }
  assert.equal(subscriptionStatus('active',false),'expired');
  assert.equal(subscriptionStatus('past_due',true),'expired');
  assert.equal(subscriptionStatus('active',true),'active');

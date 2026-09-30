@@ -69,7 +69,7 @@ export function AdminOverview({ onOpen, onOpenUser }: { onOpen: (tab: 'users' | 
   useEffect(() => { void load(); }, [load]);
 
   const period = days === 365 ? 'los últimos 12 meses' : `los últimos ${days} días`;
-  const paid = data ? data.users.plans.player + data.users.plans.team : 0;
+  const paid = data ? data.users.plans.player + data.users.plans.team + (data.users.plans.premium ?? 0) : 0;
 
   return (
     <section className="space-y-4">
@@ -121,7 +121,7 @@ export function AdminOverview({ onOpen, onOpenUser }: { onOpen: (tab: 'users' | 
               ]} />
             </Panel>
             <Panel title="Jugadores por plan" note="hoy">
-              <BarList rows={(['express', 'player', 'team'] as const).map(p => ({ label: planLabels[p], value: data.users.plans[p] }))} />
+              <BarList rows={(['express', 'player', 'team', 'premium'] as const).map(p => ({ label: planLabels[p], value: data.users.plans[p] ?? 0 }))} />
             </Panel>
           </div>
 

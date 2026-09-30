@@ -34,7 +34,7 @@ try {
   run('git', ['diff', '--check']);
   run('ssh', [...ssh, 'test -x /var/www/miapp/deploy.sh && docker inspect --format "{{.State.Running}}" lapartideta-app']);
   if (apply) {
-    run('ssh', [...ssh, 'cd /var/www/miapp && ./deploy.sh && test "$(docker inspect --format "{{.State.Running}}" lapartideta-app)" = true']);
+    run('ssh', [...ssh, 'cd /var/www/miapp && git pull --ff-only origin main && cp deploy.sh /root/omiki-deploy-before-$(date +%Y%m%d%H%M%S).sh && install -m 755 scripts/vps/deploy.sh deploy.sh && ./deploy.sh && test "$(docker inspect --format "{{.State.Running}}" lapartideta-app)" = true']);
   }
   for (const origin of ['https://app.omikigolf.com', 'https://golf.arinsaldev.com']) {
     const response = await fetch(`${origin}/?deploy_check=${Date.now()}`, { redirect: 'manual', signal: AbortSignal.timeout(30000) });

@@ -115,13 +115,15 @@ async function prepareBox(): Promise<Box> {
   }
   return box;
 }
-async function getBox() {
+async function getBox(): Promise<Box> {
   if (!opening) {
-    opening = (
+    // Await inside an async function to flatten the Web Locks callback result.
+    // Older DOM typings describe it as Promise<Promise<Box>>.
+    opening = (async () =>
       "locks" in navigator
-        ? navigator.locks.request("golf-express-message-box", prepareBox)
+        ? await navigator.locks.request("golf-express-message-box", prepareBox)
         : prepareBox()
-    ).finally(() => {
+    )().finally(() => {
       opening = null;
     });
   }

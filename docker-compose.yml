@@ -3,7 +3,7 @@ services:
     image: lapartideta:local
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile.umbrel
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:?Configura VITE_SUPABASE_URL en .env.local}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:?Configura VITE_SUPABASE_ANON_KEY en .env.local}
