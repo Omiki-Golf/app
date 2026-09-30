@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
-import { Zap, LogIn, Plus, Share2, Bell, User, ChevronRight, FlaskConical, CreditCard } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, Bell, User, ChevronRight, FlaskConical } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -8,13 +8,11 @@ import { ResetExpressRounds } from './ResetExpressRounds';
 interface HomeScreenProps {
   planType: PlanType;
   isAuthenticated: boolean;
-  userEmail?: string;
   profile: UserProfile | null;
   pendingInvitations: number;
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  onShowPlans: () => void;
   onShowProfile: () => void;
   onShowNotifications: () => void;
   onShowAuth: () => void;
@@ -28,13 +26,11 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   planType,
   isAuthenticated,
-  userEmail,
   profile,
   pendingInvitations,
   onQuickPlay,
   onJoinQuickPlay,
   onCreateTeam,
-  onShowPlans,
   onShowProfile,
   onShowNotifications,
   onShowAuth,
@@ -45,16 +41,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onCycleSimulatorPlan,
 }) => {
   const isExpress = planType === 'express';
-  const isTeam = planType === 'team';
-  const plansButton = (
-    <button
-      onClick={onShowPlans}
-      className="w-full flex items-center justify-center gap-3 bg-card-2 text-ink-2 border border-line px-6 py-3.5 rounded-2xl hover:bg-neutral-hover transition-all font-semibold active:scale-[0.98]"
-    >
-      <CreditCard className="w-5 h-5 text-accent-ink" />
-      Ver planes
-    </button>
-  );
+  const isTeam = (planType === 'team' || planType === 'premium');
 
   return (
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
@@ -89,7 +76,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </button>
             </>
 
-            <ThemeToggle />
+            {!isAuthenticated && <ThemeToggle />}
+            {isExpress && !isAuthenticated && <ResetExpressRounds />}
           </div>
 
           {/* Acceso / Perfil */}
@@ -104,41 +92,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <LogIn size={22} aria-hidden="true" />
             </button>
           ) : (
-            <button
-              onClick={onShowProfile}
-              title="Mi perfil"
-              aria-label="Abrir Mi perfil"
-              className="flex items-center justify-center w-11 h-11 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
-            >
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="w-9 h-9 rounded-full" />
-              ) : (
-                <User size={21} className="text-ink-2" />
-              )}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="text-right">
+                <p className="text-xs font-bold capitalize text-ink">{planType}</p>
+                <p className="text-xs text-ink-3">HCP {profile?.exact_handicap ?? 0}</p>
+              </div>
+              <button
+                onClick={onShowProfile}
+                title="Mi perfil"
+                aria-label="Abrir Mi perfil"
+                className="flex items-center justify-center w-11 h-11 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
+              >
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="w-9 h-9 rounded-full" />
+                ) : (
+                  <User size={21} className="text-ink-2" />
+                )}
+              </button>
+            </div>
           )}
         </div>
 
-        {isAuthenticated && (
-          <div className="bg-card border border-line rounded-2xl px-4 py-3 mb-5 shadow-soft text-center">
-            <p className="font-semibold text-ink">¡Bienvenido!</p>
-            <div className="flex items-center justify-center gap-2 mt-1 min-w-0">
-              <span className="text-sm text-ink-3 truncate">{profile?.nick || userEmail}</span>
-              <span className={`shrink-0 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'
-              }`}>
-                {planType}
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* Logo */}
         <div className="text-center mb-6 sm:mb-8">
-          <div className="inline-flex items-center justify-center w-24 h-24 sm:w-28 sm:h-28 rounded-full shadow-card mb-3 overflow-hidden bg-transparent">
-            <img src="/images/Omiki.png" alt="OMIKI Golf" className="w-full h-full object-contain" />
-          </div>
-          <h1 className="text-4xl font-bold text-ink mb-1">OMIKI Golf</h1>
+          <h1 className="mb-3">
+            <img src="/images/Omiki_VerdeAmarillo_Trans.png" alt="OMIKI Golf" width={4020} height={1564} className="mx-auto h-auto w-72 max-w-full object-contain" />
+          </h1>
           <p className="text-ink-3">Tu companero de golf</p>
         </div>
 
@@ -160,7 +139,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             Unirse a Partida
           </WriteButton>
 
-          {!isTeam && plansButton}
 
           {isTeam && (
             <WriteButton
@@ -173,8 +151,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-3">
-          {isExpress && !isAuthenticated && <ResetExpressRounds />}
+        <img src="/images/Omiki_O_VerdeAmarillo_Trans.png" alt="" aria-hidden="true" className="mx-auto h-auto w-28 object-contain" />
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <WriteButton
             type="button"
             onClick={onToggleSimulator}
@@ -201,7 +180,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </WriteButton>
           )}
 
-          {isTeam && plansButton}
         </div>
 
         {simulatorEnabled && (

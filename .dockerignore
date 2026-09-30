@@ -1,0 +1,16 @@
+# Solo se envia al constructor lo necesario para compilar la web.
+**
+!package.json
+!package-lock.json
+!index.html
+!vite.config.ts
+!tsconfig*.json
+!postcss.config.js
+!tailwind.config.js
+!src/
+!src/**
+!public/
+!public/**
+!docker/
+!docker/nginx.conf
+!Dockerfile

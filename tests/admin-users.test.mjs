@@ -40,6 +40,7 @@ test("user management: permissions, filters, atomic audit, plans and read-only w
       A,
     ]);
     await db.exec(sql);
+    await db.exec(await readFile(new URL('../supabase/migrations/20260922120000_premium_subscription_plan.sql', import.meta.url), 'utf8'));
     await db.exec(await readFile(new URL('../supabase/migrations/20260915190000_inapp_messages.sql', import.meta.url), 'utf8'));
     const as = async (id, role = "authenticated") => {
       await db.exec("RESET ROLE");
@@ -178,6 +179,9 @@ test("user management: permissions, filters, atomic audit, plans and read-only w
           "after" in e.details,
       ),
     );
+    await change(P, 'plan', { plan: 'premium', end: '2099-01-01' });
+    assert.equal((await detail(P)).plan, 'premium');
+    assert.equal((await db.query("SELECT admin_list_app_users('', 'premium') AS d")).rows[0].d.total, 1);
     await as(P);
     await db.exec("UPDATE user_subscriptions SET plan_type='team',current_period_end=now()+interval '1 month'");
     await as(A);
