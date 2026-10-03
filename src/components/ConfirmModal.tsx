@@ -1,6 +1,7 @@
 import { useReadOnly } from '../context/ReadOnlyContext';
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmModalProps {
   message: string;
@@ -15,6 +16,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { t } = useTranslation();
   const restricted = useReadOnly() && readOnlySensitive;
   const handleConfirm = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,7 +60,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={handleCancel}
             className="flex-1 bg-neutral hover:bg-neutral-hover text-ink font-semibold py-3 rounded-lg transition-colors"
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -66,7 +68,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={handleConfirm}
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
           >
-            Aceptar
+            {t('common.accept')}
           </button>
         </div>
       </div>

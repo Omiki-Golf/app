@@ -3,6 +3,7 @@ import { ThemeToggle } from './ThemeToggle';
 import React, { useState } from 'react';
 import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
+import { useTranslation } from 'react-i18next';
 
 interface ProfileScreenProps {
   profile: UserProfile | null;
@@ -29,15 +30,16 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onShowGroups,
   onShowSettings,
 }) => {
+  const { t } = useTranslation();
   const isTeam = (planType === 'team' || planType === 'premium');
   const isPlayer = planType === 'player';
 
   const menuItems = [
-    { icon: Gamepad2, label: 'Mis partidas jugadas', onClick: onShowHistory, show: true },
-    { icon: BarChart3, label: 'Mis estadisticas', onClick: onShowStats, show: true },
-    { icon: Crown, label: 'Mis grupos', onClick: onShowGroups, show: isTeam },
+    { icon: Gamepad2, label: t('profile.rounds'), onClick: onShowHistory, show: true },
+    { icon: BarChart3, label: t('profile.stats'), onClick: onShowStats, show: true },
+    { icon: Crown, label: t('profile.groups'), onClick: onShowGroups, show: isTeam },
     { icon: CreditCard, label: 'Pro-Shop', onClick: onShowProShop, show: isTeam },
-    { icon: Settings, label: 'Mis datos de registro', onClick: onShowSettings, show: true },
+    { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },
   ];
 
   return (
@@ -65,7 +67,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h2 className="break-words text-xl font-bold text-ink">{profile?.nick || 'Jugador'}</h2>
+              <h2 className="break-words text-xl font-bold text-ink">{profile?.nick || t('profile.player')}</h2>
               <p className="break-words text-sm text-ink-3">{profile?.display_name || ''}</p>
               <div className="flex flex-wrap items-center gap-2 mt-1">
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'}`}>
@@ -90,8 +92,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             className="w-full bg-amber-100 text-amber-900 border-2 border-amber-300 rounded-2xl p-4 mb-5 shadow-card hover:bg-amber-200 transition-all text-left flex items-center justify-between"
           >
             <div>
-              <p className="font-bold">Prueba Team por 30 dias</p>
-              <p className="text-sm text-amber-800">Crea grupos, invita jugadores y mucho mas</p>
+              <p className="font-bold">{t('profile.trial')}</p>
+              <p className="text-sm text-amber-800">{t('profile.trialDescription')}</p>
             </div>
             <ChevronRight size={20} />
           </button>

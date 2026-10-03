@@ -4,6 +4,8 @@ import { Zap, LogIn, Plus, Share2, Bell, User, ChevronRight, FlaskConical } from
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
+import { useTranslation } from 'react-i18next';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface HomeScreenProps {
   planType: PlanType;
@@ -40,6 +42,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onToggleSimulator,
   onCycleSimulatorPlan,
 }) => {
+  const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
 
@@ -52,8 +55,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <button
               type="button"
               onClick={onShowShare}
-              title="Compartir la app"
-              aria-label="Compartir la app"
+              title={t('common.share')}
+              aria-label={t('common.share')}
               className="relative p-2.5 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
             >
               <Share2 size={20} className="text-ink-2" />
@@ -63,8 +66,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <button
                 type="button"
                 onClick={onShowNotifications}
-                title="Avisos"
-                aria-label="Avisos"
+                title={t('common.notifications')}
+                aria-label={t('common.notifications')}
                 className="relative p-2.5 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
               >
                 <Bell size={20} className="text-ink-2" />
@@ -77,6 +80,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </>
 
             {!isAuthenticated && <ThemeToggle />}
+            <LanguageSwitcher />
             {isExpress && !isAuthenticated && <ResetExpressRounds />}
           </div>
 
@@ -85,8 +89,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <button
               type="button"
               onClick={onShowAuth}
-              title="Entrar"
-              aria-label="Entrar"
+              title={t('common.signIn')}
+              aria-label={t('common.signIn')}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent bg-accent text-on-accent shadow-soft transition-all hover:bg-accent-hover active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
             >
               <LogIn size={22} aria-hidden="true" />
@@ -99,8 +103,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               </div>
               <button
                 onClick={onShowProfile}
-                title="Mi perfil"
-                aria-label="Abrir Mi perfil"
+                title={t('common.profile')}
+                aria-label={t('common.openProfile')}
                 className="flex items-center justify-center w-11 h-11 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
               >
                 {profile?.avatar_url ? (
@@ -118,7 +122,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <h1 className="mb-3">
             <img src="/images/Omiki_VerdeAmarillo_Trans.png" alt="OMIKI Golf" width={4020} height={1564} className="mx-auto h-auto w-72 max-w-full object-contain" />
           </h1>
-          <p className="text-ink-3">Tu companero de golf</p>
+          <p className="text-ink-3">{t('home.tagline')}</p>
         </div>
 
         {/* Main buttons */}
@@ -128,7 +132,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="w-full flex items-center justify-center gap-3 bg-accent text-on-accent px-6 py-4 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
           >
             <Zap className="w-6 h-6" />
-            {isExpress ? 'Crear Partida Express' : 'Crear Partida'}
+            {isExpress ? t('home.createExpress') : t('home.createGame')}
           </WriteButton>
 
           <WriteButton
@@ -136,7 +140,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="w-full flex items-center justify-center gap-3 bg-card text-accent-ink border-2 border-accent px-6 py-4 rounded-2xl hover:bg-accent-soft transition-all font-semibold text-lg active:scale-[0.98]"
           >
             <LogIn className="w-6 h-6" />
-            Unirse a Partida
+            {t('home.joinGame')}
           </WriteButton>
 
 
@@ -146,7 +150,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               className="w-full flex items-center justify-center gap-3 bg-amber-500 text-white px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
             >
               <Plus className="w-6 h-6" />
-              Crear Team
+              {t('home.createTeam')}
             </WriteButton>
           )}
         </div>
@@ -165,7 +169,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             }`}
           >
             <FlaskConical size={14} />
-            Simulador
+            {t('home.simulator')}
           </WriteButton>
 
           {simulatorEnabled && (
@@ -175,7 +179,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               disabled={simulatorUpdating}
               className="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold bg-card text-ink-2 shadow-soft hover:bg-card-2 transition-all border border-line disabled:opacity-60"
             >
-              Plan: <span className="text-accent-ink capitalize">{planType}</span>
+              <span>{t('home.plan', { plan: planType })}</span>
               <ChevronRight size={14} className="text-ink-4" />
             </WriteButton>
           )}
@@ -184,7 +188,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {simulatorEnabled && (
           <p className="text-center text-xs text-ink-4 mt-2">
-            Viendo la app como {profile?.nick || 'usuario'} con plan {planType}
+            {t('home.preview', { user: profile?.nick || t('common.user'), plan: planType })}
           </p>
         )}
 

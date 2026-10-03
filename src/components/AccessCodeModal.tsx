@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AccessCodeModalProps {
   onSubmit: (code: string) => void;
@@ -14,6 +15,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
   error,
   loading = false,
 }) => {
+  const { t } = useTranslation();
   const [code, setCode] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -39,7 +41,7 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
               <Lock className="text-accent-ink" size={24} />
             </div>
             <h2 className="text-xl font-bold text-ink">
-              Código de Acceso
+              {t('access.title')}
             </h2>
           </div>
           <button
@@ -51,26 +53,26 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
         </div>
 
         <p className="text-ink-2 mb-6">
-          Ingresa el código de acceso para unirte o editar esta partida.
+          {t('access.description')}
         </p>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-ink-2 mb-2">
-              Código de Acceso
+              {t('access.title')}
             </label>
             <input
               type="text"
               value={code}
               onChange={handleInputChange}
-              placeholder="Código"
+              placeholder={t('access.placeholder')}
               className="w-full px-4 py-3 border-2 border-line-2 rounded-lg focus:border-accent focus:outline-none text-center text-2xl font-bold tracking-wider font-mono"
               autoFocus
               maxLength={20}
               disabled={loading}
             />
             <p className="text-xs text-ink-3 mt-2 text-center">
-              Codigo de 4 caracteres
+              {t('access.hint')}
             </p>
           </div>
 
@@ -87,22 +89,21 @@ export const AccessCodeModal: React.FC<AccessCodeModalProps> = ({
               disabled={loading}
               className="flex-1 bg-neutral hover:bg-neutral-hover disabled:opacity-50 text-ink font-semibold py-3 rounded-lg transition-colors"
             >
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || code.length < 4}
               className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-on-accent font-semibold py-3 rounded-lg transition-colors"
             >
-              {loading ? 'Verificando...' : 'Acceder'}
+              {loading ? t('access.verifying') : t('access.enter')}
             </button>
           </div>
         </form>
 
         <div className="mt-6 pt-4 border-t border-line">
           <p className="text-xs text-ink-3 text-center">
-            El código de acceso es proporcionado por el creador de la partida.
-            Todas las clasificaciones son públicas.
+            {t('access.footer')}
           </p>
         </div>
       </div>

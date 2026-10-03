@@ -7,6 +7,7 @@ import { Group } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { PremiumModal } from './PremiumModal';
 import { useSubscription } from '../hooks/useSubscription';
+import { useTranslation } from 'react-i18next';
 
 interface MyGroupsProps {
   onBack: () => void;
@@ -25,6 +26,7 @@ interface GroupWithCode {
 }
 
 export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onLogout }: MyGroupsProps) {
+  const { t, i18n } = useTranslation();
   const [groups, setGroups] = useState<GroupWithCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -51,7 +53,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        setError('No hay sesión activa');
+        setError(t('groups.noSession'));
         return;
       }
 
@@ -67,7 +69,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
       setGroups(data || []);
     } catch (err: any) {
-      setError(err.message || 'Error al cargar los grupos');
+      setError(err.message || t('groups.loadError'));
     } finally {
       setLoading(false);
     }
@@ -97,7 +99,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       setGroups(groups.filter(g => g.id !== groupToDelete));
       setGroupToDelete(null);
     } catch (err: any) {
-      setError(err.message || 'Error al eliminar el grupo');
+      setError(err.message || t('groups.deleteError'));
       setGroupToDelete(null);
     }
   };
@@ -127,7 +129,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       <div className="min-h-screen bg-app p-4 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-          <p className="text-ink-3">Cargando tus grupos...</p>
+          <p className="text-ink-3">{t('groups.loading')}</p>
         </div>
       </div>
     );
@@ -150,7 +152,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                 <button
                   onClick={() => setShowPremium(true)}
                   className="relative group bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full p-2 transition-all hover:scale-110"
-                  title="Hazte Premium"
+                  title={t('groups.premium')}
                 >
                   <Crown size={18} className="text-amber-500" />
                   <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-amber-300 text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
@@ -163,7 +165,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
               {isPremium && (
                 <div 
                   className="bg-emerald-500/10 border border-emerald-500/30 rounded-full p-2" 
-                  title="Premium activo"
+                  title={t('groups.premiumActive')}
                 >
                   <Crown size={18} className="text-accent-ink" />
                 </div>
@@ -180,7 +182,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-3">
               <Users className="w-8 h-8 text-accent-ink" />
             </div>
-            <h1 className="text-2xl font-bold text-ink mb-1">Mis Grupos</h1>
+            <h1 className="text-2xl font-bold text-ink mb-1">{t('groups.title')}</h1>
             <p className="text-sm text-ink-3">{userEmail}</p>
           </div>
 
@@ -192,7 +194,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
           {groups.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-ink-3 mb-4">Aún no has creado ningún grupo</p>
+              <p className="text-ink-3 mb-4">{t('groups.empty')}</p>
               <NavigationButton destination={backDestination}
                 onClick={onBack}
                 className="text-accent-ink hover:text-accent-ink font-medium"
@@ -210,7 +212,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     <WriteButton
                       onClick={() => handleDeleteGroup(group.id)}
                       className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Eliminar grupo"
+                      title={t('groups.delete')}
                     >
                       <Trash2 size={18} />
                     </WriteButton>
@@ -218,7 +220,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
                   <div className="flex items-center gap-3 mb-3">
                     <div className="flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
-                      <p className="text-xs text-ink-3 mb-1">Código de acceso</p>
+                      <p className="text-xs text-ink-3 mb-1">{t('groups.accessCode')}</p>
                       <p className="text-xl font-mono font-bold text-accent-ink tracking-wider">
                         {group.group_code}
                       </p>
@@ -226,17 +228,17 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     <button
                       onClick={() => handleCopyCode(group.group_code)}
                       className="px-4 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors flex items-center gap-2"
-                      title="Copiar código"
+                      title={t('groups.copyCode')}
                     >
                       {copiedCode === group.group_code ? (
                         <>
                           <Check size={18} />
-                          Copiado
+                          {t('groups.copied')}
                         </>
                       ) : (
                         <>
                           <Copy size={18} />
-                          Copiar
+                          {t('groups.copy')}
                         </>
                       )}
                     </button>
@@ -246,11 +248,11 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     onClick={() => handleSelectGroup(group)}
                     className="w-full bg-accent text-on-accent px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium"
                   >
-                    Seleccionar Grupo
+                    {t('groups.select')}
                   </button>
 
                   <p className="text-xs text-ink-3 mt-2">
-                    Creado el {new Date(group.created_at).toLocaleDateString()}
+                    {t('groups.created', { date: new Intl.DateTimeFormat(i18n.resolvedLanguage).format(new Date(group.created_at)) })}
                   </p>
                 </div>
               ))}
@@ -261,7 +263,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
       {groupToDelete && (
         <ConfirmModal
-          message="¿Estás seguro de que quieres eliminar este grupo? Esta acción no se puede deshacer."
+          message={t('groups.deleteConfirm')}
           onConfirm={confirmDeleteGroup}
           onCancel={cancelDeleteGroup}
         />

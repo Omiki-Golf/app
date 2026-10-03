@@ -9,6 +9,7 @@ if (import.meta.env.DEV) {
 import { ApplicationGateway } from './components/admin/ApplicationGateway';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider } from './context/AuthContext';
+import './i18n';
 import './index.css';
 
 try {

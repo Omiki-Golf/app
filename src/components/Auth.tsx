@@ -8,6 +8,7 @@ import { UserTier } from '../types';
 import { EmailSentModal } from './EmailSentModal';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
+import { useTranslation } from 'react-i18next';
 
 interface AuthProps {
   onAuthSuccess: (userId: string) => void | Promise<void>;
@@ -21,6 +22,7 @@ interface AuthProps {
 type AuthMode = 'login' | 'register' | 'forgot-password' | 'reset-password';
 
 export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = false, onRecoveryComplete, onBack, backDestination = 'back' }: AuthProps) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<AuthMode>(recoveryRequested ? 'reset-password' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -71,7 +73,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
       return false;
     } catch {
       setNickStatus('idle');
-      setError('No se ha podido comprobar el nick. Inténtalo de nuevo.');
+      setError(t('auth.errors.nickCheck'));
       return false;
     }
   };
@@ -114,7 +116,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         await onAuthSuccess(signedInUser.id);
       }
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      setError(err.message || t('auth.errors.login'));
     } finally {
       setLoading(false);
     }
@@ -124,22 +126,22 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError(t('auth.errors.passwords'));
       return;
     }
 
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError(t('auth.errors.passwordLength'));
       return;
     }
 
     if (!displayName.trim()) {
-      setError('Introduce tu nombre');
+      setError(t('auth.errors.name'));
       return;
     }
 
     if (!(await checkNick())) {
-      setError('Elige un nick disponible');
+      setError(t('auth.errors.nick'));
       return;
     }
 
@@ -171,7 +173,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         const registeredUserId = data.user.id;
         const { golfService } = await import('../services/golfService');
         if (!(await getReadOnly())) await golfService.linkGroupsToAuthUser();
-        setMessage('Cuenta creada exitosamente. Iniciando sesión...');
+        setMessage(t('auth.messages.accountCreated'));
         setTimeout(() => {
           void onAuthSuccess(registeredUserId);
         }, 1500);
@@ -179,7 +181,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         setShowEmailSentModal(true);
       }
     } catch (err: any) {
-      setError(err.message || 'Error al registrarse');
+      setError(err.message || t('auth.errors.register'));
     } finally {
       setLoading(false);
     }
@@ -201,9 +203,9 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         await adminService.recover(email.trim());
       }
 
-      setMessage('Se ha enviado un enlace de recuperación a tu correo electrónico.');
+      setMessage(t('auth.messages.recoverySent'));
     } catch (err: any) {
-      setError(err.message || 'Error al enviar el correo de recuperación');
+      setError(err.message || t('auth.errors.recovery'));
     } finally {
       setLoading(false);
     }
@@ -213,12 +215,12 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden');
+      setError(t('auth.errors.passwords'));
       return;
     }
 
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres');
+      setError(t('auth.errors.passwordLength'));
       return;
     }
 
@@ -234,14 +236,14 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
       if (error) throw error;
 
       onRecoveryComplete?.();
-      setMessage('Contraseña actualizada correctamente. Redirigiendo...');
+      setMessage(t('auth.messages.passwordUpdated'));
       setTimeout(() => {
         setMode('login');
         setPassword('');
         setConfirmPassword('');
       }, 2000);
     } catch (err: any) {
-      setError(err.message || 'Error al actualizar la contraseña');
+      setError(err.message || t('auth.errors.update'));
     } finally {
       setLoading(false);
     }
@@ -260,14 +262,14 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
               <User className="w-8 h-8 text-accent-ink" />
             </div>
-            <h2 className="text-3xl font-bold text-ink mb-2">Iniciar Sesión</h2>
-            <p className="text-ink-3">Accede a tus grupos guardados</p>
+            <h2 className="text-3xl font-bold text-ink mb-2">{t('auth.login')}</h2>
+            <p className="text-ink-3">{t('auth.loginSubtitle')}</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Correo o usuario administrador
+                {t('auth.identifier')}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -275,7 +277,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                   type="text" autoComplete="username" autoCapitalize="none" spellCheck={false}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Correo o AdminF"
+                  placeholder={t('auth.identifierPlaceholder')}
                   required
                   className="w-full pl-10 pr-4 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -284,7 +286,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Contraseña
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -318,7 +320,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
               disabled={loading}
               className="w-full bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover transition-colors font-semibold shadow-card disabled:opacity-50"
             >
-              {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+              {loading ? t('auth.loggingIn') : t('auth.login')}
             </button>
 
             <div className="text-center space-y-2">
@@ -327,16 +329,16 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                 onClick={() => setMode('forgot-password')}
                 className="text-sm text-accent-ink hover:text-accent-ink font-medium"
               >
-                ¿Olvidaste tu contraseña?
+                {t('auth.forgot')}
               </button>
               <div className="text-sm text-ink-3">
-                ¿No tienes cuenta?{' '}
+                {t('auth.noAccount')}{' '}
                 <button
                   type="button"
                   onClick={() => setMode('register')}
                   className="text-accent-ink hover:text-accent-ink font-medium"
                 >
-                  Regístrate
+                  {t('auth.registerLink')}
                 </button>
               </div>
             </div>
@@ -344,7 +346,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
           {onShowPlans && (
             <button type="button" onClick={onShowPlans}
               className="mt-6 w-full rounded-xl border border-line bg-card-2 px-6 py-3 font-semibold text-ink-2 transition-colors hover:bg-neutral-hover">
-              Ver planes
+              {t('auth.plans')}
             </button>
           )}
         </div>
@@ -365,20 +367,20 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
               <User className="w-8 h-8 text-accent-ink" />
             </div>
-            <h2 className="text-3xl font-bold text-ink mb-2">Crear Cuenta</h2>
-            <p className="text-ink-3">Guarda tus grupos y accede desde cualquier dispositivo</p>
+            <h2 className="text-3xl font-bold text-ink mb-2">{t('auth.createAccount')}</h2>
+            <p className="text-ink-3">{t('auth.registerSubtitle')}</p>
           </div>
 
           <form onSubmit={handleRegister} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-ink-2 mb-2">Nombre</label>
+              <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.name')}</label>
               <div className="relative">
                 <User className="absolute left-3 top-3.5 text-ink-4" size={20} />
                 <input
                   type="text"
                   value={displayName}
                   onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Tu nombre"
+                  placeholder={t('auth.namePlaceholder')}
                   required
                   className="w-full pl-10 pr-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -386,7 +388,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-ink-2 mb-2">Nick único</label>
+              <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.nick')}</label>
               <div className="relative">
                 <User className="absolute left-3 top-3.5 text-ink-4" size={20} />
                 <input
@@ -398,7 +400,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                     setNickSuggestion('');
                   }}
                   onBlur={() => void checkNick()}
-                  placeholder="Tu nombre dentro de Omiki"
+                  placeholder={t('auth.nickPlaceholder')}
                   minLength={2}
                   maxLength={24}
                   required
@@ -407,11 +409,11 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                 {nickStatus === 'available' && <Check className="absolute right-3 top-3.5 text-accent-ink" size={20} />}
                 {nickStatus === 'taken' && <X className="absolute right-3 top-3.5 text-red-500" size={20} />}
               </div>
-              {nickStatus === 'checking' && <p className="text-xs text-ink-3 mt-1">Comprobando disponibilidad…</p>}
-              {nickStatus === 'available' && <p className="text-xs text-accent-ink mt-1">Nick disponible</p>}
+              {nickStatus === 'checking' && <p className="text-xs text-ink-3 mt-1">{t('auth.checkingNick')}</p>}
+              {nickStatus === 'available' && <p className="text-xs text-accent-ink mt-1">{t('auth.nickAvailable')}</p>}
               {nickStatus === 'taken' && (
                 <p className="text-xs text-red-600 mt-1">
-                  Este nick no está disponible.
+                  {t('auth.nickTaken')}
                   {nickSuggestion && (
                     <button
                       type="button"
@@ -422,7 +424,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                       }}
                       className="ml-1 font-semibold underline"
                     >
-                      Usar {nickSuggestion}
+                      {t('auth.useNick', { nick: nickSuggestion })}
                     </button>
                   )}
                 </p>
@@ -430,7 +432,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-ink-2 mb-2">Avatar</label>
+              <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.avatar')}</label>
               <div className="grid grid-cols-5 gap-2">
                 {AVATAR_OPTIONS.map((avatar) => (
                   <button
@@ -440,7 +442,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                     className={`aspect-square rounded-full overflow-hidden border-2 transition-all ${
                       avatarUrl === avatar.url ? 'border-accent ring-2 ring-accent-ring' : 'border-line'
                     }`}
-                    aria-label={`Seleccionar ${avatar.name}`}
+                    aria-label={t('auth.selectAvatar', { name: avatar.name })}
                     aria-pressed={avatarUrl === avatar.url}
                   >
                     <img src={avatar.url} alt="" loading="lazy" className="w-full h-full object-cover" />
@@ -451,7 +453,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Correo Electrónico
+                {t('auth.email')}
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -468,7 +470,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Contraseña
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -476,7 +478,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder={t('auth.minPassword')}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -492,7 +494,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Confirmar Contraseña
+                {t('auth.confirmPassword')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -500,7 +502,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repite tu contraseña"
+                  placeholder={t('auth.repeatPassword')}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -516,7 +518,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-3">
-                Tipo de usuario
+                {t('auth.userType')}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {tierOptions.map((tier) => {
@@ -558,17 +560,17 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
               disabled={loading}
               className="w-full bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover transition-colors font-semibold shadow-card disabled:opacity-50"
             >
-              {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
+              {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
             </button>
 
             <div className="text-center text-sm text-ink-3">
-              ¿Ya tienes cuenta?{' '}
+              {t('auth.hasAccount')}{' '}
               <button
                 type="button"
                 onClick={() => setMode('login')}
                 className="text-accent-ink hover:text-accent-ink font-medium"
               >
-                Inicia sesión
+                {t('auth.login')}
               </button>
             </div>
           </form>
@@ -594,14 +596,14 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
               <Lock className="w-8 h-8 text-accent-ink" />
             </div>
-            <h2 className="text-3xl font-bold text-ink mb-2">Nueva Contraseña</h2>
-            <p className="text-ink-3">Ingresa tu nueva contraseña</p>
+            <h2 className="text-3xl font-bold text-ink mb-2">{t('auth.resetTitle')}</h2>
+            <p className="text-ink-3">{t('auth.resetSubtitle')}</p>
           </div>
 
           <form onSubmit={handleResetPassword} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Nueva Contraseña
+                {t('auth.resetTitle')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -609,7 +611,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder={t('auth.minPassword')}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -625,7 +627,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">
-                Confirmar Nueva Contraseña
+                {t('auth.confirmNewPassword')}
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -633,7 +635,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                   type={showConfirmPassword ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repite tu contraseña"
+                  placeholder={t('auth.repeatPassword')}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
@@ -665,7 +667,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
               disabled={loading}
               className="w-full bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover transition-colors font-semibold shadow-card disabled:opacity-50"
             >
-              {loading ? 'Actualizando...' : 'Actualizar Contraseña'}
+              {loading ? t('auth.updating') : t('auth.updatePassword')}
             </button>
           </form>
         </div>
@@ -685,14 +687,14 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
           <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
             <Mail className="w-8 h-8 text-accent-ink" />
           </div>
-          <h2 className="text-3xl font-bold text-ink mb-2">Recuperar Contraseña</h2>
-          <p className="text-ink-3">Te enviaremos un enlace para restablecer tu contraseña</p>
+          <h2 className="text-3xl font-bold text-ink mb-2">{t('auth.recoverTitle')}</h2>
+          <p className="text-ink-3">{t('auth.recoverSubtitle')}</p>
         </div>
 
         <form onSubmit={handleForgotPassword} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-ink-2 mb-2">
-              Correo o usuario administrador
+              {t('auth.identifier')}
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-3.5 text-ink-4" size={20} />
@@ -700,7 +702,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
                 type="text" autoComplete="username" autoCapitalize="none" spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Correo o AdminF"
+                placeholder={t('auth.identifierPlaceholder')}
                 required
                 className="w-full pl-10 pr-4 py-3 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
               />
@@ -725,7 +727,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
             disabled={loading}
             className="w-full bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover transition-colors font-semibold shadow-card disabled:opacity-50"
           >
-            {loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
+            {loading ? t('auth.sending') : t('auth.sendRecovery')}
           </button>
         </form>
       </div>

@@ -9,11 +9,13 @@ import { ThemeToggle } from './ThemeToggle';
 type CheckoutState = Awaited<ReturnType<typeof playerCheckoutService.load>>;
 interface Props {
   userId: string;
+  /** Value of `stripe_checkout` captured by App before it cleans the URL. */
+  checkoutReturn?: string | null;
   onBack: () => void;
   onDone: () => Promise<void>;
   service?: typeof playerCheckoutService;
 }
-export function PlayerCheckout({ userId, onBack, onDone, service = playerCheckoutService }: Props) {
+export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, service = playerCheckoutService }: Props) {
   const [state, setState] = useState<CheckoutState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,7 +24,7 @@ export function PlayerCheckout({ userId, onBack, onDone, service = playerCheckou
   useEffect(() => {
     mounted.current = true;
     let live = true;
-    const returned = new URLSearchParams(window.location.search).get('stripe_checkout') === 'success';
+    const returned = checkoutReturn === 'success';
     const load = returned ? service.refresh(userId) : service.load(userId);
     load.then(value => { if (live) { setState(value); setError(''); } }).catch(cause => { if (live) setError(cause.message); });
     // The webhook can arrive after the browser returns. Poll only the database.
@@ -31,7 +33,7 @@ export function PlayerCheckout({ userId, onBack, onDone, service = playerCheckou
     }, 2500) : undefined;
     const stop = window.setTimeout(() => window.clearInterval(timer), 60000);
     return () => { live = false; mounted.current = false; window.clearInterval(timer); window.clearTimeout(stop); };
-  }, [userId, service]);
+  }, [userId, service, checkoutReturn]);
   const run = async (action: () => Promise<void>) => {
     if (working.current) return;
     working.current = true; setBusy(true); setError('');
@@ -61,7 +63,7 @@ export function PlayerCheckout({ userId, onBack, onDone, service = playerCheckou
           </div>
           <p className="mb-5 text-center text-sm text-ink-3">{state.completed ? 'Stripe ha confirmado el pago de prueba. No se ha realizado ningún cobro real.' : `Tu correo está confirmado. Continúa a Stripe para activar ${plan.name} con una tarjeta de prueba.`}</p>
           {!state.completed && <p className="mb-4 text-center text-sm text-ink-3">Tarjeta de prueba: 4242 4242 4242 4242. Usa una fecha futura y cualquier CVC de 3 cifras.</p>}
-          {new URLSearchParams(window.location.search).get('stripe_checkout') === 'cancelled' && !state.completed && <p role="status" className="mb-4 text-sm text-ink-3">Has vuelto sin completar el pago. Puedes retomarlo.</p>}
+          {checkoutReturn === 'cancelled' &&!state.completed && <p role="status" className="mb-4 text-sm text-ink-3">Has vuelto sin completar el pago. Puedes retomarlo.</p>}
           {state.readOnly && <p className="mb-4 text-sm text-ink-3">Esta cuenta tiene permisos de solo lectura.</p>}
           {!state.completed && state.existingPaidPlan && <p className="mb-4 text-sm text-ink-3">La cuenta ya tiene una suscripción. Comprueba su estado antes de continuar.</p>}
           <button type="button" disabled={busy || (!state.completed && (state.readOnly || state.existingPaidPlan))} onClick={() => void run(async () => {

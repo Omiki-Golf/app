@@ -40,6 +40,7 @@ import { useSubscription } from './hooks/useSubscription';
 import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 
 type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'notifications' | 'pro-shop';
 
@@ -56,7 +57,8 @@ interface RoundState {
 }
 
 const GlobalThemeSwitch = () => (
-  <div className="fixed right-3 top-3 z-[100]">
+  <div className="fixed right-3 top-3 z-[100] flex items-center gap-2">
+    <LanguageSwitcher />
     <ThemeToggle />
   </div>
 );
@@ -76,6 +78,11 @@ function App() {
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
     () => new URLSearchParams(window.location.search).get('email-confirmed') === '1'
+  );
+  // Stripe returns with ?stripe_checkout=success|cancelled. Read it once and
+  // drop it from the address bar so it does not survive logout or reloads.
+  const [checkoutReturn, setCheckoutReturn] = useState(
+    () => new URLSearchParams(window.location.search).get('stripe_checkout')
   );
   const [roundState, setRoundState] = useState<RoundState>({
     round: null,
@@ -198,6 +205,12 @@ function App() {
     url.searchParams.delete('email-confirmed');
     window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, [emailConfirmed]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('stripe_checkout')) return;
+    url.searchParams.delete('stripe_checkout');
+    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+  }, []);
   useEffect(() => {
     const checkIncognito = () => {
       try {
@@ -822,7 +835,7 @@ function App() {
   );
 
   if (currentView === 'player-checkout' && user) {
-    return <PlayerCheckout key={user.id} userId={user.id} onBack={() => setCurrentView('main')} onDone={async () => { await refreshSubscription(); setCurrentGroup(null); setCurrentView('main'); }} />;
+    return <PlayerCheckout key={user.id} userId={user.id} checkoutReturn={checkoutReturn} onBack={() => { setCheckoutReturn(null); setCurrentView('main'); }} onDone={async () => { await refreshSubscription(); setCheckoutReturn(null); setCurrentGroup(null); setCurrentView('main'); }} />;
   }
 
   if (emailConfirmed) {

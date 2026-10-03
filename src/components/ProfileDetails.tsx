@@ -5,6 +5,7 @@ import { Check, CheckCircle2, Loader2, Save, User, X } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
+import { useTranslation } from 'react-i18next';
 
 interface ProfileDetailsProps {
   profile: UserProfile | null;
@@ -21,6 +22,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   onBack,
   onSaved,
 }) => {
+  const { t } = useTranslation();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [nick, setNick] = useState(profile?.nick ?? '');
   const [avatarUrl, setAvatarUrl] = useState(normalizeAvatarUrl(profile?.avatar_url));
@@ -68,7 +70,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       return false;
     } catch {
       setNickStatus('idle');
-      setError('No se ha podido comprobar el nick. Inténtalo de nuevo.');
+      setError(t('auth.errors.nickCheck'));
       return false;
     }
   };
@@ -77,7 +79,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     event.preventDefault();
     if (!displayName.trim()) return;
     if (!profile && !(await checkNick())) {
-      setError('Elige un nick disponible.');
+      setError(t('auth.errors.nick'));
       return;
     }
 
@@ -105,7 +107,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       setSaved(true);
     } catch (saveError) {
       console.error('Error actualizando el perfil:', saveError);
-      setError('No se han podido guardar los datos. Comprueba el nick e inténtalo de nuevo.');
+      setError(t('profile.saveError'));
     } finally {
       setSaving(false);
     }
@@ -124,18 +126,18 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
             <div className="inline-flex items-center justify-center w-14 h-14 bg-accent-soft rounded-full mb-3">
               <User className="text-accent-ink" size={28} />
             </div>
-            <h1 className="text-2xl font-bold text-ink">Mis datos de registro</h1>
-            <p className="text-sm text-ink-3 mt-1">Personaliza cómo te ven los demás jugadores.</p>
+            <h1 className="text-2xl font-bold text-ink">{t('profile.details')}</h1>
+            <p className="text-sm text-ink-3 mt-1">{t('profile.detailsDescription')}</p>
           </div>
 
           <WriteForm onSubmit={handleSave} className="space-y-6">
               {!profile && (
                 <div className="rounded-xl border border-accent-ring bg-accent-soft p-4 text-sm text-ink-2">
-                  Tu cuenta es anterior a los nuevos perfiles. Completa estos datos una sola vez para crear el tuyo.
+                  {t('profile.legacy')}
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-ink-2 mb-2">Correo electrónico</label>
+                <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.email')}</label>
                 <input value={email ?? ''} disabled className="w-full px-4 py-3 bg-card-2 text-ink-3 border border-line rounded-xl opacity-80" />
               </div>
 
@@ -154,7 +156,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                     required
                     minLength={2}
                     maxLength={24}
-                    placeholder="Tu nombre dentro de Omiki"
+                    placeholder={t('auth.nickPlaceholder')}
                     className={`w-full px-4 py-3 pr-10 border rounded-xl ${
                       profile ? 'bg-card-2 text-ink-3 border-line opacity-80' : 'bg-card text-ink border-line-2 focus:ring-2 focus:ring-accent'
                     }`}
@@ -163,14 +165,14 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                   {!profile && nickStatus === 'taken' && <X className="absolute right-3 top-3.5 text-red-500" size={20} />}
                 </div>
                 {profile ? (
-                  <p className="text-xs text-ink-4 mt-1">El nick no se puede modificar por ahora.</p>
+                  <p className="text-xs text-ink-4 mt-1">{t('profile.nickLocked')}</p>
                 ) : (
                   <>
-                    {nickStatus === 'checking' && <p className="text-xs text-ink-3 mt-1">Comprobando disponibilidad…</p>}
-                    {nickStatus === 'available' && <p className="text-xs text-accent-ink mt-1">Nick disponible</p>}
+                    {nickStatus === 'checking' && <p className="text-xs text-ink-3 mt-1">{t('auth.checkingNick')}</p>}
+                    {nickStatus === 'available' && <p className="text-xs text-accent-ink mt-1">{t('auth.nickAvailable')}</p>}
                     {nickStatus === 'taken' && (
                       <p className="text-xs text-red-600 mt-1">
-                        Este nick no está disponible.
+                        {t('auth.nickTaken')}
                         {nickSuggestion && (
                           <button
                             type="button"
@@ -181,7 +183,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                             }}
                             className="ml-1 font-semibold underline"
                           >
-                            Usar {nickSuggestion}
+                            {t('auth.useNick', { nick: nickSuggestion })}
                           </button>
                         )}
                       </p>
@@ -191,7 +193,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-ink-2 mb-2">Nombre</label>
+                <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.name')}</label>
                 <input
                   value={displayName}
                   onChange={(event) => {
@@ -205,7 +207,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               </div>
 
               <fieldset>
-                <legend className="block text-sm font-medium text-ink-2 mb-3">Avatar</legend>
+                <legend className="block text-sm font-medium text-ink-2 mb-3">{t('auth.avatar')}</legend>
                 <div className="grid grid-cols-5 gap-3">
                   {AVATAR_OPTIONS.map((avatar) => (
                     <button
@@ -218,7 +220,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       className={`aspect-square rounded-full overflow-hidden border-2 transition-all ${
                         avatarUrl === avatar.url ? 'border-accent ring-2 ring-accent-ring' : 'border-line'
                       }`}
-                      aria-label={`Seleccionar ${avatar.name}`}
+                      aria-label={t('auth.selectAvatar', { name: avatar.name })}
                       aria-pressed={avatarUrl === avatar.url}
                     >
                       <img src={avatar.url} alt="" loading="lazy" className="w-full h-full object-cover" />
@@ -230,7 +232,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               {error && <p className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</p>}
               {saved && (
                 <p className="flex items-center gap-2 rounded-xl bg-accent-soft border border-accent-ring text-accent-ink px-4 py-3 text-sm">
-                  <CheckCircle2 size={18} /> Cambios guardados.
+                  <CheckCircle2 size={18} /> {t('profile.saved')}
                 </p>
               )}
 
@@ -240,7 +242,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover font-semibold disabled:opacity-50"
               >
                 {saving ? <Loader2 size={19} className="animate-spin" /> : <Save size={19} />}
-                {saving ? 'Guardando…' : profile ? 'Guardar cambios' : 'Crear mi perfil'}
+                {saving ? t('profile.saving') : profile ? t('profile.save') : t('profile.create')}
               </button>
             </WriteForm>
         </section>

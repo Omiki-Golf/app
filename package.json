@@ -24,10 +24,12 @@
     "@supabase/supabase-js": "^2.57.4",
     "html-to-image": "^1.11.13",
     "html2canvas-pro": "^2.4.0",
+    "i18next": "^26.4.2",
     "lucide-react": "^1.33.0",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.15"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.14",

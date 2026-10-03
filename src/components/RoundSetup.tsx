@@ -7,6 +7,7 @@ import { Bell, ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-reac
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
+import { useTranslation } from 'react-i18next';
 import { safeStorage } from '../utils/safeStorage';
 import { MAX_EXPRESS_GAMES } from '../services/expressTierGuard';
 import { ParTeeUpgradeModal } from './ParTeeUpgradeModal';
@@ -47,6 +48,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   onShowNotifications,
   notificationCount = 0,
 }) => {
+  const { t } = useTranslation();
   const isExpress = planType === 'express';
   const handleGameModeClick = (mode: GameMode) => {
     if (isExpress && mode !== 'stableford') {
@@ -145,7 +147,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         setSelectedCourse(courseExists ? lastCourseId : data[0].id);
       }
     } catch (err) {
-      setError('Error cargando campos de golf');
+      setError(t('roundSetup.errors.courses'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -183,7 +185,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         if (isExpress) {
           const existingCount = await golfService.countQuickRounds();
           if (existingCount >= MAX_EXPRESS_GAMES) {
-            setError('Has alcanzado el límite máximo de 4 partidas del plan Express.');
+            setError(t('roundSetup.errors.expressLimit'));
             setShowUpgradeModal(true);
             return;
           }
@@ -191,14 +193,14 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
         const hasActive = await golfService.hasActiveQuickPlayRound();
         if (hasActive) {
-          setError('Tienes una partida en curso. Debes finalizarla o eliminarla antes de crear una nueva.');
+          setError(t('roundSetup.errors.active'));
           setLoading(false);
           return;
         }
 
         const hasCompleted = await golfService.hasCompletedQuickPlayRound();
         if (hasCompleted) {
-          setError('Tienes una partida finalizada pendiente de archivar. Ve a Mis Partidas para archivarla antes de crear una nueva.');
+          setError(t('roundSetup.errors.archive'));
           setLoading(false);
           return;
         }
@@ -211,7 +213,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     }
 
     if (!selectedCourse) {
-      setError('Por favor selecciona un campo');
+      setError(t('roundSetup.errors.selectCourse'));
       return;
     }
 
@@ -247,7 +249,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
       onRoundCreated(round.id, round.course_id, round.num_holes, round.use_slope);
     } catch (err: any) {
       console.error('Error al crear la partida:', err);
-      setError(err.message || 'Error al crear la partida');
+      setError(err.message || t('roundSetup.errors.create'));
     } finally {
       setLoading(false);
     }
@@ -303,7 +305,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
       setPinError('');
       proceedWithRoundCreation();
     } else {
-      setPinError('PIN incorrecto. Inténtalo de nuevo.');
+      setPinError(t('roundSetup.errors.pin'));
     }
   };
 
@@ -316,7 +318,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        {onShowNotifications && <div className="flex justify-start"><button type="button" onClick={onShowNotifications} title="Notificaciones" aria-label={`Notificaciones: ${notificationCount} pendientes`} className="relative w-11 h-11 rounded-full border border-line bg-card shadow-soft flex items-center justify-center text-accent-ink">
+        {onShowNotifications && <div className="flex justify-start"><button type="button" onClick={onShowNotifications} title={t('common.notifications')} aria-label={`${t('common.notifications')}: ${notificationCount}`} className="relative w-11 h-11 rounded-full border border-line bg-card shadow-soft flex items-center justify-center text-accent-ink">
           <Bell size={22} />
           {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold min-w-5 h-5 px-1 rounded-full">{notificationCount}</span>}
         </button></div>}
@@ -335,7 +337,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             </h1>
           </div>
           <p className="text-accent-ink text-lg">
-            {currentGroup ? 'Gestor de Partidas y Puntuación' : 'Partida Rápida'}
+            {currentGroup ? t('roundSetup.manager') : t('roundSetup.quick')}
           </p>
         </div>
 
@@ -345,17 +347,17 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             <Info className="text-amber-600 dark:text-amber-300 flex-shrink-0" size={24} />
             <div className="text-sm">
               <p className="font-semibold">
-                Modo Express
+                {t('roundSetup.express')}
               </p>
               <p className="text-amber-800 dark:text-amber-200">
-                Te quedan <span className="font-bold text-amber-700 dark:text-amber-300 text-base">{Math.max(0, MAX_EXPRESS_GAMES - quickPlayRoundsCount)}</span> de {MAX_EXPRESS_GAMES} partidas disponibles en esta modalidad.
+                {t('roundSetup.remaining', { remaining: Math.max(0, MAX_EXPRESS_GAMES - quickPlayRoundsCount), total: MAX_EXPRESS_GAMES })}
               </p>
             </div>
           </div>
         ) : (
           <div className="bg-card border border-line rounded-xl p-4 text-ink-2 flex items-center gap-3 shadow-card">
             <Info className="text-accent-ink flex-shrink-0" size={24} />
-            <p className="text-sm">Llevas <span className="font-bold">{quickPlayRoundsCount}</span> partidas</p>
+            <p className="text-sm">{t('roundSetup.played', { count: quickPlayRoundsCount })}</p>
           </div>
         ))}
 
@@ -363,18 +365,18 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         {currentGroup && !hasLimitedAccess && (
           <div className="bg-card rounded-lg shadow-card p-6">
             <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-semibold text-ink">Código de Grupo</h3>
+              <h3 className="text-lg font-semibold text-ink">{t('roundSetup.groupCode')}</h3>
               <button
                 onClick={onLeaveGroup}
                 className="text-red-600 hover:text-red-700 flex items-center gap-1 text-sm font-medium transition-colors"
-                title="Salir del grupo"
+                title={t('roundSetup.leaveGroup')}
               >
                 <LogOut size={16} />
-                Salir
+                {t('roundSetup.leave')}
               </button>
             </div>
             <p className="text-sm text-ink-3 mb-3">
-              Comparte este código con otros para que puedan participar en las partidas del grupo:
+              {t('roundSetup.shareCode')}
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-accent-soft border-2 border-green-300 rounded-lg px-4 py-3 text-center">
@@ -385,13 +387,13 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               <button
                 onClick={handleCopyGroupCode}
                 className="bg-accent hover:bg-accent-hover text-on-accent p-3 rounded-lg transition-colors"
-                title="Copiar código"
+                title={t('groups.copyCode')}
               >
                 {codeCopied ? <Check size={24} /> : <Copy size={24} />}
               </button>
             </div>
             {currentGroup.name && (
-              <p className="text-sm text-ink-3 mt-2">Grupo: {currentGroup.name}</p>
+              <p className="text-sm text-ink-3 mt-2">{t('roundSetup.group', { name: currentGroup.name })}</p>
             )}
           </div>
         )}
@@ -402,12 +404,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             onClick={onJoinWithCode}
             className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
           >
-            <h2 className="text-2xl font-bold text-purple-900 mb-4">Unirse con Código a una partida</h2>
+            <h2 className="text-2xl font-bold text-purple-900 mb-4">{t('roundSetup.joinTitle')}</h2>
             <p className="text-ink-2 mb-6">
-              ¿Tienes un código de acceso? Úsalo para unirte a una partida existente y editar las puntuaciones.
+              {t('roundSetup.joinDescription')}
             </p>
             <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-              Introducir Código
+              {t('roundSetup.enterCode')}
               <ChevronRight size={20} />
             </button>
           </div>
@@ -421,7 +423,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           >
             <span className="flex items-center gap-2">
               <LogOut size={16} />
-              Salir del grupo
+              {t('roundSetup.leaveGroup')}
             </span>
           </button>
         )}
@@ -430,7 +432,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           {/* Nueva Partida */}
           {isGroupCreator && !hasLimitedAccess && (
             <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-              <h2 className="text-2xl font-bold text-title mb-6">Nueva Partida</h2>
+              <h2 className="text-2xl font-bold text-title mb-6">{t('roundSetup.newRound')}</h2>
 
               {error && (
                 <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded mb-4">
@@ -441,7 +443,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-2">
-                    Selecciona un Campo
+                    {t('roundSetup.selectCourse')}
                   </label>
                   <select
                     value={selectedCourse || ''}
@@ -449,7 +451,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     disabled={loading}
                     className="w-full px-4 py-3 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent disabled:bg-gray-100"
                   >
-                    <option value="">-- Selecciona un campo --</option>
+                    <option value="">{t('roundSetup.coursePlaceholder')}</option>
                     {courses.map((course) => (
                       <option key={course.id} value={course.id}>
                         {course.name}
@@ -460,7 +462,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-3">
-                    Número de Hoyos
+                    {t('roundSetup.holes')}
                   </label>
                   <div className="flex gap-3">
                     <button
@@ -471,7 +473,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                           : 'bg-neutral text-ink hover:bg-neutral-hover'
                       }`}
                     >
-                      9 Hoyos
+                      {t('roundSetup.holesCount', { count: 9 })}
                     </button>
                     <button
                       onClick={() => handleNumHolesChange(18)}
@@ -481,14 +483,14 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                           : 'bg-neutral text-ink hover:bg-neutral-hover'
                       }`}
                     >
-                      18 Hoyos
+                      {t('roundSetup.holesCount', { count: 18 })}
                     </button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-3">
-                    Cálculo de Handicap
+                    {t('roundSetup.handicap')}
                   </label>
                   <div className="flex gap-3">
                     <button
@@ -499,7 +501,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                           : 'bg-neutral text-ink hover:bg-neutral-hover'
                       }`}
                     >
-                      Con Slope
+                      {t('roundSetup.withSlope')}
                     </button>
                     <button
                       onClick={() => setUseSlope(false)}
@@ -509,7 +511,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                           : 'bg-neutral text-ink hover:bg-neutral-hover'
                       }`}
                     >
-                      Sin Slope
+                      {t('roundSetup.withoutSlope')}
                     </button>
                   </div>
                 </div>
@@ -517,7 +519,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                 {useSlope && tees.length > 0 && (
                   <div>
                     <label className="block text-sm font-semibold text-ink-2 mb-3">
-                      Selecciona Barras
+                      {t('roundSetup.selectTee')}
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       {tees.map((tee) => (
@@ -543,7 +545,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-3">
-                    Modalidad de Juego
+                    {t('roundSetup.gameMode')}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button
@@ -591,13 +593,13 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     </button>
                   </div>
                   {gameMode === 'match' && (
-                    <p className="text-xs text-ink-3 mt-2">2 jugadores. Se gana por hoyo, no por puntos.</p>
+                    <p className="text-xs text-ink-3 mt-2">{t('roundSetup.matchHelp')}</p>
                   )}
                   {gameMode === 'sindicato' && (
-                    <p className="text-xs text-ink-3 mt-2">3 jugadores. 6 puntos por hoyo: 4/2/0, 3/3/0 o 4/1/1.</p>
+                    <p className="text-xs text-ink-3 mt-2">{t('roundSetup.sindicatoHelp')}</p>
                   )}
                   {gameMode === 'parejas' && (
-                    <p className="text-xs text-ink-3 mt-2">2 parejas de 2 jugadores (4 total).</p>
+                    <p className="text-xs text-ink-3 mt-2">{t('roundSetup.pairsHelp')}</p>
                   )}
                 </div>
 
@@ -606,7 +608,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                   disabled={!selectedCourse || loading}
                   className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-on-accent font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors mt-6"
                 >
-                  Crear Partida
+                  {t('roundSetup.create')}
                   <ChevronRight size={20} />
                 </WriteButton>
               </div>
@@ -623,7 +625,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               <div className="p-5 pb-4 flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-                    {currentGroup ? 'Partida Activas' : 'Mi Partida'}
+                    {currentGroup ? t('roundSetup.active') : t('roundSetup.myRound')}
                   </h2>
                   <div className="bg-amber-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
                     {activeRoundsCount}
@@ -631,12 +633,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                 </div>
                 <p className="text-ink-2 text-base leading-relaxed">
                   {currentGroup
-                    ? 'Edita las partidas y observa en tiempo real las puntuaciones de todas las partidas activas.'
-                    : 'Accede a tus partida rápida activa y continúa donde lo dejaste.'}
+                    ? t('roundSetup.activeDescription')
+                    : t('roundSetup.myRoundDescription')}
                 </p>
               </div>
               <button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
-                Ver Partida
+                {t('roundSetup.viewRound')}
                 <ChevronRight size={20} />
               </button>
             </div>
@@ -653,7 +655,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               >
                 <div className="p-5 pb-4 flex-1">
                   <div className="flex items-start justify-between mb-3">
-                    <h2 className="text-2xl font-bold text-blue-900 dark:text-blue-100">Estadísticas</h2>
+                    <h2 className="text-2xl font-bold text-blue-900 dark:text-blue-100">{t('roundSetup.statistics')}</h2>
                     <div className="bg-blue-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-base shadow-soft">
                       {completedRounds.length}
                     </div>
@@ -661,8 +663,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
                   <p className="text-ink-2 text-base leading-relaxed">
                     {completedRounds.length > 0
-                      ? 'Ver premios y estadísticas del historial de partidas'
-                      : 'No hay partidas completadas o archivadas para mostrar'}
+                      ? t('roundSetup.statsAvailable')
+                      : t('roundSetup.statsEmpty')}
                   </p>
                 </div>
 
@@ -674,7 +676,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     }}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base"
                   >
-                    <span>Ver Estadísticas</span>
+                    <span>{t('roundSetup.viewStatistics')}</span>
                     <ChevronRight size={20} />
                   </button>
                 )}
@@ -689,12 +691,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             onClick={onViewGamePoints}
             className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
           >
-            <h2 className="text-2xl font-bold text-blue-900 mb-4">Puntos de Juego</h2>
+            <h2 className="text-2xl font-bold text-blue-900 mb-4">{t('roundSetup.points')}</h2>
             <p className="text-ink-2 mb-6">
               Consulta las clasificaciones de partidas completadas en el dia, los jugadores registrados y sus handicaps.
             </p>
             <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-              Ver Puntos
+              {t('roundSetup.viewPoints')}
               <ChevronRight size={20} />
             </button>
           </div>
@@ -706,7 +708,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             onClick={onViewStatistics}
             className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
           >
-            <h2 className="text-2xl font-bold text-purple-900 mb-4">Estadísticas</h2>
+            <h2 className="text-2xl font-bold text-purple-900 mb-4">{t('roundSetup.statistics')}</h2>
             <p className="text-ink-2 mb-6">
               Consulta estadísticas de jugadores, del grupo y de campos. Solo para multipartidetas archivadas.
             </p>

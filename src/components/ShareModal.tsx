@@ -2,6 +2,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Share2, Copy, Check, X, QrCode } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ShareModalProps {
   onClose: () => void;
@@ -12,8 +13,9 @@ interface ShareModalProps {
 export default function ShareModal({ 
   onClose, 
   shareUrl = window.location.origin, 
-  title = "¡Únete a Omiki Golf!"
+  title
 }: ShareModalProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [showQR, setShowQR] = useState(false);
 
@@ -24,7 +26,7 @@ export default function ShareModal({
     try {
       await navigator.share({
         title: 'Omiki Golf',
-        text: '¡Lleva el control de tus partidas de golf con amigos!',
+        text: t('share.text'),
         url: shareUrl,
       });
     } catch (err) {
@@ -58,15 +60,15 @@ export default function ShareModal({
           <div className="inline-flex items-center justify-center w-12 h-12 bg-accent-soft rounded-full mb-3 text-accent-ink">
             <Share2 className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-bold text-ink">{title}</h3>
-          <p className="text-sm text-ink-3 mt-1">Comparte con tus amigos para empezar la partida</p>
+          <h3 className="text-xl font-bold text-ink">{title || t('share.title')}</h3>
+          <p className="text-sm text-ink-3 mt-1">{t('share.description')}</p>
         </div>
 
         {/* Muestra QR o Contenido principal */}
         {showQR ? (
           <div className="flex flex-col items-center justify-center p-4 bg-card-2 rounded-xl mb-4 border border-line">
             <QRCodeSVG value={shareUrl} size={180} level="M" includeMargin={true} />
-            <p className="text-xs text-ink-3 mt-3 text-center">Escanea con la cámara del móvil para abrir la app</p>
+            <p className="text-xs text-ink-3 mt-3 text-center">{t('share.scan')}</p>
           </div>
         ) : (
           <div className="space-y-3 mb-4">
@@ -76,7 +78,7 @@ export default function ShareModal({
                 className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent font-semibold py-3 px-4 rounded-xl hover:bg-accent-hover transition-colors shadow-soft"
               >
                 <Share2 className="w-5 h-5" />
-                Compartir (WhatsApp, Apps...)
+                {t('share.native')}
               </button>
             )}
 
@@ -85,7 +87,7 @@ export default function ShareModal({
               className="w-full flex items-center justify-center gap-2 bg-card-2 text-ink font-semibold py-3 px-4 rounded-xl hover:bg-neutral-hover transition-colors border border-line"
             >
               <QrCode className="w-5 h-5 text-ink-3" />
-              Mostrar código QR
+              {t('share.showQr')}
             </button>
           </div>
         )}
@@ -103,7 +105,7 @@ export default function ShareModal({
           <button
             onClick={handleCopy}
             className="bg-card border border-line text-ink-2 p-2 rounded-lg hover:bg-card-2 transition-colors"
-            title="Copiar enlace"
+            title={t('share.copyLink')}
           >
             {copied ? <Check className="w-4 h-4 text-accent-ink" /> : <Copy className="w-4 h-4" />}
           </button>

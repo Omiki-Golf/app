@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -37,15 +38,15 @@ class ErrorBoundary extends Component<Props, State> {
             <div className="text-center">
               <div className="text-red-600 text-6xl mb-4">⚠️</div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Algo salió mal
+                {i18n.t('errorBoundary.title')}
               </h1>
               <p className="text-gray-600 mb-4">
-                La aplicación encontró un error inesperado.
+                {i18n.t('errorBoundary.message')}
               </p>
               {this.state.error && (
                 <details className="text-left bg-gray-50 p-3 rounded mb-4">
                   <summary className="cursor-pointer font-semibold text-gray-700">
-                    Detalles técnicos
+                    {i18n.t('errorBoundary.details')}
                   </summary>
                   <pre className="mt-2 text-xs text-gray-600 overflow-auto">
                     {this.state.error.toString()}
@@ -56,7 +57,7 @@ class ErrorBoundary extends Component<Props, State> {
                 onClick={() => window.location.reload()}
                 className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
               >
-                Recargar página
+                {i18n.t('common.reload')}
               </button>
             </div>
           </div>

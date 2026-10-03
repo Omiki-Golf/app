@@ -1,13 +1,15 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { ArrowLeft, Home, LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface NavigationButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   destination?: 'back' | 'home' | 'logout';
 }
 
 export function NavigationButton({ destination = 'back', className = '', ...props }: NavigationButtonProps) {
+  const { t } = useTranslation();
   const Icon = destination === 'home' ? Home : destination === 'logout' ? LogOut : ArrowLeft;
-  const label = destination === 'home' ? 'Volver al inicio' : destination === 'logout' ? 'Cerrar sesión' : 'Volver a la pantalla anterior';
+  const label = destination === 'home' ? t('common.home') : destination === 'logout' ? t('common.logout') : t('common.back');
   const colors = destination === 'logout'
     ? '!border-red-200 !bg-red-50 !text-red-600 hover:!bg-red-100 hover:!text-red-700'
     : '!border-line !bg-card !text-accent-ink hover:!bg-card-2';
