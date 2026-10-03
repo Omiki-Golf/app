@@ -32,7 +32,7 @@ La configuración está en `.env.local` y usa la URL y la clave pública del mis
 
 ## GitHub
 
-Repositorio: `FedeBaezaPastor/LaPartidetaKF`. Los archivos del Codespace se comparten entre los equipos conectados a ese mismo entorno. La copia local es independiente: sincronizar los commits mediante Git antes de cambiar de entorno y conservar cualquier trabajo pendiente. GitHub guarda los commits que se suben; no sustituye guardar y confirmar el trabajo.
+Repositorio: `Omiki-Golf/app`. Los archivos del Codespace se comparten entre los equipos conectados a ese mismo entorno. La copia local es independiente: sincronizar los commits mediante Git antes de cambiar de entorno y conservar cualquier trabajo pendiente. GitHub guarda los commits que se suben; no sustituye guardar y confirmar el trabajo.
 
 Antes de traer cambios de otras herramientas:
 

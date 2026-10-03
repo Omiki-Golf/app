@@ -4,7 +4,7 @@
 - Guía principal: `LOCAL_SETUP.md`. Codespaces es una alternativa; consultar `CODESPACE_SETUP.md` si se trabaja allí.
 - Usar Node.js 24, instalar las dependencias fijadas con `npm ci` y arrancar con `npm run dev` (normalmente `http://localhost:5173`). En Codespaces usar `npm run dev:codespace`.
 - Las variables públicas de la web están en `.env.local`, excluido de Git. Mantener credenciales, claves SSH y copias de seguridad fuera del repositorio.
-- GitHub: `FedeBaezaPastor/LaPartidetaKF`, rama habitual `main`. Comprobar cambios locales y remotos antes de sincronizar; conservar el trabajo del usuario.
+- GitHub: `Omiki-Golf/app`, rama habitual `main`. Comprobar cambios locales y remotos antes de sincronizar; conservar el trabajo del usuario.
 
 ## Supabase
 

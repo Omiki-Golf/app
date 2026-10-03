@@ -17,7 +17,7 @@ git status
 git fetch origin
 ```
 
-Conservar cualquier cambio local. Si la copia está limpia y no hay commits divergentes, actualizar con `git merge --ff-only origin/main`. Si no existe copia, clonar `https://github.com/FedeBaezaPastor/LaPartidetaKF.git`.
+Conservar cualquier cambio local. Si la copia está limpia y no hay commits divergentes, actualizar con `git merge --ff-only origin/main`. Si no existe copia, clonar `https://github.com/Omiki-Golf/app.git`.
 
 Instalar Node.js 24 y ejecutar:
 

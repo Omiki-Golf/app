@@ -43,7 +43,7 @@ Una aplicación web moderna para gestionar partidas de golf, scorecards y estad�
 
 1. **Clona el repositorio**
 ```bash
-git clone https://github.com/FedeBaezaPastor/LaPartidetaKF.git
+git clone https://github.com/Omiki-Golf/app.git
 cd LaPartidetaKF
 ```
 
@@ -218,7 +218,7 @@ Este proyecto está bajo licencia MIT. Ver `LICENSE` para más detalles.
 **Federico Báez Pastor**
 
 - GitHub: [@FedeBaezaPastor](https://github.com/FedeBaezaPastor)
-- Proyecto: [LaPartidetaKF](https://github.com/FedeBaezaPastor/LaPartidetaKF)
+- Proyecto: [Omiki-Golf/app](https://github.com/Omiki-Golf/app)
 
 ## 🤝 Contribuciones
 
@@ -233,7 +233,7 @@ Las contribuciones son bienvenidas. Por favor:
 ## 📞 Soporte
 
 ¿Encontraste un bug o tienes una sugerencia? 
-- Abre un [Issue](https://github.com/FedeBaezaPastor/LaPartidetaKF/issues)
+- Abre un [Issue](https://github.com/Omiki-Golf/app/issues)
 - Contacta directamente
 
 ## 🔮 Próximas Características

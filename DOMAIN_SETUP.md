@@ -5,10 +5,10 @@ La aplicación sigue alojada en el VPS 169.58.89.28. cdmon gestiona dominio y DN
 - app.omikigolf.com: A hacia 169.58.89.28, TTL 900; dirección principal.
 - omikigolf.com: A hacia 169.58.89.28, TTL 900.
 - www: CNAME hacia omikigolf.com, TTL 900.
-- Raíz y www redirigen con HTTP 307 y Cache-Control no-store a HTTPS en app, conservando ruta y query. El navegador conserva el fragmento al no incluir uno en Location.
+- La raíz y www sirven la web pública independiente desde el repositorio `Omiki-Golf/www`.
 - golf.arinsaldev.com permanece operativo. No se modifica correo, DNSSEC ni servidores DNS.
 
-Cuando exista la web pública, www dejará de redirigir. Ahora no hay una segunda web.
+La aplicación y la web pública se despliegan en contenedores independientes.
 Las sesiones están aisladas por origen; puede ser necesario entrar de nuevo en app.
 
 ## Publicación
@@ -18,11 +18,12 @@ El servidor usa `/var/www/miapp/deploy.sh`, instalado desde `scripts/vps/deploy.
 Este compila la web con el entorno privado del VPS y construye la imagen mediante
 `docker/Dockerfile.vps`, que incorpora `dist` y `scripts/vps/nginx.conf`.
 `docker/Dockerfile.umbrel` corresponde al despliegue independiente en Umbrel.
-Los cuatro dominios
-figuran en VIRTUAL_HOST y LETSENCRYPT_HOST; el proxy Docker y su servicio de
+Los dominios de la aplicación (`app.omikigolf.com` y `golf.arinsaldev.com`)
+figuran en su VIRTUAL_HOST y LETSENCRYPT_HOST; raíz y www pertenecen al contenedor
+`omiki-www-app`. El proxy Docker y su servicio de
 certificados gestionan HTTPS y renovación. No editar la configuración generada del
-proxy ni reiniciar otros servicios. El check verifica app, el dominio antiguo y
-ambas redirecciones temporales.
+proxy ni reiniciar otros servicios. El check verifica HTTP 200 en la app, el
+dominio antiguo y las dos direcciones de la web pública.
 
 La integración local del 30/09/2026 cambia el Dockerfile utilizado por el script.
 Cuando se autorice publicar, `npm run deploy -- --apply` descarga `main`, guarda
@@ -46,7 +47,7 @@ APP_ORIGIN para nuevos enlaces administrativos; el cliente utiliza su origen act
 ## Verificación y reversión
 
 Validar HTTPS, recursos, login y persistencia de sesión en app; HTTP 200 en el dominio
-antiguo; HTTP 307 del raíz y www conservando ruta, query y fragmento en navegador.
+antiguo, la raíz y www.
 Verificar preflight y solicitudes de las tres funciones para orígenes permitidos y
 rechazo 403 de orígenes ajenos. No enviar correos reales para pruebas automáticas.
 

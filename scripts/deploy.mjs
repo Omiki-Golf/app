@@ -42,12 +42,9 @@ try {
     if (response.status !== 200) throw new Error(`${origin} responde HTTP ${response.status}.`);
   }
   for (const origin of ['https://omikigolf.com', 'https://www.omikigolf.com']) {
-    const path = '/?deploy_check=redirect';
-    const response = await fetch(`${origin}${path}`, { redirect: 'manual', signal: AbortSignal.timeout(30000) });
+    const response = await fetch(`${origin}/?deploy_check=${Date.now()}`, { redirect: 'manual', signal: AbortSignal.timeout(30000) });
     await response.body?.cancel();
-    if (response.status !== 307 || response.headers.get('location') !== `https://app.omikigolf.com${path}`) {
-      throw new Error(`${origin} no redirige temporalmente a app.omikigolf.com.`);
-    }
+    if (response.status !== 200) throw new Error(`${origin} responde HTTP ${response.status}.`);
   }
   console.log(apply ? 'Publicación completada; contenedor activo y web HTTP 200.' : 'Comprobaciones completadas. No se ha publicado. Para publicar el commit subido: npm run deploy -- --apply');
 } catch (error) {
