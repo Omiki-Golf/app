@@ -40,7 +40,6 @@ import { useSubscription } from './hooks/useSubscription';
 import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
-import { LanguageSwitcher } from './components/LanguageSwitcher';
 
 type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'notifications' | 'pro-shop';
 
@@ -57,8 +56,7 @@ interface RoundState {
 }
 
 const GlobalThemeSwitch = () => (
-  <div className="fixed right-3 top-3 z-[100] flex items-center gap-2">
-    <LanguageSwitcher />
+  <div className="fixed right-3 top-3 z-[100]">
     <ThemeToggle />
   </div>
 );
@@ -857,6 +855,13 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <PlansComparison backDestination={returnToProfile ? 'back' : 'home'}
             onBack={() => backFromProfileSection('main')}
+            currentPlan={user ? activePlanType : undefined}
+            onStartTeamTrial={user && activePlanType === 'player' ? async () => {
+              await userService.startTeamTrial();
+              await refreshSubscription();
+              setReturnToProfile(false);
+              setCurrentView('profile');
+            } : undefined}
             onSelectPlan={(plan) => {
               if (plan === 'express') {
                 setCurrentView('main');
@@ -870,7 +875,7 @@ function App() {
               if (user) setCurrentView(pendingPlayer ? 'player-checkout' : 'profile');
               else setCurrentView('registration');
             }}
-            onShowAuth={() => openAuth('plans')}
+            onShowAuth={user ? undefined : () => openAuth('plans')}
           />
         </div>
       </>
@@ -881,7 +886,7 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
+        {!user && <GlobalThemeSwitch />}
         <div className={isIncognito ? 'pt-10' : ''}>
           <RegistrationForm
             period={registrationPeriod}
@@ -900,7 +905,7 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
+        {!user && <GlobalThemeSwitch />}
         <div className={`min-h-screen bg-app flex items-center justify-center ${isIncognito ? 'pt-10' : ''}`}>
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-accent mx-auto mb-4"></div>
@@ -915,7 +920,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         {profileSaved && (
           <div
             role="status"
@@ -953,7 +957,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <ProfileDetails
             profile={profile}
@@ -975,7 +978,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <TeamCreation
             userId={user.id}
@@ -994,7 +996,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <NotificationsBell
             key={user?.id || 'express'}
@@ -1013,7 +1014,7 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
+        {!user && <GlobalThemeSwitch />}
         <div className={isIncognito ? 'pt-10' : ''}>
           <ProShop
             groupId={currentGroup.id}
@@ -1030,7 +1031,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <Auth backDestination={authReturnView === 'main' ? 'home' : 'back'}
             onShowPlans={() => { setReturnToProfile(false); setCurrentView('plans'); }}
@@ -1056,7 +1056,6 @@ function App() {
     return (
       <>
         <IncognitoWarning />
-        <GlobalThemeSwitch />
         <div className={isIncognito ? 'pt-10' : ''}>
           <MyGroups backDestination={returnToProfile ? 'back' : 'home'}
             onBack={() => backFromProfileSection('main')}
@@ -1134,7 +1133,7 @@ function App() {
   return (
     <div className="min-h-screen bg-app">
       <IncognitoWarning />
-      <GlobalThemeSwitch />
+      {!user && <GlobalThemeSwitch />}
       <div className={isIncognito ? 'pt-10' : ''}>
       {currentView === 'main' && currentGroup && (
         <RoundSetup

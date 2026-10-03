@@ -28,6 +28,20 @@ test("effective plans: active, expired, indefinite and Express fallback", async 
   );
   const now = Date.parse("2026-09-11T12:00:00Z");
   assert.equal(effectivePlan(null, now), "express");
+  assert.equal(
+    effectivePlan(
+      { plan_type: "player", status: "active", current_period_end: "2026-09-01", team_trial_ends_at: "2026-09-20" },
+      now,
+    ),
+    "team",
+  );
+  assert.equal(
+    effectivePlan(
+      { plan_type: "player", status: "active", current_period_end: "2026-10-01", team_trial_ends_at: "2026-09-11T12:00:00Z" },
+      now,
+    ),
+    "player",
+  );
   for (const plan_type of ["player", "team", "premium"]) {
     assert.equal(
       effectivePlan(

@@ -82,12 +82,19 @@ export const userService = {
   async getPlanType(userId: string): Promise<PlanType> {
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .select('plan_type, status, current_period_end')
+      .select('plan_type, status, current_period_end, team_trial_ends_at')
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle();
     if (error) throw error;
     return effectivePlan(data);
+  },
+
+  async startTeamTrial(): Promise<string> {
+    const { data, error } = await supabase.rpc('start_team_trial');
+    if (error) throw new Error(error.message || 'No se ha podido activar la prueba Team.');
+    if (typeof data !== 'string') throw new Error('No se ha podido confirmar la prueba Team.');
+    return data;
   },
 
   async setPlanType(userId: string, planType: PlanType, paymentRef?: string): Promise<void> {

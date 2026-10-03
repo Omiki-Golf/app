@@ -45,6 +45,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
+  const avatarPlanClasses: Record<PlanType, string> = {
+    express: 'border-blue-500 bg-blue-500 hover:bg-blue-600',
+    player: 'border-emerald-500 bg-emerald-500 hover:bg-emerald-600',
+    team: 'border-orange-500 bg-orange-500 hover:bg-orange-600',
+    premium: 'border-purple-500 bg-purple-500 hover:bg-purple-600',
+  };
 
   return (
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
@@ -105,12 +111,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={onShowProfile}
                 title={t('common.profile')}
                 aria-label={t('common.openProfile')}
-                className="flex items-center justify-center w-11 h-11 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${avatarPlanClasses[planType]}`}
               >
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-9 h-9 rounded-full" />
+                  <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />
                 ) : (
-                  <User size={21} className="text-ink-2" />
+                  <User size={21} className="text-white" />
                 )}
               </button>
             </div>
@@ -120,7 +126,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {/* Logo */}
         <div className="text-center mb-6 sm:mb-8">
           <h1 className="mb-3">
-            <img src="/images/Omiki_VerdeAmarillo_Trans.png" alt="OMIKI Golf" width={4020} height={1564} className="mx-auto h-auto w-72 max-w-full object-contain" />
+            <img src="/images/Omiki_VerdeAmarillo_Trans_Optimizada.png" alt="OMIKI Golf" width={804} height={313} fetchPriority="high" decoding="async" className="mx-auto h-auto w-72 max-w-full object-contain" />
           </h1>
           <p className="text-ink-3">{t('home.tagline')}</p>
         </div>
@@ -155,7 +161,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
 
-        <img src="/images/Omiki_O_VerdeAmarillo_Trans.png" alt="" aria-hidden="true" className="mx-auto h-auto w-28 object-contain" />
+        <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-28 object-contain" />
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <WriteButton

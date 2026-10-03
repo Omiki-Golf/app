@@ -1,7 +1,7 @@
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
 import React, { useState } from 'react';
-import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard } from 'lucide-react';
+import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard, LogOut } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
 
@@ -33,39 +33,41 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const { t } = useTranslation();
   const isTeam = (planType === 'team' || planType === 'premium');
   const isPlayer = planType === 'player';
+  const avatarPlanClasses: Record<PlanType, string> = {
+    express: 'border-blue-500 bg-blue-500',
+    player: 'border-emerald-500 bg-emerald-500',
+    team: 'border-orange-500 bg-orange-500',
+    premium: 'border-purple-500 bg-purple-500',
+  };
 
   const menuItems = [
+    { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },
     { icon: Gamepad2, label: t('profile.rounds'), onClick: onShowHistory, show: true },
     { icon: BarChart3, label: t('profile.stats'), onClick: onShowStats, show: true },
     { icon: Crown, label: t('profile.groups'), onClick: onShowGroups, show: isTeam },
     { icon: CreditCard, label: 'Pro-Shop', onClick: onShowProShop, show: isTeam },
-    { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },
   ];
 
   return (
     <div className="min-h-screen bg-app transition-colors">
       <div className="max-w-lg mx-auto px-4 py-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-6">
           <NavigationButton destination="home"
             onClick={onBack}
             className="flex items-center gap-2 text-ink-3 hover:text-ink"
-          />
-          <NavigationButton destination="logout"
-            onClick={onLogout}
-            className="h-11 w-11 !rounded-full border border-red-200 bg-red-50 text-red-600 shadow-soft transition-all hover:bg-red-100 hover:text-red-700 active:scale-95"
           />
         </div>
 
         {/* Profile header */}
         <div className="bg-card rounded-2xl shadow-card p-6 mb-5">
           <div className="flex items-center gap-4">
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="avatar" className="w-16 h-16 shrink-0 rounded-full border-2 border-accent-ring" />
-            ) : (
-              <div className="w-16 h-16 shrink-0 bg-accent-soft rounded-full flex items-center justify-center">
-                <Settings className="text-accent-ink" size={24} />
-              </div>
-            )}
+            <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-[3px] ${avatarPlanClasses[planType]}`}>
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="avatar" className="h-14 w-14 rounded-full bg-white object-cover ring-1 ring-white/80" />
+              ) : (
+                <Settings className="text-white" size={24} />
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <h2 className="break-words text-xl font-bold text-ink">{profile?.nick || t('profile.player')}</h2>
               <p className="break-words text-sm text-ink-3">{profile?.display_name || ''}</p>
@@ -113,6 +115,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </button>
           ))}
         </div>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 font-semibold text-red-600 shadow-soft transition-all hover:bg-red-100 hover:text-red-700 active:scale-[0.98]"
+        >
+          <LogOut size={20} aria-hidden="true" />
+          {t('common.logout')}
+        </button>
       </div>
     </div>
   );

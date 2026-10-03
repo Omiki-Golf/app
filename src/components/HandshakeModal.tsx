@@ -48,21 +48,23 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
         </div>
 
         <p className="text-sm text-ink-2 font-medium mb-4">
-          El resultado ya no puede cambiar. ¿Quieres finalizar la partida igualmente?
+          El resultado ya está decidido. ¿Quieres seguir anotando hoyos o finalizar la partida ahora?
         </p>
 
         <div className="space-y-3">
           <button
+            type="button"
             onClick={onContinue}
             className="w-full bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-xl transition-colors shadow-card shadow-emerald-600/30"
           >
-            No, seguir jugando
+            Seguir jugando
           </button>
           <button
+            type="button"
             onClick={handleFinish}
             className="w-full bg-neutral hover:bg-neutral-hover text-ink font-bold py-3 px-4 rounded-xl transition-colors"
           >
-            Sí, finalizar partida
+            Finalizar partida
           </button>
         </div>
       </div>

@@ -26,6 +26,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
   const [nick, setNick] = useState(profile?.nick ?? '');
   const [avatarUrl, setAvatarUrl] = useState(normalizeAvatarUrl(profile?.avatar_url));
+  const [showSelectedAvatar, setShowSelectedAvatar] = useState(Boolean(profile?.avatar_url));
   const [nickStatus, setNickStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [nickSuggestion, setNickSuggestion] = useState('');
   const [saving, setSaving] = useState(false);
@@ -36,6 +37,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setDisplayName(profile?.display_name ?? '');
     setNick(profile?.nick ?? '');
     setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url ?? DEFAULT_AVATAR_URL));
+    setShowSelectedAvatar(Boolean(profile?.avatar_url));
   }, [profile]);
 
   const checkNick = async () => {
@@ -123,8 +125,12 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
         <section className="bg-card rounded-2xl shadow-card p-6">
           <div className="text-center mb-7">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-accent-soft rounded-full mb-3">
-              <User className="text-accent-ink" size={28} />
+            <div className="mb-3 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-accent-ring bg-accent-soft">
+              {showSelectedAvatar ? (
+                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <User className="text-accent-ink" size={28} />
+              )}
             </div>
             <h1 className="text-2xl font-bold text-ink">{t('profile.details')}</h1>
             <p className="text-sm text-ink-3 mt-1">{t('profile.detailsDescription')}</p>
@@ -215,6 +221,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       type="button"
                       onClick={() => {
                         setAvatarUrl(avatar.url);
+                        setShowSelectedAvatar(true);
                         setSaved(false);
                       }}
                       className={`aspect-square rounded-full overflow-hidden border-2 transition-all ${
