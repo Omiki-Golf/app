@@ -4,17 +4,18 @@ import { AdminRounds } from './AdminRounds';
 import { AdminUsers } from './AdminUsers';
 import { AdminOverview } from './AdminOverview';
 import { AdminGroups } from './AdminGroups';
+import { AdminVersions } from './AdminVersions';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 import { adminService, type AdminAccount, type AdminAuditEntry, type AdminDirectoryEntry } from '../../services/adminService';
 import { NavigationButton } from '../NavigationButton';
 import { ThemeToggle } from '../ThemeToggle';
 
-type Tab = 'overview' | 'users' | 'groups' | 'rounds' | 'messages' | 'courses' | 'audit' | 'admins';
+type Tab = 'overview' | 'users' | 'groups' | 'rounds' | 'messages' | 'courses' | 'versions' | 'audit' | 'admins';
 const sections: { title: string; tabs: { id: Tab; label: string }[] }[] = [
   { title: 'Análisis', tabs: [{ id: 'overview', label: 'Panel' }] },
   { title: 'Gestión', tabs: [{ id: 'users', label: 'Jugadores' }, { id: 'groups', label: 'Grupos' }, { id: 'rounds', label: 'Partidas' }, { id: 'messages', label: 'Mensajes' }] },
-  { title: 'Sistema', tabs: [{ id: 'courses', label: 'Campos de golf' }, { id: 'audit', label: 'Actividad' }, { id: 'admins', label: 'Administradores' }] },
+  { title: 'Sistema', tabs: [{ id: 'courses', label: 'Campos de golf' }, { id: 'versions', label: 'Versiones' }, { id: 'audit', label: 'Actividad' }, { id: 'admins', label: 'Administradores' }] },
 ];
 
 const statuses = { active: 'Activo', invited: 'Pendiente de activar', disabled: 'Desactivado' };
@@ -162,6 +163,7 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
         {tab === 'overview' && <AdminOverview onOpen={setTab} onOpenUser={id => { setFocusUser(id); setTab('users'); }} />}
         {tab === 'groups' && <AdminGroups />}
         {tab === 'courses' && <AdminCourses />}
+        {tab === 'versions' && <AdminVersions />}
         {tab === 'messages' && <AdminMessages />}
         {tab === 'rounds' && <AdminRounds />}
         {tab === 'users' && <AdminUsers key={focusUser ?? 'list'} openUserId={focusUser} onExit={() => { setFocusUser(undefined); setTab('overview'); }} />}
