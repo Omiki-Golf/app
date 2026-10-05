@@ -3,6 +3,7 @@ import { effectivePlan } from '../utils/effectivePlan';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
+import { setAuthenticatedUserId } from '../utils/userId';
 
 export interface UserSubscription {
   planType: string;
@@ -61,6 +62,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       currentUserId.current = currentSession?.user.id ?? null;
+      setAuthenticatedUserId(currentSession?.user.id ?? null);
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       if (currentSession?.user) {
@@ -72,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, currentSession) => {
         currentUserId.current = currentSession?.user.id ?? null;
+        setAuthenticatedUserId(currentSession?.user.id ?? null);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
 
@@ -104,6 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await supabase.auth.signOut({ scope: 'local' });
     currentUserId.current = null;
+    setAuthenticatedUserId(null);
     setUser(null);
     setSession(null);
     setSubscription(null);

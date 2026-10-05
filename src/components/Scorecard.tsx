@@ -36,6 +36,7 @@ interface ScorecardProps {
   backDestination?: 'back' | 'home';
   onFinishRound: () => void;
   onCourseChanged?: (courseId: string, numHoles: 9 | 18, holes: GolfHole[], players?: RoundPlayer[]) => void;
+  messagesButton?: React.ReactNode;
 }
 
 export const Scorecard: React.FC<ScorecardProps> = ({
@@ -57,6 +58,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onResetGame, backDestination = 'back',
   onFinishRound,
   onCourseChanged,
+  messagesButton,
 }) => {
   const isDivend = groupCode === 'DIVEND';
   const isModeScoring = gameMode !== 'stableford';
@@ -177,16 +179,19 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               onClick={onResetGame}
               className="bg-neutral hover:bg-neutral-hover text-ink p-2 rounded-lg transition-colors"
             />
-            <h1 className="text-2xl md:text-3xl font-bold text-title flex-1 text-center">
-              Tarjeta de Puntuación
+            <h1 className="flex-1 text-center text-lg font-bold text-title sm:text-2xl md:text-3xl">
+              <span className="sm:hidden">Tarjeta</span><span className="hidden sm:inline">Tarjeta de Puntuación</span>
             </h1>
-            <button
-              onClick={onShowLeaderboard}
-              className="bg-accent hover:bg-accent-hover text-on-accent px-4 py-2 rounded-lg flex items-center gap-2 font-semibold transition-colors"
-            >
-              <Trophy size={20} />
-              <span className="hidden sm:inline">Clasificación</span>
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {messagesButton}
+              <button
+                onClick={onShowLeaderboard}
+                className="bg-accent hover:bg-accent-hover text-on-accent px-3 sm:px-4 py-2 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+              >
+                <Trophy size={20} />
+                <span className="hidden sm:inline">Clasificación</span>
+              </button>
+            </div>
           </div>
 
           <div className="mb-4 bg-accent rounded-lg p-4 text-on-accent">

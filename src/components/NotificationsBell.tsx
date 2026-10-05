@@ -2,19 +2,22 @@ import { MessageInbox } from './MessageInbox';
 import { GroupMessages } from './messages/GroupMessages';
 import { messageService } from '../services/messageService';
 import { WriteButton } from '../context/ReadOnlyContext';
-import { NavigationButton } from './NavigationButton';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Check, X, Users, Clock } from 'lucide-react';
+import { Bell, Check, X, Users, Clock, Trophy, Flag, Hand } from 'lucide-react';
 import { userService } from '../services/userService';
 import { GroupInvitation } from '../types';
+import type { ActivityEvent, ActivityScope } from '../services/messageService';
+import { useTranslation } from 'react-i18next';
 
 interface NotificationsBellProps {
   userId: string | null;
   onBack: () => void;
   onInvitationResolved: () => void;
+  activityScope: ActivityScope;
 }
 
-export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved }) => {
+export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, activityScope }) => {
+  const { t } = useTranslation();
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
@@ -22,8 +25,29 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   const [showGroupMessages, setShowGroupMessages] = useState(false);
   const [invitationError, setInvitationError] = useState('');
   const [responseError, setResponseError] = useState('');
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [activityError, setActivityError] = useState('');
   const invitationRequest = useRef(0);
   const responseRunning = useRef(false);
+
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [onBack]);
+
+  useEffect(() => {
+    let live = true;
+    const loadActivity = async () => {
+      try {
+        const data = await messageService.activity(activityScope, userId, true);
+        if (live) { setActivity(data.events); setActivityError(''); onInvitationResolved(); }
+      } catch { if (live) setActivityError(t('activity.loadError')); }
+    };
+    void loadActivity();
+    const timer = window.setInterval(() => void loadActivity(), 30000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, [activityScope.roundId, activityScope.groupId, activityScope.accessCode, userId, onInvitationResolved, t]);
 
   useEffect(() => {
     if (!userId) return;
@@ -78,17 +102,27 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   };
 
   return (
-    <div className="min-h-screen bg-app transition-colors">
-      <div className="max-w-lg mx-auto px-4 py-6">
-        <NavigationButton destination="home"
-          onClick={onBack}
-          className="flex items-center gap-2 text-ink-3 hover:text-ink mb-6"
-        />
+    <div className="fixed inset-0 z-[150] bg-black/45 sm:flex sm:justify-end" role="dialog" aria-modal="true" aria-label={t('activity.panelTitle')} onMouseDown={(event) => { if (event.target === event.currentTarget) onBack(); }}>
+      <div className="h-full w-full overflow-y-auto bg-app px-4 py-6 shadow-2xl transition-colors sm:max-w-xl">
+        <button type="button" onClick={onBack} className="mb-6 flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-ink shadow-soft" aria-label={t('common.close')} title={t('common.close')}><X size={22} /></button>
 
         <div className="flex items-center gap-3 mb-6">
           <Bell size={24} className="text-ink-2" />
           <h1 className="text-2xl font-bold text-ink">Notificaciones</h1>
         </div>
+
+        {(activityScope.roundId || activityScope.groupId) && <section className="mb-7 space-y-3 text-ink">
+          <h2 className="font-bold text-lg">{t('activity.title')}</h2>
+          {activityError && <p role="alert" className="text-red-600">{activityError}</p>}
+          {!activityError && activity.length === 0 && <p className="text-sm text-ink-3">{t('activity.empty')}</p>}
+          {activity.map((event) => {
+            const Icon = event.event_type === 'hole_in_one' ? Trophy : event.event_type === 'no_paso_rojas' ? Flag : Hand;
+            return <article key={event.id} className="flex gap-3 rounded-xl border border-line bg-card p-4">
+              <Icon className="mt-0.5 shrink-0 text-accent-ink" size={20} />
+              <div><p className="font-semibold">{event.player_name} · {t(`activity.events.${event.event_type}`)} · {t('activity.hole', { number: event.hole_number })}</p><p className="text-xs text-ink-3">{new Date(event.created_at).toLocaleString()}</p></div>
+            </article>;
+          })}
+        </section>}
 
         {showGroupMessages && userId ? <GroupMessages onBack={() => setShowGroupMessages(false)} /> : <>
         {managesGroups && <button className="w-full bg-card border border-line rounded-xl p-3 text-ink mb-5" onClick={() => setShowGroupMessages(true)}>Mensajes de mis grupos</button>}

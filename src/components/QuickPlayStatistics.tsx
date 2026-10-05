@@ -2,7 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
-  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase
+  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
@@ -13,6 +13,7 @@ import { GameMode } from '../types';
 interface QuickPlayStatisticsProps {
   onBack: () => void;
   roundId?: string;
+  messagesButton?: React.ReactNode;
 }
 
 interface PlayerHighlights {
@@ -38,7 +39,7 @@ interface AvailableRound {
   game_mode?: string;
 }
 
-export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack }) => {
+export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, messagesButton }) => {
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -49,9 +50,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const [animateIn, setAnimateIn] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState('');
+  const [shareAsset, setShareAsset] = useState<{ file: File; url: string; date: string } | null>(null);
 
   const statsContainerRef = useRef<HTMLDivElement>(null);
   const desktopExportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => () => {
+    if (shareAsset) URL.revokeObjectURL(shareAsset.url);
+  }, [shareAsset]);
 
   // Un solo useEffect inicial para cargar las rondas y la primera partida de forma directa
   useEffect(() => {
@@ -78,6 +84,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   }, []);
 
   const handleSelectRound = async (roundId: string) => {
+    setShareAsset(null);
+    setShareError('');
     setSelectedRoundId(roundId);
     await loadRoundData(roundId);
   };
@@ -320,50 +328,48 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       const fileName = `Estadisticas_Golf_${dateStr.replace(/\//g, '-')}.png`;
       const file = new File([blob], fileName, { type: 'image/png' });
 
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: 'Estadísticas de la Partida',
-            text: `📊 ¡Mirad las estadísticas de nuestra partida de golf! (${dateStr})`,
-          });
-        } catch (nativeShareError) {
-          if (nativeShareError instanceof DOMException && nativeShareError.name === 'AbortError') {
-            return;
-          }
-          throw nativeShareError;
-        }
-      } else {
-        try {
-          if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-            await navigator.clipboard.write([
-              new ClipboardItem({ [blob.type]: blob }),
-            ]);
-          }
-          const textMessage = encodeURIComponent(
-            `📊 ¡Estadísticas de la partida de golf (${dateStr})!\n\nPega la imagen en el chat.`
-          );
-          window.open(`https://wa.me/?text=${textMessage}`, '_blank');
-        } catch (clipboardError) {
-          console.warn('No se pudo copiar al portapapeles, recurriendo a descarga:', clipboardError);
-          const imageUrl = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = imageUrl;
-          link.download = fileName;
-          link.click();
-          window.setTimeout(() => URL.revokeObjectURL(imageUrl), 1000);
-          const textMessage = encodeURIComponent(
-            `📊 ¡He generado la imagen de la partida (${dateStr})! Adjunto el archivo.`
-          );
-          window.open(`https://wa.me/?text=${textMessage}`, '_blank');
-        }
-      }
+      setShareAsset({ file, url: URL.createObjectURL(blob), date: dateStr });
     } catch (error) {
       console.error('Error al generar la imagen para WhatsApp:', error);
       setShareError('No se ha podido generar la imagen completa. Inténtalo de nuevo.');
     } finally {
       setSharing(false);
     }
+  };
+
+  const handleNativeShare = async () => {
+    if (!shareAsset) return;
+    setShareError('');
+    if (!navigator.share || !navigator.canShare?.({ files: [shareAsset.file] })) {
+      setShareError('Este navegador no permite compartir archivos directamente. Descarga la imagen y adjúntala en WhatsApp.');
+      return;
+    }
+    try {
+      await navigator.share({
+        files: [shareAsset.file],
+        title: 'Estadísticas de la partida',
+        text: `📊 ¡Mirad las estadísticas de nuestra partida de golf! (${shareAsset.date})`,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareError('El móvil no ha podido abrir el selector para compartir. Descarga la imagen y envíala desde WhatsApp.');
+    }
+  };
+
+  const handleDownloadShare = () => {
+    if (!shareAsset) return;
+    const link = document.createElement('a');
+    link.href = shareAsset.url;
+    link.download = shareAsset.file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleOpenWhatsApp = () => {
+    if (!shareAsset) return;
+    const text = encodeURIComponent(`📊 Estadísticas de nuestra partida de golf (${shareAsset.date}). Adjuntaré la imagen.`);
+    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   const getModeLabel = (mode?: string) => {
@@ -378,6 +384,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   if (loading) {
     return (
       <div className="theme-static min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-800 p-4 md:p-8 flex items-center justify-center">
+        <div className="absolute right-4 top-4">{messagesButton}</div>
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
           <p className="text-white font-medium">Cargando estadísticas...</p>
@@ -390,10 +397,10 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     return (
       <div className="theme-static min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-800 p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
-          <NavigationButton destination="back"
+          <div className="mb-6 flex items-center justify-between"><NavigationButton destination="back"
             onClick={onBack}
-            className="bg-white hover:bg-gray-100 text-emerald-900 font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors mb-6"
-          />
+            className="bg-white hover:bg-gray-100 text-emerald-900 font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors"
+          />{messagesButton}</div>
 
           <div className="bg-white rounded-lg shadow-2xl p-8 text-center">
             <TrendingDown size={64} className="mx-auto text-gray-400 mb-4" />
@@ -862,13 +869,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           </div>
 
           <div className="flex items-center gap-2 self-end md:self-auto">
+            {messagesButton}
             <button
               onClick={handleShareWhatsApp}
               disabled={sharing}
               className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105 shadow-lg disabled:opacity-50"
             >
               <MessageCircle size={20} />
-              <span className="hidden sm:inline">{sharing ? 'Generando...' : 'Compartir'}</span>
+              <span className="hidden sm:inline">{sharing ? 'Generando...' : shareAsset ? 'Regenerar imagen' : 'Preparar para compartir'}</span>
             </button>
 
             <WriteButton
@@ -884,6 +892,29 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         {shareError && (
           <div role="alert" className="mb-4 rounded-xl border border-red-400/50 bg-red-950/70 px-4 py-3 text-sm text-red-100">
             {shareError}
+          </div>
+        )}
+
+        {shareAsset && (
+          <div className="mb-4 rounded-xl border border-emerald-400/40 bg-slate-900/90 p-4 text-white shadow-xl">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <img src={shareAsset.url} alt="Vista previa de las estadísticas" className="h-24 w-24 rounded-lg border border-white/20 object-cover object-top" />
+              <div className="flex-1">
+                <p className="font-bold text-emerald-300">Imagen preparada</p>
+                <p className="mt-1 text-sm text-slate-300">En móvil, «Compartir imagen» abre el selector del sistema para elegir WhatsApp. Si no aparece, descárgala y adjúntala desde el chat.</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void handleNativeShare()} className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-bold hover:bg-green-500">
+                    <Share2 size={18} /> Compartir imagen
+                  </button>
+                  <button type="button" onClick={handleDownloadShare} className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-bold hover:bg-slate-600">
+                    <Download size={18} /> Descargar
+                  </button>
+                  <button type="button" onClick={handleOpenWhatsApp} className="inline-flex items-center gap-2 rounded-lg border border-green-500 px-3 py-2 text-sm font-bold text-green-300 hover:bg-green-950">
+                    <MessageCircle size={18} /> Abrir WhatsApp
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

@@ -13,9 +13,99 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.5.1';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.5.1',
+    date: '2026-10-05',
+    title: 'Más espacio útil en pantalla',
+    summary: 'El acceso a mensajes aprovecha la primera fila existente sin desplazar el contenido.',
+    changes: [
+      { type: 'improved', text: 'El icono de mensajes se centra en la cabecera y se adapta a las pantallas con títulos o acciones.' },
+      { type: 'fixed', text: 'Se elimina la fila superior vacía que reducía el espacio disponible, especialmente en móvil.' },
+    ],
+  },
+  {
+    version: '1.5.0',
+    date: '2026-10-05',
+    title: 'Mensajes globales y actividad de juego',
+    summary: 'El buzón permanece accesible durante el juego y muestra automáticamente los momentos destacados de la partida.',
+    changes: [
+      { type: 'new', text: 'Acceso global a mensajes mediante un panel que conserva la pantalla y el hoyo actuales.' },
+      { type: 'new', text: 'Avisos automáticos de Hoyo en uno, No pasó de rojas y Spanish Hands para la partida o el Team.' },
+      { type: 'improved', text: 'El contador combina mensajes, invitaciones y actividad pendiente con lectura sincronizada para cuentas registradas.' },
+    ],
+  },
+  {
+    version: '1.4.0',
+    date: '2026-10-05',
+    title: 'Identificador para soporte',
+    summary: 'Los jugadores registrados pueden localizar y copiar fácilmente el identificador de su cuenta.',
+    changes: [
+      { type: 'new', text: 'Mis datos de registro incluye el ID de soporte completo y un botón para copiarlo.' },
+      { type: 'improved', text: 'El identificador de soporte está disponible en los cuatro idiomas de la aplicación.' },
+    ],
+  },
+  {
+    version: '1.3.0',
+    date: '2026-10-05',
+    title: 'Compartir estadísticas con alternativas fiables',
+    summary: 'La imagen se prepara antes de abrir el selector del móvil, evitando bloqueos del navegador.',
+    changes: [
+      { type: 'improved', text: 'Compartir estadísticas utiliza una segunda pulsación directa para abrir WhatsApp mediante el selector del sistema.' },
+      { type: 'new', text: 'La imagen generada puede previsualizarse, descargarse o acompañarse de un mensaje abierto en WhatsApp.' },
+      { type: 'fixed', text: 'Se evita intentar abrir WhatsApp después de una generación larga, comportamiento que algunos móviles bloqueaban.' },
+    ],
+  },
+  {
+    version: '1.2.1',
+    date: '2026-10-05',
+    title: 'Iniciales dentro de las bolas',
+    summary: 'El marcador identifica a cada jugador con sus iniciales integradas en su bola de color.',
+    changes: [
+      { type: 'improved', text: 'Las iniciales aparecen dentro de la bola del jugador, compartiendo color los miembros de una pareja.' },
+    ],
+  },
+  {
+    version: '1.2.0',
+    date: '2026-10-05',
+    title: 'Marcadores adaptados al móvil',
+    summary: 'Los resultados intermedios de Match, Sindicato y Parejas son más compactos y fáciles de identificar.',
+    changes: [
+      { type: 'new', text: 'Cada jugador tiene una bola de color estable; en Parejas, los compañeros comparten color de equipo.' },
+      { type: 'improved', text: 'Los marcadores sustituyen los nombres completos por iniciales y se adaptan al ancho del móvil.' },
+    ],
+  },
+  {
+    version: '1.1.1',
+    date: '2026-10-05',
+    title: 'Cabecera de nueva partida',
+    summary: 'La creación de partidas rápidas muestra la marca actual y una navegación más clara.',
+    changes: [
+      { type: 'improved', text: 'La cabecera muestra OmkiGolf y sitúa el acceso al inicio en la esquina superior izquierda.' },
+    ],
+  },
+  {
+    version: '1.1.0',
+    date: '2026-10-05',
+    title: 'Partidas vinculadas a la cuenta',
+    summary: 'Las partidas rápidas de jugadores registrados quedan asociadas a su cuenta y disponibles entre dispositivos.',
+    changes: [
+      { type: 'new', text: 'Las partidas creadas con sesión iniciada se vinculan al identificador del jugador registrado.' },
+      { type: 'new', text: 'Administración puede reasignar partidas rápidas antiguas a un jugador, conservando participantes y resultados.' },
+      { type: 'improved', text: 'Cada reasignación requiere confirmación y motivo, y queda registrada en la actividad administrativa.' },
+    ],
+  },
+  {
+    version: '1.0.1',
+    date: '2026-10-05',
+    title: 'Preferencia de tema al iniciar',
+    summary: 'Corrección del aspecto inicial para jugadores que utilizan el modo oscuro.',
+    changes: [
+      { type: 'fixed', text: 'El tema guardado se aplica antes de mostrar la pantalla principal, sin necesidad de abrir primero el perfil.' },
+    ],
+  },
   {
     version: '1.0.0',
     date: '2026-10-04',

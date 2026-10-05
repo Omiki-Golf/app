@@ -14,11 +14,17 @@ function stored(): Theme | null {
   return v === 'light' || v === 'dark' ? v : null;
 }
 
-function apply(theme: Theme) {
+function apply(theme: Theme, animate = true) {
   const el = document.documentElement;
-  el.classList.add('theme-transition');
+  if (animate) el.classList.add('theme-transition');
   el.classList.toggle('dark', theme === 'dark');
-  window.setTimeout(() => el.classList.remove('theme-transition'), 250);
+  if (animate) window.setTimeout(() => el.classList.remove('theme-transition'), 250);
+}
+
+// The theme belongs to the whole application, not to the presence of a toggle.
+// Apply it before React renders so authenticated screens do not start in light mode.
+export function initializeTheme() {
+  apply(stored() ?? systemTheme(), false);
 }
 
 export function useTheme() {

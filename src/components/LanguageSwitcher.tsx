@@ -92,7 +92,7 @@ export function LanguageSwitcher({ className = '' }: LanguageSwitcherProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         title={`${t('language.label')}: ${t(`language.${currentLanguage}`)}`}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-ink shadow-soft transition-all hover:bg-card-2 active:scale-95"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line bg-card text-ink shadow-soft transition-all hover:bg-card-2 active:scale-95 max-[360px]:h-10 max-[360px]:w-10"
       >
         <FlagIcon language={currentLanguage} />
       </button>

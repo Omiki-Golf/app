@@ -9,6 +9,13 @@ const migration = await readFile(
   ),
   "utf8",
 );
+const ownershipMigration = await readFile(
+  new URL(
+    "../supabase/migrations/20261005120000_registered_round_ownership.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const A = "00000000-0000-4000-8000-000000000001",
   P = "00000000-0000-4000-8000-000000000002",
   R = "00000000-0000-4000-8000-000000000003",
@@ -20,12 +27,14 @@ test("round administration: transitions, audit, permissions, preserved scores an
  CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('request.uid',true),'')::uuid$$;
  CREATE TABLE app_administrators(user_id uuid,alias text,status text);
  CREATE FUNCTION is_app_administrator() RETURNS boolean LANGUAGE sql SECURITY DEFINER AS $$SELECT EXISTS(SELECT 1 FROM public.app_administrators WHERE user_id=auth.uid() AND status='active')$$;
- CREATE TABLE app_admin_audit(id bigint GENERATED ALWAYS AS IDENTITY,actor_user_id uuid,actor_alias text,action text,details jsonb);
+ CREATE TABLE app_admin_audit(id bigint GENERATED ALWAYS AS IDENTITY,actor_user_id uuid,actor_alias text,action text,target_user_id uuid,details jsonb);
+ CREATE TABLE user_profiles(user_id uuid PRIMARY KEY,nick text);
  CREATE TABLE golf_courses(id uuid PRIMARY KEY,name text);
  CREATE TABLE golf_rounds(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),reference_number integer,course_id uuid,user_id text,group_id uuid,game_mode text,num_holes integer,status text,completed_at timestamptz,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
  CREATE TABLE round_players(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),round_id uuid REFERENCES golf_rounds(id) ON DELETE CASCADE,name text,created_at timestamptz DEFAULT now());
  CREATE TABLE round_scores(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),round_id uuid REFERENCES golf_rounds(id) ON DELETE CASCADE,player_id uuid,hole_number integer,gross_strokes integer);
  INSERT INTO app_administrators VALUES('${A}','AdminF','active');
+ INSERT INTO user_profiles VALUES('${P}','Jugador registrado');
  INSERT INTO golf_rounds(id,reference_number,user_id,status,game_mode,num_holes) VALUES('${R}',1,'anon_device','active','stableford',9);
  INSERT INTO golf_rounds(id,reference_number,user_id,status,group_id) VALUES('${G}',2,'anon_device','active','${G}');
  INSERT INTO golf_rounds(reference_number,user_id,status) SELECT i,'anon_device','deleted' FROM generate_series(3,5)i;
@@ -39,6 +48,7 @@ test("round administration: transitions, audit, permissions, preserved scores an
       INSERT INTO public.golf_courses VALUES('${G}','Cosg Costa Ázahar - Rojo');
       UPDATE public.golf_rounds SET course_id='${G}' WHERE id IN ('${G}','${R}');`);
     await db.exec(await readFile(new URL('../supabase/migrations/20260914190000_admin_round_search.sql',import.meta.url),'utf8'));
+    await db.exec(ownershipMigration);
 
     const as = async (id) => {
       await db.exec("RESET ROLE");
@@ -173,15 +183,48 @@ test("round administration: transitions, audit, permissions, preserved scores an
       await db.query("SELECT admin_list_app_rounds('', '', 'group') AS d")
     ).rows[0].d;
     assert.equal(groups.total, 1);
+    const legacyRound = "00000000-0000-4000-8000-000000000005";
+    await db.query(
+      "INSERT INTO golf_rounds(id,reference_number,user_id,status) VALUES($1,7,'anon_legacy','completed')",
+      [legacyRound],
+    );
+    let legacy = await detail(legacyRound);
+    await as(P);
+    await assert.rejects(
+      db.query("SELECT admin_reassign_app_round($1,$2,$3,$4)", [
+        legacyRound,
+        P,
+        "Vinculación solicitada",
+        legacy.round.updated_at,
+      ]),
+      /denegado/,
+    );
+    await as(A);
+    legacy = (
+      await db.query("SELECT admin_reassign_app_round($1,$2,$3,$4) AS d", [
+        legacyRound,
+        P,
+        "Vinculación solicitada",
+        legacy.round.updated_at,
+      ])
+    ).rows[0].d;
+    assert.equal(legacy.round.user_id, P);
+    await db.exec("RESET ROLE");
+    const reassignmentLog = (
+      await db.query("SELECT * FROM app_admin_audit WHERE action='round.reassign'")
+    ).rows[0];
+    assert.equal(reassignmentLog.target_user_id, P);
+    assert.equal(reassignmentLog.details.before, "anon_legacy");
+    assert.equal(reassignmentLog.details.after, P);
     await as(null);
     assert.equal(Number(await count()), 4);
     // Preserve the existing Express hard reset: a parent deletion cascades normally.
     await db.query("DELETE FROM golf_rounds WHERE id=$1", [R]);
     await db.exec("RESET ROLE");
     const logs = (await db.query("SELECT * FROM app_admin_audit")).rows;
-    assert.equal(logs.length, 5);
+    assert.equal(logs.length, 6);
     assert.ok(
-      logs.every(
+      logs.filter((l) => l.action !== "round.reassign").every(
         (l) =>
           l.actor_user_id === A && l.details.round_id === R && l.details.reason,
       ),

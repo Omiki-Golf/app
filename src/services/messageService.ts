@@ -67,6 +67,17 @@ export interface Inbox {
   total: number;
   unread: number;
 }
+export interface ActivityEvent {
+  id: string;
+  round_id: string;
+  group_id: string | null;
+  event_type: 'hole_in_one' | 'no_paso_rojas' | 'spanish_hands';
+  player_name: string;
+  hole_number: number;
+  created_at: string;
+}
+export interface ActivityInbox { events: ActivityEvent[]; unread: number; server_time: string; }
+export interface ActivityScope { roundId?: string | null; groupId?: string | null; accessCode?: string | null; }
 async function rpc<T>(
   name: string,
   args: Record<string, unknown> = {},
@@ -76,6 +87,7 @@ async function rpc<T>(
   return data as T;
 }
 const boxKey = "golf.express.message-box.v1";
+const activityCursorPrefix = 'omiki.activity.cursor.';
 interface Box {
   secret: string;
   id?: string;
@@ -140,6 +152,21 @@ async function assertIdentity(userId: string | null) {
     throw new Error("La sesión ha cambiado. Actualiza la pantalla.");
 }
 export const messageService = {
+  async activity(scope: ActivityScope, userId: string | null, markRead = false): Promise<ActivityInbox> {
+    if (!scope.roundId && !scope.groupId) return { events: [], unread: 0, server_time: new Date().toISOString() };
+    await assertIdentity(userId);
+    const scopeKey = `${scope.groupId ? 'group' : 'round'}.${scope.groupId || scope.roundId}`;
+    const localCursor = userId ? null : safeStorage.getItem(activityCursorPrefix + scopeKey);
+    const result = await rpc<ActivityInbox>('round_activity_inbox', {
+      p_round: scope.roundId || null,
+      p_group: scope.groupId || null,
+      p_access_code: scope.accessCode || null,
+      p_since: localCursor,
+      p_mark_read: markRead,
+    });
+    if (markRead && !userId) safeStorage.setItem(activityCursorPrefix + scopeKey, result.server_time);
+    return markRead ? { ...result, unread: 0 } : result;
+  },
   groups: (search = "", managedOnly = false) =>
     rpc<MessageGroup[]>("message_groups", {
       p_search: search,

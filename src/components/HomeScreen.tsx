@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
-import { Zap, LogIn, Plus, Share2, Bell, User, ChevronRight, FlaskConical } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, User, ChevronRight, FlaskConical } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -11,36 +11,34 @@ interface HomeScreenProps {
   planType: PlanType;
   isAuthenticated: boolean;
   profile: UserProfile | null;
-  pendingInvitations: number;
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
   onShowProfile: () => void;
-  onShowNotifications: () => void;
   onShowAuth: () => void;
   onShowShare: () => void;
   simulatorEnabled: boolean;
   simulatorUpdating: boolean;
   onToggleSimulator: () => void;
   onCycleSimulatorPlan: () => void;
+  messagesButton?: React.ReactNode;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   planType,
   isAuthenticated,
   profile,
-  pendingInvitations,
   onQuickPlay,
   onJoinQuickPlay,
   onCreateTeam,
   onShowProfile,
-  onShowNotifications,
   onShowAuth,
   onShowShare,
   simulatorEnabled,
   simulatorUpdating,
   onToggleSimulator,
   onCycleSimulatorPlan,
+  messagesButton,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
@@ -56,8 +54,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
       <div className="max-w-md w-full">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-3 mb-5">
-          <div className="flex items-center gap-2">
+        <div className="relative mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 max-[360px]:gap-1">
             <button
               type="button"
               onClick={onShowShare}
@@ -68,39 +66,29 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <Share2 size={20} className="text-ink-2" />
             </button>
 
-            <>
-              <button
-                type="button"
-                onClick={onShowNotifications}
-                title={t('common.notifications')}
-                aria-label={t('common.notifications')}
-                className="relative p-2.5 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
-              >
-                <Bell size={20} className="text-ink-2" />
-                {pendingInvitations > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                    {pendingInvitations}
-                  </span>
-                )}
-              </button>
-            </>
-
             {!isAuthenticated && <ThemeToggle />}
-            <LanguageSwitcher />
-            {isExpress && !isAuthenticated && <ResetExpressRounds />}
+            {isAuthenticated && <LanguageSwitcher />}
+          </div>
+
+          <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+            {messagesButton}
           </div>
 
           {/* Acceso / Perfil */}
           {!isAuthenticated ? (
-            <button
-              type="button"
-              onClick={onShowAuth}
-              title={t('common.signIn')}
-              aria-label={t('common.signIn')}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent bg-accent text-on-accent shadow-soft transition-all hover:bg-accent-hover active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-            >
-              <LogIn size={22} aria-hidden="true" />
-            </button>
+            <div className="flex items-center gap-2 max-[360px]:gap-1">
+              <LanguageSwitcher />
+              {isExpress && <ResetExpressRounds />}
+              <button
+                type="button"
+                onClick={onShowAuth}
+                title={t('common.signIn')}
+                aria-label={t('common.signIn')}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent bg-accent text-on-accent shadow-soft transition-all hover:bg-accent-hover active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current max-[360px]:h-10 max-[360px]:w-10"
+              >
+                <LogIn size={22} aria-hidden="true" />
+              </button>
+            </div>
           ) : (
             <div className="flex shrink-0 items-center gap-2">
               <div className="text-right">

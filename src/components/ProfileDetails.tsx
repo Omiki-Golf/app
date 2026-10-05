@@ -1,7 +1,7 @@
 import { WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useEffect, useState } from 'react';
-import { Check, CheckCircle2, Loader2, Save, User, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Loader2, Save, User, X } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
@@ -32,6 +32,24 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [supportIdCopied, setSupportIdCopied] = useState(false);
+
+  const copySupportId = async () => {
+    try {
+      await navigator.clipboard.writeText(userId);
+    } catch {
+      const field = document.createElement('textarea');
+      field.value = userId;
+      field.style.position = 'fixed';
+      field.style.opacity = '0';
+      document.body.appendChild(field);
+      field.select();
+      document.execCommand('copy');
+      field.remove();
+    }
+    setSupportIdCopied(true);
+    window.setTimeout(() => setSupportIdCopied(false), 2000);
+  };
 
   useEffect(() => {
     setDisplayName(profile?.display_name ?? '');
@@ -145,6 +163,18 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               <div>
                 <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.email')}</label>
                 <input value={email ?? ''} disabled className="w-full px-4 py-3 bg-card-2 text-ink-3 border border-line rounded-xl opacity-80" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-ink-2 mb-2">{t('profile.supportId')}</label>
+                <div className="flex items-stretch gap-2">
+                  <code className="min-w-0 flex-1 select-all break-all rounded-xl border border-line bg-card-2 px-3 py-3 text-xs text-ink-2">{userId}</code>
+                  <button type="button" onClick={() => void copySupportId()} className="inline-flex min-w-24 items-center justify-center gap-2 rounded-xl border border-line bg-card-2 px-3 font-semibold text-accent-ink hover:bg-neutral" aria-label={t('profile.copySupportId')}>
+                    {supportIdCopied ? <Check size={18} /> : <Copy size={18} />}
+                    {supportIdCopied ? t('profile.copiedSupportId') : t('profile.copySupportId')}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-ink-4">{t('profile.supportIdHelp')}</p>
               </div>
 
               <div>

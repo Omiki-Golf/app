@@ -125,6 +125,9 @@ export const adminService = {
  async changeRound(round: ManagedRound, action: string, reason: string): Promise<ManagedRoundDetail> {
   const {data,error}=await supabase.rpc('admin_change_app_round',{p_round_id:round.id,p_action:action,p_reason:reason,p_expected:round.updated_at}); if(error) throw error; return data;
  },
+ async reassignRound(round: ManagedRound, userId: string, reason: string): Promise<ManagedRoundDetail> {
+  const {data,error}=await supabase.rpc('admin_reassign_app_round',{p_round_id:round.id,p_user_id:userId,p_reason:reason,p_expected:round.updated_at}); if(error) throw error; return data;
+ },
  async users(search = '', plan = '', blocked: boolean | null = null, page = 0): Promise<{users: ManagedUserRow[]; total: number}> {
   const {data,error}=await supabase.rpc('admin_list_app_users',{p_search:search,p_plan:plan,p_blocked:blocked,p_page:page});
   if(error) throw error; return data;

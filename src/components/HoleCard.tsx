@@ -19,6 +19,39 @@ interface HoleCardProps {
   onScoreChange: (playerId: string, score: any) => void;
 }
 
+const markerColors = [
+  'bg-blue-500 border-blue-700',
+  'bg-orange-500 border-orange-700',
+  'bg-violet-500 border-violet-700',
+] as const;
+
+const playerInitials = (name: string) => name
+  .trim()
+  .split(/\s+/)
+  .filter(Boolean)
+  .map((part) => part[0])
+  .join('')
+  .slice(0, 2)
+  .toLocaleUpperCase('es') || '?';
+
+function CompactPlayer({ name, colorIndex }: { name: string; colorIndex: number }) {
+  const safeIndex = Math.max(0, colorIndex) % markerColors.length;
+  return (
+    <span
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-black leading-none text-white shadow-sm ${markerColors[safeIndex]}`}
+      title={name}
+      aria-label={name}
+    >
+      {playerInitials(name)}
+    </span>
+  );
+}
+
+function ColorMarker({ colorIndex }: { colorIndex: number }) {
+  const safeIndex = Math.max(0, colorIndex) % markerColors.length;
+  return <span aria-hidden="true" className={`h-4 w-4 shrink-0 rounded-full border-2 shadow-sm ${markerColors[safeIndex]}`} />;
+}
+
 export const HoleCard: React.FC<HoleCardProps> = ({
   hole,
   players,
@@ -298,11 +331,8 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
               >
                 <div className="flex-1 text-left">
                   <div className="flex items-center gap-2">
-                    {isParejas && (
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
-                        {teamLabel}
-                      </span>
-                    )}
+                    {isModeScoring && <ColorMarker colorIndex={isParejas ? team : playerIndex} />}
+                    {isParejas && <span className="sr-only">{teamLabel}</span>}
                     <p className="font-semibold text-ink">{player.name}</p>
                   </div>
                   <p className="text-xs text-ink-3">HCP {player.playing_handicap}</p>
@@ -584,27 +614,17 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
 
       {isModeScoring && matchStatus.label && (
         <div className="border-t-2 border-accent-ring bg-accent-soft p-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-accent-ink uppercase tracking-wide">Marcador</span>
             </div>
-            <div className="flex items-center gap-3">
-              {gameMode === 'match' && players.map((p) => {
-                const total = allHoles.reduce((sum, h) => {
-                  const ps = allHoleScores[p.id]?.[h.hole_number];
-                  return ps ? sum + (ps.mode_points ?? 0) : sum;
-                }, 0);
-                const isLeader = matchStatus.leader === p.name;
-                return (
-                  <div key={p.id} className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold ${isLeader ? 'text-title' : 'text-ink-3'}`}>
-                      {p.name}
-                    </span>
-                    <span className={`text-sm font-bold ${isLeader ? 'text-accent-ink' : 'text-ink-3'}`}>
-                      {total}
-                    </span>
-                  </div>
-                );
+            <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end">
+              {gameMode === 'match' && players.map((p, index) => {
+                const total = allHoles.reduce((sum, h) => sum + (allHoleScores[p.id]?.[h.hole_number]?.mode_points ?? 0), 0);
+                return <React.Fragment key={p.id}>
+                  {index > 0 && <span className="font-black text-ink-3">-</span>}
+                  <span className="inline-flex items-center gap-1.5"><CompactPlayer name={p.name} colorIndex={index} /><strong className="text-accent-ink">{total}</strong></span>
+                </React.Fragment>;
               })}
               {gameMode === 'sindicato' && [...players].sort((a, b) => {
                 const totalA = allHoles.reduce((sum, h) => {
@@ -621,20 +641,16 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   const ps = allHoleScores[p.id]?.[h.hole_number];
                   return ps ? sum + (ps.mode_points ?? 0) : sum;
                 }, 0);
-                const isLeader = matchStatus.leader === p.name;
+                const colorIndex = players.findIndex((player) => player.id === p.id);
                 return (
-                  <div key={p.id} className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold ${isLeader ? 'text-title' : 'text-ink-3'}`}>
-                      {p.name}
-                    </span>
-                    <span className={`text-sm font-bold ${isLeader ? 'text-accent-ink' : 'text-ink-3'}`}>
-                      {total} pts
-                    </span>
-                  </div>
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm">
+                    <CompactPlayer name={p.name} colorIndex={colorIndex} />
+                    <strong className="text-accent-ink">{total}</strong>
+                  </span>
                 );
               })}
               {gameMode === 'parejas' && players.length === 4 && (() => {
-                const teamAssignmentsLocal = Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1]));
+                const teamAssignmentsLocal = Object.fromEntries(players.map((p, i) => [p.id, teamAssignments[p.id] ?? (i < 2 ? 0 : 1)]));
                 const team0 = players.filter((p) => teamAssignmentsLocal[p.id] === 0);
                 const team1 = players.filter((p) => teamAssignmentsLocal[p.id] === 1);
                 // Both players on a team have identical mode_points, so use one player's total per team
@@ -647,18 +663,16 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   return ps ? s + (ps.mode_points ?? 0) : s;
                 }, 0) : 0;
                 return (
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-blue-200 text-blue-900">P1</span>
-                    <span className="text-ink-2">{team0.map(p => p.name).join('/')}</span>
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 font-bold">
+                    {team0.map((p) => <CompactPlayer key={p.id} name={p.name} colorIndex={0} />)}
                     <span className={`px-2 py-0.5 rounded-lg ${team0Pts > team1Pts ? 'bg-accent text-on-accent' : team0Pts < team1Pts ? 'bg-neutral-hover text-ink-3' : 'bg-neutral text-ink-2'}`}>
-                      {team0Pts}-{team1Pts}
+                      {team0Pts} - {team1Pts}
                     </span>
-                    <span className="text-ink-2">{team1.map(p => p.name).join('/')}</span>
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-orange-200 text-orange-900">P2</span>
+                    {team1.map((p) => <CompactPlayer key={p.id} name={p.name} colorIndex={1} />)}
                   </div>
                 );
               })()}
-              {gameMode !== 'sindicato' && gameMode !== 'parejas' && (
+              {gameMode !== 'match' && gameMode !== 'sindicato' && gameMode !== 'parejas' && (
                 <div className={`px-3 py-1 rounded-lg font-bold text-sm ${
                   matchStatus.diff > 0
                     ? 'bg-accent text-on-accent'

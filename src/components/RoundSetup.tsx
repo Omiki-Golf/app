@@ -3,7 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
 import { GolfCourse, GolfHole, Group, Tee, GameMode } from '../types';
 import { golfService } from '../services/golfService';
-import { Bell, ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-react';
+import { ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
@@ -28,8 +28,7 @@ interface RoundSetupProps {
   hasLimitedAccess?: boolean;
   planType?: 'express' | 'player' | 'team' | 'premium';
   onShowPlans?: () => void;
-  onShowNotifications?: () => void;
-  notificationCount?: number;
+  messagesButton?: React.ReactNode;
 }
 
 export const RoundSetup: React.FC<RoundSetupProps> = ({
@@ -45,8 +44,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   hasLimitedAccess = false,
   planType = 'express',
   onShowPlans,
-  onShowNotifications,
-  notificationCount = 0,
+  messagesButton,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
@@ -318,22 +316,19 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        {onShowNotifications && <div className="flex justify-start"><button type="button" onClick={onShowNotifications} title={t('common.notifications')} aria-label={`${t('common.notifications')}: ${notificationCount}`} className="relative w-11 h-11 rounded-full border border-line bg-card shadow-soft flex items-center justify-center text-accent-ink">
-          <Bell size={22} />
-          {notificationCount > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold min-w-5 h-5 px-1 rounded-full">{notificationCount}</span>}
-        </button></div>}
-        <div className="text-center relative">
-          {!currentGroup && onBack && (
-            <NavigationButton destination="home"
-              onClick={onBack}
-              className="absolute left-0 top-0 text-ink hover:text-accent-ink flex items-center gap-2 transition-colors"
-            />
-          )}
+        {((!currentGroup && onBack) || messagesButton) && (
+          <div className="grid grid-cols-3 items-center">
+            <div>{!currentGroup && onBack && <NavigationButton destination="home" onClick={onBack} />}</div>
+            <div className="flex justify-center">{messagesButton}</div>
+            <div />
+          </div>
+        )}
+        <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
             <h1 className="text-4xl md:text-5xl font-bold text-title">
               {currentGroup?.group_code === 'DIVEND'
                 ? 'Partideta dels divendres'
-                : (currentGroup?.name || 'La Partideta')}
+                : (currentGroup?.name || 'OmkiGolf')}
             </h1>
           </div>
           <p className="text-accent-ink text-lg">

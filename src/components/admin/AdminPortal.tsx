@@ -30,6 +30,7 @@ const actions: Record<string, string> = {
   'round.reopen': 'Partida reabierta',
   'round.withdraw': 'Partida retirada',
   'round.restore': 'Partida restaurada',
+  'round.reassign': 'Partida reasignada a jugador',
   'user.profile_changed': 'Perfil de jugador modificado',
   'user.plan_changed': 'Plan de jugador modificado',
   'user.restriction_changed': 'Bloqueo de jugador modificado',

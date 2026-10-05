@@ -1,7 +1,7 @@
 import { supabase } from './services/supabaseClient';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { useReadOnly } from './context/ReadOnlyContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType } from './types';
 import { golfService } from './services/golfService';
@@ -34,6 +34,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { ProfileDetails } from './components/ProfileDetails';
 import { TeamCreation } from './components/TeamCreation';
 import { NotificationsBell } from './components/NotificationsBell';
+import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
 import { PaymentSelector } from './components/PaymentSelector';
 import { useSubscription } from './hooks/useSubscription';
@@ -41,7 +42,7 @@ import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
 
-type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'notifications' | 'pro-shop';
+type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop';
 
 interface RoundState {
   round: GolfRound | null;
@@ -100,7 +101,11 @@ function App() {
   const [accessCodeError, setAccessCodeError] = useState('');
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
-  const {count: pendingInvitations, refresh: refreshNotifications} = useNotificationCount(user?.id ?? null, currentView);
+  const activityScope = currentGroup
+    ? { groupId: currentGroup.id }
+    : { roundId: roundState.round?.group_id ? null : roundState.round?.id, accessCode: roundState.round?.id ? accessCodeStorage.getAccessCode(roundState.round.id) : null };
+  const {count: pendingInvitations, refresh: refreshNotifications} = useNotificationCount(user?.id ?? null, currentView, activityScope);
+  const handleNotificationsRefresh = useCallback(() => { void refreshNotifications(); }, [refreshNotifications]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -110,6 +115,7 @@ function App() {
   const [simulatorUpdating, setSimulatorUpdating] = useState(false);
   const [returnToProfile, setReturnToProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [messagesOpen, setMessagesOpen] = useState(false);
   // Paid access comes from the server-confirmed database subscription.
   const activePlanType = planType;
 
@@ -142,6 +148,22 @@ function App() {
     const timeoutId = window.setTimeout(() => setProfileSaved(false), 3000);
     return () => window.clearTimeout(timeoutId);
   }, [profileSaved]);
+
+  useEffect(() => {
+    const closeMessagesOnBack = () => setMessagesOpen(false);
+    window.addEventListener('popstate', closeMessagesOnBack);
+    return () => window.removeEventListener('popstate', closeMessagesOnBack);
+  }, []);
+
+  const openMessages = () => {
+    if (messagesOpen) return;
+    window.history.pushState({ ...(window.history.state || {}), omikiMessages: true }, '', window.location.href);
+    setMessagesOpen(true);
+  };
+  const closeMessages = () => {
+    if (window.history.state?.omikiMessages) window.history.back();
+    else setMessagesOpen(false);
+  };
 
   const openAuth = (returnView: ViewType) => {
     setAuthReturnView(returnView);
@@ -832,6 +854,20 @@ function App() {
     </>
   );
 
+  const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'scorecard' || currentView === 'quickplay-statistics';
+  const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
+  const withMessages = (content: React.ReactNode) => <>
+    {!usesInlineMessages && <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} belowWarning={isIncognito} />}
+    {messagesOpen && <NotificationsBell
+      key={`${user?.id || 'express'}-${activityScope.groupId || activityScope.roundId || 'general'}`}
+      userId={user?.id ?? null}
+      activityScope={activityScope}
+      onBack={closeMessages}
+      onInvitationResolved={handleNotificationsRefresh}
+    />}
+    {content}
+  </>;
+
   if (currentView === 'player-checkout' && user) {
     return <PlayerCheckout key={user.id} userId={user.id} checkoutReturn={checkoutReturn} onBack={() => { setCheckoutReturn(null); setCurrentView('main'); }} onDone={async () => { await refreshSubscription(); setCheckoutReturn(null); setCurrentGroup(null); setCurrentView('main'); }} />;
   }
@@ -917,7 +953,7 @@ function App() {
   }
 
   if (currentView === 'profile') {
-    return (
+    return withMessages(
       <>
         <IncognitoWarning />
         {profileSaved && (
@@ -954,7 +990,7 @@ function App() {
   }
 
   if (currentView === 'profile-details' && user) {
-    return (
+    return withMessages(
       <>
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
@@ -975,7 +1011,7 @@ function App() {
   }
 
   if (currentView === 'team-creation' && user) {
-    return (
+    return withMessages(
       <>
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
@@ -985,24 +1021,6 @@ function App() {
             onTeamCreated={(groupId) => {
               refreshSubscription();
               setCurrentView('my-groups');
-            }}
-          />
-        </div>
-      </>
-    );
-  }
-
-  if (currentView === 'notifications') {
-    return (
-      <>
-        <IncognitoWarning />
-        <div className={isIncognito ? 'pt-10' : ''}>
-          <NotificationsBell
-            key={user?.id || 'express'}
-            userId={user?.id ?? null}
-            onBack={() => setCurrentView('main')}
-            onInvitationResolved={() => {
-              void refreshNotifications();
             }}
           />
         </div>
@@ -1053,7 +1071,7 @@ function App() {
   }
 
   if (currentView === 'my-groups') {
-    return (
+    return withMessages(
       <>
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
@@ -1075,7 +1093,7 @@ function App() {
   }
 
   if (!currentGroup && currentView === 'main') {
-    return (
+    return withMessages(
       <>
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
@@ -1083,7 +1101,6 @@ function App() {
             planType={activePlanType}
             isAuthenticated={!!user}
             profile={profile}
-            pendingInvitations={pendingInvitations}
             onQuickPlay={() => setCurrentView('setup')}
             onJoinQuickPlay={() => {
               setPendingRoundId(null);
@@ -1092,13 +1109,13 @@ function App() {
             }}
             onCreateTeam={() => setCurrentView('team-creation')}
             onShowProfile={() => setCurrentView('profile')}
-            onShowNotifications={() => setCurrentView('notifications')}
             onShowAuth={() => { setReturnToProfile(false); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}
             simulatorEnabled={simulatorEnabled}
             simulatorUpdating={simulatorUpdating}
             onToggleSimulator={handleToggleSimulator}
             onCycleSimulatorPlan={handleCycleSimulatorPlan}
+            messagesButton={inlineMessagesButton}
           />
           {showAccessCodeModal && (
             <AccessCodeModal
@@ -1130,15 +1147,13 @@ function App() {
     );
   }
 
-  return (
+  return withMessages(
     <div className="min-h-screen bg-app">
       <IncognitoWarning />
       {!user && <GlobalThemeSwitch />}
       <div className={isIncognito ? 'pt-10' : ''}>
       {currentView === 'main' && currentGroup && (
         <RoundSetup
-          onShowNotifications={() => setCurrentView('notifications')}
-          notificationCount={pendingInvitations}
           onRoundCreated={handleRoundCreated}
           onViewActiveRounds={() => setCurrentView('active-rounds')}
           onViewGamePoints={() => setCurrentView('game-points')}
@@ -1154,13 +1169,12 @@ function App() {
           hasLimitedAccess={hasLimitedAccess}
           planType={activePlanType}
           onShowPlans={() => setCurrentView('plans')}
+          messagesButton={inlineMessagesButton}
         />
       )}
 
       {currentView === 'setup' && !currentGroup && (
         <RoundSetup
-          onShowNotifications={() => setCurrentView('notifications')}
-          notificationCount={pendingInvitations}
           onRoundCreated={handleRoundCreated}
           onViewActiveRounds={() => setCurrentView('active-rounds')}
           onViewGamePoints={() => setCurrentView('game-points')}
@@ -1175,6 +1189,7 @@ function App() {
           currentGroup={null}
           planType={activePlanType}
           onShowPlans={() => setCurrentView('plans')}
+          messagesButton={inlineMessagesButton}
         />
       )}
 
@@ -1238,6 +1253,7 @@ function App() {
           onResetGame={handleBackToMain}
           onFinishRound={handleFinishRound}
           onCourseChanged={handleCourseChanged}
+          messagesButton={inlineMessagesButton}
         />
       )}
 
@@ -1285,6 +1301,7 @@ function App() {
         <QuickPlayStatistics
           roundId={roundState.round?.id}
           onBack={() => backFromProfileSection('setup')}
+          messagesButton={inlineMessagesButton}
         />
       )}
 

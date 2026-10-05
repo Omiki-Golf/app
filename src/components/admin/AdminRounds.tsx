@@ -3,6 +3,7 @@ import {
   adminService,
   type ManagedRound,
   type ManagedRoundDetail,
+  type ManagedUserRow,
 } from "../../services/adminService";
 import { NavigationButton } from "../NavigationButton";
 const labels: Record<string, string> = {
@@ -254,7 +255,13 @@ function RoundDetail({
     [confirm, setConfirm] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [success, setSuccess] = useState("");
+    [success, setSuccess] = useState(""),
+    [reassigning, setReassigning] = useState(false),
+    [userSearch, setUserSearch] = useState(""),
+    [userResults, setUserResults] = useState<ManagedUserRow[]>([]),
+    [selectedUser, setSelectedUser] = useState<ManagedUserRow | null>(null),
+    [reassignReason, setReassignReason] = useState(""),
+    [reassignConfirm, setReassignConfirm] = useState(false);
   const running = useRef(false);
   const r = detail.round;
   const allowed = r.group_id
@@ -278,6 +285,41 @@ function RoundDetail({
       setDetail(await adminService.changeRound(r, action, reason));
       setAction("");
       setSuccess("Cambio guardado y registrado en Actividad.");
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      running.current = false;
+      setBusy(false);
+    }
+  };
+  const searchUsers = async () => {
+    if (userSearch.trim().length < 2) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await adminService.users(userSearch.trim(), "", null, 0);
+      setUserResults(result.users);
+      if (result.users.length === 0) setError("No se ha encontrado ningún jugador registrado.");
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const reassign = async () => {
+    if (running.current || !selectedUser) return;
+    running.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      setDetail(await adminService.reassignRound(r, selectedUser.user_id, reassignReason));
+      setReassigning(false);
+      setSelectedUser(null);
+      setUserResults([]);
+      setUserSearch("");
+      setReassignReason("");
+      setReassignConfirm(false);
+      setSuccess("Partida reasignada y registrada en Actividad.");
     } catch (e) {
       setError(message(e));
     } finally {
@@ -322,6 +364,7 @@ function RoundDetail({
             className="border border-line rounded-xl p-3 disabled:opacity-40"
             onClick={() => {
               setAction(a);
+              setReassigning(false);
               setReason("");
               setConfirm(false);
               setError("");
@@ -331,6 +374,20 @@ function RoundDetail({
             {actions[a]}
           </button>
         ))}
+        {!r.group_id && !r.admin_withdrawn_at && (
+          <button
+            disabled={busy || !!action}
+            className="border border-line rounded-xl p-3 disabled:opacity-40"
+            onClick={() => {
+              setReassigning(true);
+              setAction("");
+              setError("");
+              setSuccess("");
+            }}
+          >
+            Reasignar a jugador
+          </button>
+        )}
         <button
           disabled={busy}
           className="border rounded-xl p-3"
@@ -412,6 +469,74 @@ function RoundDetail({
                   ? "Confirmar y guardar"
                   : "Revisar cambio"}
             </button>
+          </div>
+        </form>
+      )}
+      {reassigning && (
+        <form
+          className="bg-card border border-line rounded-xl p-4 space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (reassignConfirm) void reassign();
+            else if (selectedUser) setReassignConfirm(true);
+            else void searchUsers();
+          }}
+        >
+          <h3 className="font-bold">Reasignar partida a un jugador registrado</h3>
+          <p>La partida aparecerá en la cuenta elegida. Se conservarán todos sus jugadores y resultados.</p>
+          <label className="block">
+            Buscar por correo, nick o nombre
+            <div className="flex gap-2">
+              <input
+                className={input}
+                minLength={2}
+                maxLength={200}
+                value={userSearch}
+                disabled={busy || reassignConfirm}
+                onChange={(e) => {
+                  setUserSearch(e.target.value);
+                  setSelectedUser(null);
+                  setReassignConfirm(false);
+                }}
+              />
+              <button type="button" disabled={busy || userSearch.trim().length < 2 || reassignConfirm} className="border rounded-xl px-4 disabled:opacity-40" onClick={() => void searchUsers()}>
+                Buscar
+              </button>
+            </div>
+          </label>
+          {!reassignConfirm && userResults.length > 0 && (
+            <div className="space-y-2" role="listbox" aria-label="Jugadores encontrados">
+              {userResults.map((user) => (
+                <button
+                  type="button"
+                  key={user.user_id}
+                  className={`w-full text-left border rounded-xl p-3 ${selectedUser?.user_id === user.user_id ? "border-accent bg-accent/10" : "border-line"}`}
+                  onClick={() => setSelectedUser(user)}
+                >
+                  <span className="font-semibold">{user.display_name || user.nick || user.email}</span>
+                  <span className="block text-sm text-ink-3">{user.email} · Plan {user.plan}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedUser && (
+            <label className="block">
+              Motivo obligatorio (mínimo 3 caracteres)
+              <textarea className={input} required minLength={3} maxLength={500} value={reassignReason} disabled={busy || reassignConfirm} onChange={(e) => setReassignReason(e.target.value)} />
+            </label>
+          )}
+          {reassignConfirm && selectedUser && (
+            <p>Confirma que la partida #{r.reference_number} pasará de <strong>{r.user_id}</strong> a <strong>{selectedUser.display_name || selectedUser.nick || selectedUser.email}</strong>.</p>
+          )}
+          <div className="flex gap-3">
+            <button type="button" disabled={busy} className="border rounded-xl p-3" onClick={() => reassignConfirm ? setReassignConfirm(false) : setReassigning(false)}>
+              {reassignConfirm ? "Revisar" : "Cancelar"}
+            </button>
+            {selectedUser && (
+              <button disabled={busy || reassignReason.trim().length < 3} className="bg-accent text-on-accent rounded-xl p-3 disabled:opacity-40">
+                {busy ? "Guardando…" : reassignConfirm ? "Confirmar y reasignar" : "Revisar reasignación"}
+              </button>
+            )}
           </div>
         </form>
       )}
