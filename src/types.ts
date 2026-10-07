@@ -161,6 +161,7 @@ export interface GolfRound {
   course_id: string;
   created_by: string;
   user_id: string;
+  responsible_user_id?: string | null;
   group_id?: string;
   num_holes: 9 | 18;
   holes_range?: '1-9' | '10-18';

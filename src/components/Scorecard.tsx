@@ -26,6 +26,9 @@ interface ScorecardProps {
   courseId?: string;
   accessCode?: string;
   hasEditAccess?: boolean;
+  isCreator?: boolean;
+  canFinishRound?: boolean;
+  currentResponsibleUserId?: string | null;
   courseName?: string;
   groupCode?: string | null;
   gameMode?: GameMode;
@@ -35,6 +38,7 @@ interface ScorecardProps {
   onResetGame: () => void;
   backDestination?: 'back' | 'home';
   onFinishRound: () => void;
+  onResponsibleChanged?: (userId: string | null) => Promise<void>;
   onCourseChanged?: (courseId: string, numHoles: 9 | 18, holes: GolfHole[], players?: RoundPlayer[]) => void;
   messagesButton?: React.ReactNode;
 }
@@ -49,6 +53,9 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   courseId,
   accessCode,
   hasEditAccess = true,
+  isCreator = false,
+  canFinishRound = false,
+  currentResponsibleUserId = null,
   courseName = '',
   groupCode = null,
   gameMode = 'stableford',
@@ -57,6 +64,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onShowLeaderboard,
   onResetGame, backDestination = 'back',
   onFinishRound,
+  onResponsibleChanged,
   onCourseChanged,
   messagesButton,
 }) => {
@@ -70,6 +78,37 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   };
   const [showFinishModal, setShowFinishModal] = useState(false);
   const [showAccessCode, setShowAccessCode] = useState(false);
+  const [participants, setParticipants] = useState<Array<{ user_id: string; label: string; joined_at: string }>>([]);
+  const [savingResponsible, setSavingResponsible] = useState(false);
+
+  useEffect(() => {
+    if (!isCreator || !roundId || groupCode) return;
+    let live = true;
+    const load = async () => {
+      try {
+        const joined = await golfService.getExpressRoundParticipants(roundId);
+        if (live) setParticipants(joined);
+      } catch (err) {
+        console.error('Error cargando participantes Express:', err);
+      }
+    };
+    void load();
+    const timer = window.setInterval(load, 15000);
+    return () => { live = false; window.clearInterval(timer); };
+  }, [isCreator, roundId, groupCode]);
+
+  const handleResponsibleChange = async (userId: string) => {
+    if (!onResponsibleChanged) return;
+    setSavingResponsible(true);
+    setError('');
+    try {
+      await onResponsibleChanged(userId || null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo designar al responsable');
+    } finally {
+      setSavingResponsible(false);
+    }
+  };
 
   useEffect(() => {
     console.log('📊 Scorecard: Players prop updated:', players.map(p => ({ name: p.name, playing_handicap: p.playing_handicap })));
@@ -252,6 +291,29 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             </div>
           )}
 
+          {isCreator && !groupCode && participants.length > 0 && (
+            <div className="mb-4 bg-card border border-line rounded-lg p-4 shadow-soft">
+              <label htmlFor="express-responsible" className="block text-sm font-semibold text-ink mb-2">
+                Responsable de finalizar
+              </label>
+              <select
+                id="express-responsible"
+                value={currentResponsibleUserId || ''}
+                onChange={(event) => void handleResponsibleChange(event.target.value)}
+                disabled={savingResponsible}
+                className="w-full rounded-lg border border-line bg-card px-3 py-2 text-ink disabled:opacity-50"
+              >
+                <option value="">Solo yo (creador)</option>
+                {participants.map((participant) => (
+                  <option key={participant.user_id} value={participant.user_id}>{participant.label}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-ink-3">
+                El responsable podrá finalizar mientras la partida esté activa. Después, solo tú podrás consultar sus estadísticas.
+              </p>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 bg-red-50 border-l-4 border-red-500 p-3 rounded">
               <p className="text-red-700 text-sm">{error}</p>
@@ -317,7 +379,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               Anterior
             </button>
 
-            {isLastHole && allScoresComplete ? (
+            {isLastHole && allScoresComplete && canFinishRound ? (
               <WriteButton
                 onClick={handleFinishWithConfirm}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -793,7 +855,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             setHandshakeAcknowledged(true);
             setHandshakeData(null);
           }}
-          onFinishRound={onFinishRound}
+          onFinishRound={canFinishRound ? onFinishRound : undefined}
         />
       )}
     </div>

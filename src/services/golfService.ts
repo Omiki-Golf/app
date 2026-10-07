@@ -14,7 +14,12 @@ import {
 import { calculatePlayingHandicap, calculateScore } from '../utils/calculations';
 import { getUserId } from '../utils/userId';
 import { storageUtils } from '../utils/storage';
-import { generateAccessCode, accessCodeStorage } from '../utils/accessCode';
+import { generateAccessCode } from '../utils/accessCode';
+
+const getRoundOwnerId = async (): Promise<string> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user.id ?? getUserId();
+};
 
 export const golfService = {
   async getHandicapUpdatePreview(): Promise<Array<{
@@ -362,7 +367,7 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     teeId?: string,
     gameMode: GameMode = 'stableford'
   ): Promise<GolfRound> {
-    const userId = getUserId();
+    const userId = await getRoundOwnerId();
     const groupId = storageUtils.getCurrentGroupId();
 
     // Generate a unique access code
@@ -586,6 +591,14 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .update(updates)
       .eq('id', roundId);
 
+    if (error) throw error;
+  },
+
+  async finishExpressRound(roundId: string): Promise<void> {
+    const { error } = await supabase.rpc('finish_express_round', {
+      p_round: roundId,
+      p_actor: getUserId(),
+    });
     if (error) throw error;
   },
 
@@ -932,6 +945,33 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (error || !data) return null;
     return data;
+  },
+
+  async registerExpressRoundAccess(roundId: string, accessCode: string): Promise<void> {
+    const { error } = await supabase.rpc('register_express_round_access', {
+      p_round: roundId,
+      p_access_code: accessCode.toUpperCase(),
+      p_actor: getUserId(),
+    });
+    if (error) throw error;
+  },
+
+  async getExpressRoundParticipants(roundId: string): Promise<Array<{ user_id: string; label: string; joined_at: string }>> {
+    const { data, error } = await supabase.rpc('list_express_round_participants', {
+      p_round: roundId,
+      p_actor: getUserId(),
+    });
+    if (error) throw error;
+    return data || [];
+  },
+
+  async setExpressRoundResponsible(roundId: string, responsibleUserId: string | null): Promise<void> {
+    const { error } = await supabase.rpc('set_express_round_responsible', {
+      p_round: roundId,
+      p_responsible: responsibleUserId,
+      p_actor: getUserId(),
+    });
+    if (error) throw error;
   },
 
   // Player database operations
@@ -2599,7 +2639,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     round: GolfRound,
     courseName: string
   ): Promise<void> {
-    const userId = getUserId();
+    const userId = await getRoundOwnerId();
 
     const playerStats = players.map(player => {
       const playerScores = scores.filter(s => s.player_id === player.id);
@@ -2710,38 +2750,6 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
       isCreator: true,
     };
   }
-
-    // 2. Si no se encontró partida propia, revisar los códigos de acceso guardados
-    const storedCodes = accessCodeStorage.getAllAccessCodes();
-    console.log('[getQuickPlayCompletedRound] No creator round found. Checking stored access codes:', storedCodes.length);
-
-    for (const entry of storedCodes) {
-      const { data: roundData, error: roundError } = await supabase
-        .from('golf_rounds')
-        .select('*')
-        .eq('id', entry.roundId)
-        .is('group_id', null)
-        .in('status', ['completed', 'archived'])
-        .single();
-
-      if (!roundError && roundData) {
-        const [players, scores, course, holes] = await Promise.all([
-          this.getRoundPlayers(roundData.id),
-          this.getRoundScores(roundData.id),
-          this.getCourse(roundData.course_id),
-          this.getCourseHoles(roundData.course_id, roundData.num_holes, roundData.holes_range),
-        ]);
-
-        return {
-          round: roundData,
-          players,
-          scores,
-          course,
-          holes,
-          isCreator: false,
-        };
-      }
-    }
 
     return null;
   }, // <-- AQUÍ ES DONDE DEBE CERRARSE LA FUNCIÓN

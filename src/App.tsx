@@ -8,6 +8,7 @@ import { golfService } from './services/golfService';
 import { calculateModePoints, ModeScoreInput } from './utils/calculations';
 import { accessCodeStorage } from './utils/accessCode';
 import { storageUtils } from './utils/storage';
+import { getUserId } from './utils/userId';
 import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthContext
 import { RoundSetup } from './components/RoundSetup';
 import { PlayerSetup } from './components/PlayerSetup';
@@ -347,6 +348,13 @@ function App() {
             const storedCode = accessCodeStorage.getAccessCode(activeRoundId);
             const hasEditAccess = isCreator || storedCode === roundData.round.access_code;
 
+            if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator) {
+              accessCodeStorage.removeAccessCode(activeRoundId);
+              storageUtils.clearActiveRound();
+              setCurrentView('setup');
+              return;
+            }
+
             const course = await golfService.getCourse(roundData.round.course_id);
 
             setRoundState({
@@ -427,16 +435,31 @@ function App() {
           setCurrentView('setup');
           return;
         }
-        const { getUserId } = await import('./utils/userId');
         if (!live) return;
+        if (data.status !== 'active' && data.user_id !== getUserId()) {
+          accessCodeStorage.removeAccessCode(roundId);
+          storageUtils.clearActiveRound();
+          setRoundState(prev => prev.round?.id === roundId ? { ...prev, round: null, players: [], scores: [], hasEditAccess: false } : prev);
+          setCurrentView('setup');
+          return;
+        }
         const edit = data.status === 'active' && (data.user_id === getUserId() || accessCodeStorage.getAccessCode(roundId) === data.access_code);
         setRoundState(prev => prev.round?.id === roundId ? {...prev, round: data, hasEditAccess: edit} : prev);
       } catch { /* Keep the existing view on a transient network failure. */ }
     };
     const check = () => { void refreshRound(); };
     const timer = window.setInterval(check, 30000);
+    const statusSubscription = supabase
+      .channel(`express-round-status-${roundId}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'golf_rounds', filter: `id=eq.${roundId}` }, check)
+      .subscribe();
     window.addEventListener('focus', check);
-    return () => { live = false; window.clearInterval(timer); window.removeEventListener('focus', check); };
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', check);
+      void supabase.removeChannel(statusSubscription);
+    };
   }, [roundState.round?.id, roundState.round?.group_id]);
 
   const handleGroupCreated = async (group: Group) => {
@@ -524,6 +547,10 @@ function App() {
         const isCreator = currentUserId === roundData.round.user_id;
         const storedCode = accessCodeStorage.getAccessCode(roundId);
         const hasEditAccess = isCreator || storedCode === roundData.round.access_code;
+
+        if (!roundData.round.group_id && !isCreator && storedCode === roundData.round.access_code) {
+          await golfService.registerExpressRoundAccess(roundId, storedCode);
+        }
 
         const course = await golfService.getCourse(roundData.round.course_id);
 
@@ -821,13 +848,18 @@ function App() {
 
     try {
       setLoading(true);
-      await golfService.updateRoundStatus(roundState.round.id, 'completed');
+      const isQuickPlay = !roundState.round.group_id;
+      if (isQuickPlay) await golfService.finishExpressRound(roundState.round.id);
+      else await golfService.updateRoundStatus(roundState.round.id, 'completed');
       storageUtils.clearActiveRound();
 
-      const isQuickPlay = !roundState.round.group_id;
-
       if (isQuickPlay) {
-        setCurrentView('quickplay-statistics');
+        if (roundState.isCreator) setCurrentView('quickplay-statistics');
+        else {
+          accessCodeStorage.removeAccessCode(roundState.round.id);
+          setRoundState(prev => ({ ...prev, round: null, players: [], scores: [], hasEditAccess: false }));
+          setCurrentView('setup');
+        }
       } else if (currentGroup) {
         setCurrentView('statistics');
       } else {
@@ -1244,6 +1276,9 @@ function App() {
           courseId={roundState.round.course_id}
           accessCode={roundState.round.access_code}
           hasEditAccess={roundState.hasEditAccess && !readOnly}
+          isCreator={roundState.isCreator}
+          canFinishRound={!!roundState.round.group_id || roundState.isCreator || roundState.round.responsible_user_id === getUserId()}
+          currentResponsibleUserId={roundState.round.responsible_user_id}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
           gameMode={roundState.round.game_mode}
@@ -1252,6 +1287,14 @@ function App() {
           onShowLeaderboard={() => setCurrentView('leaderboard')}
           onResetGame={handleBackToMain}
           onFinishRound={handleFinishRound}
+          onResponsibleChanged={async (responsibleUserId) => {
+            if (!roundState.round) return;
+            await golfService.setExpressRoundResponsible(roundState.round.id, responsibleUserId);
+            setRoundState(prev => ({
+              ...prev,
+              round: prev.round ? { ...prev.round, responsible_user_id: responsibleUserId } : null,
+            }));
+          }}
           onCourseChanged={handleCourseChanged}
           messagesButton={inlineMessagesButton}
         />

@@ -13,9 +13,21 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.1';
+export const APP_VERSION = '1.5.2';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.5.2',
+    date: '2026-10-07',
+    title: 'Control de las partidas Express',
+    summary: 'Las partidas Express quedan vinculadas al creador y solo las finaliza quien tenga esa responsabilidad.',
+    changes: [
+      { type: 'fixed', text: 'Una partida iniciada desde el móvil ya no puede quedar asociada por error al identificador local del dispositivo.' },
+      { type: 'improved', text: 'La base de datos garantiza la propiedad de la cuenta incluso si el teléfono conserva una versión anterior de la aplicación.' },
+      { type: 'improved', text: 'El creador puede designar a otro participante como responsable de finalizar una partida Express.' },
+      { type: 'fixed', text: 'Al finalizar una partida Express, solo el creador conserva el acceso a sus estadísticas.' },
+    ],
+  },
   {
     version: '1.5.1',
     date: '2026-10-05',

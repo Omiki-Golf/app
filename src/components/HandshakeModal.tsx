@@ -59,13 +59,13 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
           >
             Seguir jugando
           </button>
-          <button
+          {onFinishRound && <button
             type="button"
             onClick={handleFinish}
             className="w-full bg-neutral hover:bg-neutral-hover text-ink font-bold py-3 px-4 rounded-xl transition-colors"
           >
             Finalizar partida
-          </button>
+          </button>}
         </div>
       </div>
     </div>
