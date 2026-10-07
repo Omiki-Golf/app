@@ -947,6 +947,27 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data;
   },
 
+  async getExpressRoundStatisticsByCode(accessCode: string): Promise<any | null> {
+    const { data, error } = await supabase.rpc('get_express_round_statistics_by_code', {
+      p_access_code: accessCode.toUpperCase(),
+    });
+    if (error) throw error;
+    if (!data) return null;
+
+    const holes = data.holes || [];
+    if (holes.length === 9 && data.round?.num_holes === 18 && !data.round?.holes_range) {
+      data.holes = [
+        ...holes,
+        ...holes.map((hole: any) => ({
+          ...hole,
+          id: `${hole.id}_back`,
+          hole_number: hole.hole_number + 9,
+        })),
+      ];
+    }
+    return data;
+  },
+
   async registerExpressRoundAccess(roundId: string, accessCode: string): Promise<void> {
     const { error } = await supabase.rpc('register_express_round_access', {
       p_round: roundId,

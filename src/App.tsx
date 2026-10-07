@@ -100,6 +100,7 @@ function App() {
   const [showAccessCodeModal, setShowAccessCodeModal] = useState(false);
   const [pendingRoundId, setPendingRoundId] = useState<string | null>(null);
   const [accessCodeError, setAccessCodeError] = useState('');
+  const [sharedExpressStats, setSharedExpressStats] = useState<any | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
   const activityScope = currentGroup
@@ -806,6 +807,15 @@ function App() {
           accessCodeStorage.saveAccessCode(round.id, code);
           setShowAccessCodeModal(false);
           await handleJoinRound(round.id);
+        } else if (!currentGroup) {
+          const statistics = await golfService.getExpressRoundStatisticsByCode(code);
+          if (statistics) {
+            setSharedExpressStats(statistics);
+            setShowAccessCodeModal(false);
+            setCurrentView('quickplay-statistics');
+          } else {
+            setAccessCodeError('No se encontró una partida con ese código');
+          }
         } else {
           setAccessCodeError('No se encontró una partida con ese código');
         }
@@ -1343,8 +1353,12 @@ function App() {
       {currentView === 'quickplay-statistics' && !currentGroup && (
         <QuickPlayStatistics
           roundId={roundState.round?.id}
-          onBack={() => backFromProfileSection('setup')}
-          messagesButton={inlineMessagesButton}
+          sharedRoundData={sharedExpressStats}
+          onBack={() => {
+            setSharedExpressStats(null);
+            backFromProfileSection('setup');
+          }}
+          messagesButton={sharedExpressStats ? undefined : inlineMessagesButton}
         />
       )}
 

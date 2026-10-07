@@ -13,9 +13,19 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.2';
+export const APP_VERSION = '1.5.3';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.5.3',
+    date: '2026-10-07',
+    title: 'Estadísticas Express mediante código',
+    summary: 'El código de una partida Express permite consultar su resultado después de finalizarla.',
+    changes: [
+      { type: 'new', text: 'Las partidas Express finalizadas o archivadas pueden abrirse de nuevo introduciendo su código.' },
+      { type: 'improved', text: 'La consulta por código es de solo lectura y permite descargar o compartir las estadísticas sin añadir la partida al historial.' },
+    ],
+  },
   {
     version: '1.5.2',
     date: '2026-10-07',

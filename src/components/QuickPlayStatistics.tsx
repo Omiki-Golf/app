@@ -13,6 +13,7 @@ import { GameMode } from '../types';
 interface QuickPlayStatisticsProps {
   onBack: () => void;
   roundId?: string;
+  sharedRoundData?: any | null;
   messagesButton?: React.ReactNode;
 }
 
@@ -39,7 +40,8 @@ interface AvailableRound {
   game_mode?: string;
 }
 
-export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, messagesButton }) => {
+export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, sharedRoundData = null, messagesButton }) => {
+  const isSharedView = !!sharedRoundData;
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -64,6 +66,21 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     const init = async () => {
       try {
         setLoading(true);
+        if (sharedRoundData) {
+          setAvailableRounds([]);
+          setSelectedRoundId(sharedRoundData.round?.id || null);
+          setRoundData(sharedRoundData);
+          setStats(golfService.calculateQuickPlayAwards(
+            sharedRoundData.players,
+            sharedRoundData.scores,
+            sharedRoundData.holes,
+            sharedRoundData.round?.game_mode || 'stableford'
+          ));
+          setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
+          setLoading(false);
+          window.setTimeout(() => setAnimateIn(true), 150);
+          return;
+        }
         const rounds = await golfService.getAvailableRoundsForStats();
         setAvailableRounds(rounds);
 
@@ -81,7 +98,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     };
 
     init();
-  }, []);
+  }, [sharedRoundData]);
 
   const handleSelectRound = async (roundId: string) => {
     setShareAsset(null);
@@ -879,15 +896,23 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <span className="hidden sm:inline">{sharing ? 'Generando...' : shareAsset ? 'Regenerar imagen' : 'Preparar para compartir'}</span>
             </button>
 
-            <WriteButton
-              onClick={() => setShowDeleteConfirm(true)}
-              className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
-            >
-              <Trash2 size={20} />
-              <span className="hidden sm:inline">Eliminar</span>
-            </WriteButton>
+            {!isSharedView && (
+              <WriteButton
+                onClick={() => setShowDeleteConfirm(true)}
+                className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
+              >
+                <Trash2 size={20} />
+                <span className="hidden sm:inline">Eliminar</span>
+              </WriteButton>
+            )}
           </div>
         </div>
+
+        {isSharedView && (
+          <div className="mb-6 rounded-xl border border-emerald-400/40 bg-slate-900/80 px-4 py-3 text-center text-sm font-semibold text-emerald-100">
+            Consulta mediante código · Estadísticas en modo solo lectura
+          </div>
+        )}
 
         {shareError && (
           <div role="alert" className="mb-4 rounded-xl border border-red-400/50 bg-red-950/70 px-4 py-3 text-sm text-red-100">
@@ -1307,7 +1332,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
       </div>
 
-      {showDeleteConfirm && (
+      {!isSharedView && showDeleteConfirm && (
         <ConfirmModal
           message="¿Estás seguro de que deseas eliminar esta partida? Esta acción no se puede deshacer."
           onConfirm={handleDelete}
