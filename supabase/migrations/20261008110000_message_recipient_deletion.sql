@@ -88,4 +88,3 @@ GRANT EXECUTE ON FUNCTION public.my_message_delete(uuid),public.my_message_delet
   TO authenticated;
 GRANT EXECUTE ON FUNCTION public.express_message_delete(uuid,text,uuid)
   TO service_role;
-
