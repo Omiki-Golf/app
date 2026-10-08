@@ -50,8 +50,29 @@ export default function LocalVoiceRoundSetup({ courses, onApply }: { courses: Go
       }
       return;
     }
+    let useOnDeviceRecognition = false;
+    if (typeof Recognition.available === 'function') {
+      try {
+        const availability = await Recognition.available({ langs: ['es-ES'], processLocally: true });
+        if (availability === 'available') {
+          useOnDeviceRecognition = true;
+        } else if ((availability === 'downloadable' || availability === 'downloading') && typeof Recognition.install === 'function') {
+          setListening(true);
+          setError('Preparando el reconocimiento de voz en español en este dispositivo…');
+          useOnDeviceRecognition = await Recognition.install({ langs: ['es-ES'], processLocally: true });
+          setListening(false);
+          if (!useOnDeviceRecognition) {
+            setError('No se pudo instalar el reconocimiento de voz local en español. Puedes escribir la orden manualmente.');
+            return;
+          }
+        }
+      } catch {
+        // Browsers without the experimental on-device API can still use their usual recognition service.
+      }
+    }
     const recognition = new Recognition();
     recognition.lang = 'es-ES'; recognition.interimResults = false; recognition.maxAlternatives = 1;
+    if ('processLocally' in recognition) recognition.processLocally = useOnDeviceRecognition;
     recognition.onstart = () => { setListening(true); setError(''); };
     recognition.onend = () => setListening(false);
     recognition.onerror = (event: any) => {
@@ -59,6 +80,10 @@ export default function LocalVoiceRoundSetup({ courses, onApply }: { courses: Go
         setError('El reconocimiento de voz está bloqueado por el navegador. Permite el micrófono para localhost:5174, recarga y vuelve a intentarlo; también puedes escribir la orden.');
       } else if (event.error === 'no-speech') {
         setError('No se ha detectado voz. Acércate al micrófono y vuelve a intentarlo.');
+      } else if (event.error === 'network') {
+        setError('El servicio de voz del navegador no tiene conexión. Actualiza Chrome para usar el reconocimiento local o escribe la orden; Ollama seguirá interpretándola en tu ordenador.');
+      } else if (event.error === 'language-not-supported') {
+        setError('El navegador no dispone del reconocimiento local en español. Actualiza Chrome o escribe la orden manualmente.');
       } else {
         setError(`No se pudo escuchar (${event.error}). Puedes escribir la orden manualmente.`);
       }
