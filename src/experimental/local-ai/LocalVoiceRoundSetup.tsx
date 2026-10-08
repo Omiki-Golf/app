@@ -32,14 +32,37 @@ export default function LocalVoiceRoundSetup({ courses, onApply }: { courses: Go
     catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudo interpretar la orden.'); }
     finally { setLoading(false); }
   };
-  const listen = () => {
+  const listen = async () => {
     const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!Recognition) { setError('Este navegador no ofrece reconocimiento de voz. Prueba con Chrome o escribe la orden.'); return; }
+    if (!navigator.mediaDevices?.getUserMedia) { setError('Este navegador no permite solicitar acceso al micrófono. Escribe la orden manualmente.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(track => track.stop());
+    } catch (cause) {
+      const name = cause instanceof DOMException ? cause.name : '';
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setError('Micrófono bloqueado. Pulsa el icono de permisos junto a la dirección, permite el micrófono para localhost:5174 y recarga la página. Si sigue bloqueado, revisa Privacidad y seguridad > Micrófono en Windows.');
+      } else if (name === 'NotFoundError') {
+        setError('Windows no encuentra ningún micrófono disponible. Conecta o activa uno, o escribe la orden.');
+      } else {
+        setError('No se ha podido abrir el micrófono. Puedes escribir la orden en el campo inferior.');
+      }
+      return;
+    }
     const recognition = new Recognition();
     recognition.lang = 'es-ES'; recognition.interimResults = false; recognition.maxAlternatives = 1;
     recognition.onstart = () => { setListening(true); setError(''); };
     recognition.onend = () => setListening(false);
-    recognition.onerror = (event: any) => setError(`No se pudo escuchar: ${event.error}.`);
+    recognition.onerror = (event: any) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        setError('El reconocimiento de voz está bloqueado por el navegador. Permite el micrófono para localhost:5174, recarga y vuelve a intentarlo; también puedes escribir la orden.');
+      } else if (event.error === 'no-speech') {
+        setError('No se ha detectado voz. Acércate al micrófono y vuelve a intentarlo.');
+      } else {
+        setError(`No se pudo escuchar (${event.error}). Puedes escribir la orden manualmente.`);
+      }
+    };
     recognition.onresult = (event: any) => { const text = event.results[0][0].transcript; setTranscript(text); void interpret(text); };
     recognition.start();
   };
