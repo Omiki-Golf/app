@@ -3,7 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { GolfCourse, GolfHole, Group, GameMode } from '../types';
 import { golfService } from '../services/golfService';
-import { ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-react';
+import { ChevronRight, Copy, Check, LogOut, Info, Lock, Sparkles } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
@@ -16,11 +16,12 @@ import { supabase } from '../services/supabaseClient';
 import { getUserId } from '../utils/userId';
 import { CourseCatalogPicker } from './CourseCatalogPicker';
 import { LOCAL_AI_ENABLED } from '../experimental/local-ai/config';
+import type { AiRoundSetupValue } from '../experimental/local-ai/LocalVoiceRoundSetup';
 
 const LocalVoiceRoundSetup = lazy(() => import('../experimental/local-ai/LocalVoiceRoundSetup'));
 
 interface RoundSetupProps {
-  onRoundCreated: (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean) => void;
+  onRoundCreated: (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean, startImmediately?: boolean) => void;
   onViewActiveRounds: () => void;
   onViewGamePoints: () => void;
   onViewStatistics?: () => void;
@@ -76,6 +77,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [pinError, setPinError] = useState('');
   const [completedRounds, setCompletedRounds] = useState<any[]>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showLocalAiSetup, setShowLocalAiSetup] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('stableford');
   const [completedRoundsCount, setCompletedRoundsCount] = useState<number>(0);
 
@@ -256,6 +258,37 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     }
   };
 
+  const createCompleteAiRound = async (value: AiRoundSetupValue) => {
+    if (isExpress) {
+      if (await golfService.countQuickRounds() >= MAX_EXPRESS_GAMES) {
+        if (onShowPlans) onShowPlans('express-limit');
+        throw new Error(t('roundSetup.errors.expressLimit'));
+      }
+      if (await golfService.hasActiveQuickPlayRound()) throw new Error(t('roundSetup.errors.active'));
+      if (await golfService.hasCompletedQuickPlayRound()) throw new Error(t('roundSetup.errors.archive'));
+    }
+    let roundId: string | undefined;
+    try {
+      const round = await golfService.createRound(value.courseId, value.holes, false, value.holesRange, undefined, value.gameMode);
+      roundId = round.id;
+      const localPlayers = JSON.parse(localStorage.getItem('quickPlayPlayers') || '[]');
+      for (const player of value.players) {
+        const handicapFor9Holes = value.holes === 18 ? player.handicap / 2 : player.handicap;
+        await golfService.addPlayerToRound(round.id, player.name, handicapFor9Holes, false);
+        const existing = localPlayers.find((item: any) => item.name.toLocaleLowerCase('es') === player.name.toLocaleLowerCase('es'));
+        if (existing) { existing.exact_handicap = handicapFor9Holes; existing.exact_handicap_18 = handicapFor9Holes; }
+        else localPlayers.push({ id: crypto.randomUUID(), name: player.name, exact_handicap: handicapFor9Holes, exact_handicap_18: handicapFor9Holes, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+      }
+      localStorage.setItem('quickPlayPlayers', JSON.stringify(localPlayers));
+      if (isExpress && !currentGroup) trackExpressGameCreated(round.id);
+      safeStorage.setItem('lastSelectedCourse', value.courseId);
+      onRoundCreated(round.id, round.course_id, round.num_holes, round.use_slope, true);
+    } catch (cause) {
+      if (roundId) try { await golfService.deleteRound(roundId); } catch (cleanupError) { console.error('No se pudo retirar la partida incompleta:', cleanupError); }
+      throw cause;
+    }
+  };
+
   const handleCopyGroupCode = async () => {
     if (!currentGroup) return;
 
@@ -314,6 +347,10 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     setShowAdminPinModal(false);
     setPinError('');
   };
+
+  if (LOCAL_AI_ENABLED && showLocalAiSetup && !currentGroup) {
+    return <Suspense fallback={<p className="p-8 text-center text-ink-3">Cargando asistente local…</p>}><LocalVoiceRoundSetup courses={courses} isExpress={isExpress} onCancel={() => setShowLocalAiSetup(false)} onCreate={createCompleteAiRound} /></Suspense>;
+  }
 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
@@ -427,16 +464,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               )}
 
               <div className="space-y-4">
-                {LOCAL_AI_ENABLED && (
-                  <Suspense fallback={<p className="text-sm text-ink-3">Cargando prueba IA local…</p>}>
-                    <LocalVoiceRoundSetup courses={courses} isExpress={isExpress} onApply={({ courseId, gameMode: voiceMode, holes, players: suggestedPlayers }) => {
-                      if (courseId) setSelectedCourse(courseId);
-                      if (voiceMode) handleGameModeClick(voiceMode);
-                      if (holes) handleNumHolesChange(holes);
-                      if (suggestedPlayers.length) sessionStorage.setItem('localAiSuggestedPlayers', JSON.stringify(suggestedPlayers));
-                    }} />
-                  </Suspense>
-                )}
+                {LOCAL_AI_ENABLED && !currentGroup && <button type="button" onClick={() => setShowLocalAiSetup(true)} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-violet-400 bg-violet-50 py-4 font-bold text-violet-800 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-100"><Sparkles size={20} /> Crear con IA</button>}
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-2">
                     {t('roundSetup.selectCourse')}

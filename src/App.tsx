@@ -515,7 +515,7 @@ function App() {
     setShowLeaveGroupConfirm(false);
   };
 
-  const handleRoundCreated = async (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean) => {
+  const handleRoundCreated = async (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean, startImmediately = false) => {
     try {
       setLoading(true);
       const roundData = await golfService.getRoundWithDetails(roundId);
@@ -534,7 +534,7 @@ function App() {
           hasEditAccess: true,
           courseName: course?.name || '',
         });
-        setCurrentView('players');
+        setCurrentView(startImmediately && roundData.players.length > 0 ? 'scorecard' : 'players');
       }
     } catch (err) {
       setError('Error creando partida');
