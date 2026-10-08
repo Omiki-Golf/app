@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
   Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
@@ -10,6 +10,9 @@ import { calculateScoreToPar } from '../utils/calculations';
 import { safeStorage } from '../utils/safeStorage';
 import { GameMode } from '../types';
 import { ThemeToggle } from './ThemeToggle';
+import { LOCAL_AI_ENABLED } from '../experimental/local-ai/config';
+
+const LocalRoundAnalysis = lazy(() => import('../experimental/local-ai/LocalRoundAnalysis'));
 
 interface QuickPlayStatisticsProps {
   onBack: () => void;
@@ -970,6 +973,12 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           <div role="alert" className="mb-4 rounded-xl border border-red-400/50 bg-red-950/70 px-4 py-3 text-sm text-red-100">
             {shareError}
           </div>
+        )}
+
+        {LOCAL_AI_ENABLED && !isSharedView && (
+          <Suspense fallback={<p className="mb-4 text-center text-sm text-ink-3">Cargando prueba IA local…</p>}>
+            <LocalRoundAnalysis roundData={roundData} highlights={highlights} stats={stats} />
+          </Suspense>
         )}
 
         {shareAsset && (

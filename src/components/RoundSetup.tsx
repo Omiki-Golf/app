@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { GolfCourse, GolfHole, Group, GameMode } from '../types';
 import { golfService } from '../services/golfService';
 import { ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-react';
@@ -15,6 +15,9 @@ import { trackExpressGameCreated } from '../services/expressTierGuard';
 import { supabase } from '../services/supabaseClient';
 import { getUserId } from '../utils/userId';
 import { CourseCatalogPicker } from './CourseCatalogPicker';
+import { LOCAL_AI_ENABLED } from '../experimental/local-ai/config';
+
+const LocalVoiceRoundSetup = lazy(() => import('../experimental/local-ai/LocalVoiceRoundSetup'));
 
 interface RoundSetupProps {
   onRoundCreated: (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean) => void;
@@ -424,6 +427,16 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               )}
 
               <div className="space-y-4">
+                {LOCAL_AI_ENABLED && (
+                  <Suspense fallback={<p className="text-sm text-ink-3">Cargando prueba IA local…</p>}>
+                    <LocalVoiceRoundSetup courses={courses} onApply={({ courseId, gameMode: voiceMode, holes, players: suggestedPlayers }) => {
+                      if (courseId) setSelectedCourse(courseId);
+                      if (voiceMode) handleGameModeClick(voiceMode);
+                      if (holes) handleNumHolesChange(holes);
+                      if (suggestedPlayers.length) sessionStorage.setItem('localAiSuggestedPlayers', JSON.stringify(suggestedPlayers));
+                    }} />
+                  </Suspense>
+                )}
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-2">
                     {t('roundSetup.selectCourse')}

@@ -74,6 +74,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [tempSlope, setTempSlope] = useState('');
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showEditPlayerModal, setShowEditPlayerModal] = useState(false);
+  const [localAiSuggestions, setLocalAiSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +85,14 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     window.addEventListener('focus', refresh);
     return () => { active = false; playerLoadVersion.current++; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
   }, [roundId, currentGroup?.id, user?.id]);
+
+  useEffect(() => {
+    try {
+      const suggestions = JSON.parse(sessionStorage.getItem('localAiSuggestedPlayers') || '[]');
+      if (Array.isArray(suggestions)) setLocalAiSuggestions(suggestions.filter(item => typeof item === 'string'));
+      sessionStorage.removeItem('localAiSuggestedPlayers');
+    } catch { sessionStorage.removeItem('localAiSuggestedPlayers'); }
+  }, [roundId]);
 
   useEffect(() => {
     const loadCourseDetails = async () => {
@@ -482,6 +491,15 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               <label className="block text-sm font-semibold text-ink-2 mb-2">
                 {playerNameLabel}
               </label>
+              {localAiSuggestions.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-2" aria-label="Jugadores sugeridos por la orden de voz">
+                  {localAiSuggestions.filter(name => !players.some(player => player.name.toLocaleLowerCase('es') === name.toLocaleLowerCase('es'))).map(name => (
+                    <button key={name} type="button" onClick={() => handleSearchChange(name)} className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-800 hover:bg-violet-100">
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="text"
