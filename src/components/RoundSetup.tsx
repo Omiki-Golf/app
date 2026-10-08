@@ -429,7 +429,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               <div className="space-y-4">
                 {LOCAL_AI_ENABLED && (
                   <Suspense fallback={<p className="text-sm text-ink-3">Cargando prueba IA local…</p>}>
-                    <LocalVoiceRoundSetup courses={courses} onApply={({ courseId, gameMode: voiceMode, holes, players: suggestedPlayers }) => {
+                    <LocalVoiceRoundSetup courses={courses} isExpress={isExpress} onApply={({ courseId, gameMode: voiceMode, holes, players: suggestedPlayers }) => {
                       if (courseId) setSelectedCourse(courseId);
                       if (voiceMode) handleGameModeClick(voiceMode);
                       if (holes) handleNumHolesChange(holes);
