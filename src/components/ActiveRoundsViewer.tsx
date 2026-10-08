@@ -1,5 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { ThemeToggle } from './ThemeToggle';
 import React, { useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, Group } from '../types';
 import { golfService } from '../services/golfService';
@@ -16,6 +17,11 @@ const gameModeLabels: Record<string, string> = {
   sindicato: 'Sindicato',
   parejas: 'Parejas',
 };
+
+const deletionErrorMessage = (error: unknown, fallback: string): string =>
+  error && typeof error === 'object' && 'message' in error
+    ? String(error.message)
+    : fallback;
 
 interface RoundStats {
   round: GolfRound;
@@ -44,6 +50,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [roundToDelete, setRoundToDelete] = useState<string | null>(null);
+  const [roundToFinishAndArchive, setRoundToFinishAndArchive] = useState<string | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState<string | null>(null);
   const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
@@ -107,6 +114,55 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     }
   };
 
+  const firstMissingScore = (roundStats: RoundStats): { playerName: string; holeNumber: number } | null => {
+    if (roundStats.players.length === 0) return { playerName: 'ningún jugador', holeNumber: 1 };
+    const firstHole = roundStats.round.holes_range === '10-18' ? 10 : 1;
+    for (const player of roundStats.players) {
+      for (let offset = 0; offset < roundStats.round.num_holes; offset += 1) {
+        const holeNumber = firstHole + offset;
+        const informed = roundStats.scores.some(score =>
+          score.player_id === player.id
+          && score.hole_number === holeNumber
+          && (score.abandoned === true || score.gross_strokes > 0)
+        );
+        if (!informed) return { playerName: player.name, holeNumber };
+      }
+    }
+    return null;
+  };
+
+  const handleFinishAndArchiveClick = (roundStats: RoundStats) => {
+    const missing = firstMissingScore(roundStats);
+    if (missing) {
+      setError(missing.playerName === 'ningún jugador'
+        ? 'No se puede finalizar: la partida todavía no tiene jugadores.'
+        : `No se puede finalizar: falta informar a ${missing.playerName} en el hoyo ${missing.holeNumber}.`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setError('');
+    setRoundToFinishAndArchive(roundStats.round.id);
+  };
+
+  const handleConfirmFinishAndArchive = async () => {
+    if (!roundToFinishAndArchive) return;
+    const roundId = roundToFinishAndArchive;
+    setRoundToFinishAndArchive(null);
+    try {
+      setLoading(true);
+      setError('');
+      await golfService.finishExpressRound(roundId);
+      await golfService.archiveQuickPlayRound(roundId);
+      await loadActiveRounds();
+    } catch (err) {
+      setError(deletionErrorMessage(err, 'No se pudo finalizar y archivar la partida'));
+      await loadActiveRounds();
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDeleteAllRounds = () => {
     const isDivend = currentGroup?.group_code === 'DIVEND';
 
@@ -160,15 +216,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     try {
       setLoading(true);
       setError('');
-      const isDivend = currentGroup?.group_code === 'DIVEND';
-      if (isDivend && currentGroup) {
+      if (currentGroup) {
         await golfService.deleteAllRounds(currentGroup.id);
       } else {
         await golfService.deleteAllRounds();
       }
       await loadActiveRounds();
     } catch (err) {
-      setError('Error eliminando partidas');
+      setError(deletionErrorMessage(err, 'Error eliminando partidas'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -200,7 +255,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       await golfService.deleteRound(roundId);
       await loadActiveRounds();
     } catch (err) {
-      setError('Error eliminando la partida');
+      setError(deletionErrorMessage(err, 'Error eliminando la partida'));
       console.error(err);
     }
   };
@@ -379,18 +434,21 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         {showGlobalLeaderboard ? (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <NavigationButton destination="back"
-                onClick={() => setShowGlobalLeaderboard(false)}
-                className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
-              />
+              <div className="flex items-center gap-2">
+                <NavigationButton destination="back"
+                  onClick={() => setShowGlobalLeaderboard(false)}
+                  className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
+                />
+                <ThemeToggle />
+              </div>
 
               <h1 className="text-3xl font-bold text-title">
                 {currentGroup
                   ? `Clasificación ${currentGroup.name || 'del Grupo'}`
-                  : 'Todas las Partidas'}
+                  : 'Clasificación'}
               </h1>
 
-              <div className="w-24"></div>
+              <div className="w-[5.5rem]"></div>
             </div>
 
             <div className="bg-card rounded-lg shadow-card p-6">
@@ -468,10 +526,13 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           <>
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <NavigationButton destination={backDestination}
-                  onClick={onBack}
-                  className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
-                />
+                <div className="flex items-center gap-2">
+                  <NavigationButton destination={backDestination}
+                    onClick={onBack}
+                    className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
+                  />
+                  <ThemeToggle />
+                </div>
 
                 <div className="flex gap-2 flex-wrap">
                   {rounds.length > 0 && (
@@ -504,14 +565,16 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         </WriteButton>
                       )}
 
-                      <WriteButton
-                        onClick={handleDeleteAllRounds}
-                        disabled={loading || updatingHandicaps}
-                        className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
-                      >
-                        <Trash2 size={20} />
-                        <span className="hidden sm:inline">{currentGroup ? 'Eliminar Todas' : 'Eliminar'}</span>
-                      </WriteButton>
+                      {currentGroup && (
+                        <WriteButton
+                          onClick={handleDeleteAllRounds}
+                          disabled={loading || updatingHandicaps}
+                          className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
+                        >
+                          <Trash2 size={20} />
+                          <span className="hidden sm:inline">Eliminar Todas</span>
+                        </WriteButton>
+                      )}
                     </>
                   )}
                 </div>
@@ -521,7 +584,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                 <h1 className="text-3xl font-bold text-title">
                   {currentGroup
                     ? `Partidas ${currentGroup.name || 'del Grupo'}`
-                    : 'Mis Partidas'}
+                    : 'Mi Partida'}
                 </h1>
                 <p className="text-accent-ink text-sm mt-1">
                   {rounds.length} {rounds.length === 1 ? 'partida' : 'partidas'}
@@ -546,7 +609,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         ) : (
           <div className="space-y-4">
             {rounds.map((roundStats) => {
-              const isExpanded = selectedRound === roundStats.round.id;
+              const isExpanded = !currentGroup || selectedRound === roundStats.round.id;
               const courseHoles = roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos';
 
               const maxHole = roundStats.scores.length > 0
@@ -554,13 +617,23 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                 : 0;
 
               const isCompleted = roundStats.round.status === 'completed';
+              const missingScore = !currentGroup && !isCompleted ? firstMissingScore(roundStats) : null;
+              const playerLimit = !currentGroup
+                ? roundStats.round.game_mode === 'match'
+                  ? 2
+                  : roundStats.round.game_mode === 'sindicato'
+                    ? 3
+                    : 4
+                : 4;
 
               return (
                 <div key={roundStats.round.id} className="space-y-4">
                   <div className="bg-card rounded-lg shadow-card overflow-hidden transition-all">
                     <button
-                      onClick={() => setSelectedRound(isExpanded ? null : roundStats.round.id)}
-                      className="w-full p-4 md:p-6 flex items-center justify-between hover:bg-card-2 transition-colors"
+                      type="button"
+                      onClick={() => currentGroup && setSelectedRound(isExpanded ? null : roundStats.round.id)}
+                      disabled={!currentGroup}
+                      className={`w-full p-4 md:p-6 flex items-center justify-between transition-colors ${currentGroup ? 'hover:bg-card-2' : 'cursor-default'}`}
                     >
                     <div className="flex-1 text-left">
                       <div className="flex items-center justify-between flex-wrap gap-2 w-full">
@@ -586,7 +659,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             </span>
                           ) : null}
                         </div>
-                        <div className="flex items-center gap-1">
+                        {currentGroup && <div className="flex items-center gap-1">
                           {isCompleted && (
                             <WriteButton
                               onClick={(e) => {
@@ -610,7 +683,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           >
                             <Trash2 size={18} />
                           </WriteButton>
-                        </div>
+                        </div>}
                       </div>
                       <div className="flex gap-2 text-sm text-ink-3 mt-1 flex-wrap">
                         <span>{roundStats.players.length} {roundStats.players.length === 1 ? 'Jugador' : 'Jugadores'}</span>
@@ -628,7 +701,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                       </div>
                     </div>
 
-                    <Eye className="text-accent-ink" size={24} />
+                    {currentGroup && <Eye className="text-accent-ink" size={24} />}
                   </button>
 
                   {isExpanded && !isCompleted && (
@@ -689,14 +762,15 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                         <button
                           onClick={() => {
                             onJoinRound(roundStats.round.id);
                             setSelectedRound(null);
                           }}
-                          className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 rounded-lg transition-colors"
+                          className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
+                          <Eye size={20} />
                           {roundStats.round.status === 'completed'
                             ? 'Ver Resultados'
                             : roundStats.players.length === 0
@@ -704,7 +778,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             : 'Ver Partida'}
                         </button>
 
-                        {roundStats.players.length < 4 && !(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (
+                        {roundStats.players.length < playerLimit && !(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (
                           <WriteButton
                             onClick={(e) => {
                               e.stopPropagation();
@@ -714,6 +788,28 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           >
                             <UserPlus size={20} />
                             Añadir
+                          </WriteButton>
+                        )}
+
+                        {!currentGroup && !missingScore && (
+                          <WriteButton
+                            onClick={() => handleFinishAndArchiveClick(roundStats)}
+                            disabled={loading}
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Archive size={20} />
+                            Finalizar y archivar
+                          </WriteButton>
+                        )}
+
+                        {!currentGroup && (
+                          <WriteButton
+                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                            disabled={loading}
+                            className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={20} />
+                            Eliminar
                           </WriteButton>
                         )}
                       </div>
@@ -767,23 +863,48 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+                        {!currentGroup && (
+                          <button
+                            onClick={() => {
+                              onJoinRound(roundStats.round.id);
+                              setSelectedRound(null);
+                            }}
+                            className="w-full sm:flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Eye size={20} />
+                            Ver Resultados
+                          </button>
+                        )}
                         <WriteButton
                           onClick={() => handleArchiveRoundClick(roundStats.round.id)}
-                          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
                           <Archive size={20} />
                           Archivar Partida
                         </WriteButton>
-                        <button
-                          onClick={() => {
-                            onJoinRound(roundStats.round.id);
-                            setSelectedRound(null);
-                          }}
-                          className="w-full sm:flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 rounded-lg transition-colors"
-                        >
-                          Ver Resultados Completos
-                        </button>
+                        {currentGroup && (
+                          <button
+                            onClick={() => {
+                              onJoinRound(roundStats.round.id);
+                              setSelectedRound(null);
+                            }}
+                            className="w-full sm:flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Eye size={20} />
+                            Ver Resultados Completos
+                          </button>
+                        )}
+                        {!currentGroup && (
+                          <WriteButton
+                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                            disabled={loading}
+                            className="w-full sm:flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={20} />
+                            Eliminar
+                          </WriteButton>
+                        )}
                       </div>
                     </div>
                   )}
@@ -809,7 +930,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       {/* Modal Borrar Todas */}
       {showDeleteAllModal && (
         <ConfirmModal
-          message="¿Estás seguro de que quieres eliminar TODAS las partidas? La lista se limpiará pero las partidas eliminadas seguirán contando dentro de tu cupo disponible del Plan Express."
+          message={currentGroup
+            ? '¿Estás seguro de que quieres eliminar TODAS las partidas activas o finalizadas de este grupo?'
+            : '¿Estás seguro de que quieres eliminar todas tus partidas? La lista se limpiará, pero seguirán contando dentro del cupo consumido del Plan Express.'}
+          requiredText={currentGroup ? 'ELIMINAR TODAS' : undefined}
           onConfirm={handleConfirmDeleteAll}
           onCancel={() => setShowDeleteAllModal(false)}
         />
@@ -821,6 +945,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           message="¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express."
           onConfirm={handleConfirmDeleteRound}
           onCancel={() => setRoundToDelete(null)}
+        />
+      )}
+
+      {roundToFinishAndArchive && (
+        <ConfirmModal
+          message="¿Finalizar y archivar esta partida? Solo podrás hacerlo si todos los golpes están informados. Después podrás crear una partida nueva."
+          onConfirm={handleConfirmFinishAndArchive}
+          onCancel={() => setRoundToFinishAndArchive(null)}
         />
       )}
 
@@ -944,7 +1076,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                     value={newPlayerHandicap}
                     onChange={(e) => setNewPlayerHandicap(e.target.value)}
                     className="w-full px-3 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="ej: 18.5"
+                    placeholder={`Ej: 7 (para ${rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes || 9} hoyos)`}
                   />
                 </div>
               </div>

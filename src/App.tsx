@@ -75,6 +75,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
   const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
+  const [plansContext, setPlansContext] = useState<'default' | 'express-limit'>('default');
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
     () => new URLSearchParams(window.location.search).get('email-confirmed') === '1'
@@ -144,6 +145,12 @@ function App() {
       setCurrentView('main');
     }
   }, [activePlanType, currentView, subscriptionLoading, readOnly]);
+
+  useEffect(() => {
+    if (currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'viewer') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, [currentView, roundState.round?.id]);
 
   useEffect(() => {
     if (!profileSaved) return;
@@ -693,8 +700,20 @@ function App() {
         }
       }
 
+      let decidedResult = roundState.round.decided_result || null;
+      if (isModeScoring && !decidedResult) {
+        try {
+          decidedResult = await golfService.recordRoundDecision(roundState.round.id);
+        } catch (decisionError) {
+          console.error('Error guardando el resultado definitivo:', decisionError);
+        }
+      }
+
       setRoundState((prev) => ({
         ...prev,
+        round: prev.round && decidedResult
+          ? { ...prev.round, decided_result: decidedResult, decided_at: prev.round.decided_at || new Date().toISOString() }
+          : prev.round,
         scores: [
           ...prev.scores.filter((s) => !(s.hole_number === holeNumber && s.player_id === playerId)),
           ...updatedOtherScores,
@@ -859,8 +878,7 @@ function App() {
     try {
       setLoading(true);
       const isQuickPlay = !roundState.round.group_id;
-      if (isQuickPlay) await golfService.finishExpressRound(roundState.round.id);
-      else await golfService.updateRoundStatus(roundState.round.id, 'completed');
+      await golfService.finishRound(roundState.round.id);
       storageUtils.clearActiveRound();
 
       if (isQuickPlay) {
@@ -877,7 +895,10 @@ function App() {
       }
     } catch (err) {
       console.error('Error al finalizar la partida:', err);
-      setError('Error al finalizar la partida');
+      const message = err instanceof Error
+        ? err.message
+        : (err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Error al finalizar la partida');
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -932,7 +953,13 @@ function App() {
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
           <PlansComparison backDestination={returnToProfile ? 'back' : 'home'}
-            onBack={() => backFromProfileSection('main')}
+            onBack={() => {
+              if (plansContext === 'express-limit') {
+                setPlansContext('default');
+                setCurrentView('setup');
+              } else backFromProfileSection('main');
+            }}
+            expressLimit={plansContext === 'express-limit'}
             currentPlan={user ? activePlanType : undefined}
             onStartTeamTrial={user && activePlanType === 'player' ? async () => {
               await userService.startTeamTrial();
@@ -953,7 +980,7 @@ function App() {
               if (user) setCurrentView(pendingPlayer ? 'player-checkout' : 'profile');
               else setCurrentView('registration');
             }}
-            onShowAuth={user ? undefined : () => openAuth('plans')}
+            onShowAuth={user || plansContext === 'express-limit' ? undefined : () => openAuth('plans')}
           />
         </div>
       </>
@@ -1093,7 +1120,7 @@ function App() {
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
           <Auth backDestination={authReturnView === 'main' ? 'home' : 'back'}
-            onShowPlans={() => { setReturnToProfile(false); setCurrentView('plans'); }}
+            onShowPlans={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onAuthSuccess={async () => {
               setSimulatorEnabled(false);
               setSimulatedPlan(null);
@@ -1151,7 +1178,7 @@ function App() {
             }}
             onCreateTeam={() => setCurrentView('team-creation')}
             onShowProfile={() => setCurrentView('profile')}
-            onShowAuth={() => { setReturnToProfile(false); setCurrentView('plans'); }}
+            onShowAuth={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}
             simulatorEnabled={simulatorEnabled}
             simulatorUpdating={simulatorUpdating}
@@ -1192,7 +1219,7 @@ function App() {
   return withMessages(
     <div className="min-h-screen bg-app">
       <IncognitoWarning />
-      {!user && <GlobalThemeSwitch />}
+      {!user && currentView !== 'active-rounds' && currentView !== 'quickplay-statistics' && <GlobalThemeSwitch />}
       <div className={isIncognito ? 'pt-10' : ''}>
       {currentView === 'main' && currentGroup && (
         <RoundSetup
@@ -1210,7 +1237,7 @@ function App() {
           isGroupCreator={isGroupCreator}
           hasLimitedAccess={hasLimitedAccess}
           planType={activePlanType}
-          onShowPlans={() => setCurrentView('plans')}
+          onShowPlans={() => { setPlansContext('default'); setCurrentView('plans'); }}
           messagesButton={inlineMessagesButton}
         />
       )}
@@ -1230,7 +1257,7 @@ function App() {
           onBack={() => setCurrentView('main')}
           currentGroup={null}
           planType={activePlanType}
-          onShowPlans={() => setCurrentView('plans')}
+          onShowPlans={(context) => { setPlansContext(context || 'default'); setCurrentView('plans'); }}
           messagesButton={inlineMessagesButton}
         />
       )}
@@ -1287,24 +1314,16 @@ function App() {
           accessCode={roundState.round.access_code}
           hasEditAccess={roundState.hasEditAccess && !readOnly}
           isCreator={roundState.isCreator}
-          canFinishRound={!!roundState.round.group_id || roundState.isCreator || roundState.round.responsible_user_id === getUserId()}
-          currentResponsibleUserId={roundState.round.responsible_user_id}
+          canFinishRound={roundState.isCreator}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
           gameMode={roundState.round.game_mode}
+          decidedResult={roundState.round.decided_result}
           onHoleChange={handleHoleChange}
           onScoreChange={handleScoreChange}
           onShowLeaderboard={() => setCurrentView('leaderboard')}
           onResetGame={handleBackToMain}
           onFinishRound={handleFinishRound}
-          onResponsibleChanged={async (responsibleUserId) => {
-            if (!roundState.round) return;
-            await golfService.setExpressRoundResponsible(roundState.round.id, responsibleUserId);
-            setRoundState(prev => ({
-              ...prev,
-              round: prev.round ? { ...prev.round, responsible_user_id: responsibleUserId } : null,
-            }));
-          }}
           onCourseChanged={handleCourseChanged}
           messagesButton={inlineMessagesButton}
         />
@@ -1324,7 +1343,7 @@ function App() {
               .filter((s) => s.player_id === player.id)
               .reduce((sum, s) => sum + s.stableford_points, 0),
           }))}
-          currentHole={roundState.currentHole}
+          currentHole={roundState.holes[roundState.currentHole - 1]?.hole_number ?? roundState.currentHole}
           onBack={() => setCurrentView('scorecard')}
           hasGroup={!!currentGroup}
           gameMode={roundState.round.game_mode}
@@ -1403,7 +1422,7 @@ function App() {
                     .filter((s) => s.player_id === player.id)
                     .reduce((sum, s) => sum + s.stableford_points, 0),
                 }))}
-                currentHole={roundState.currentHole}
+                currentHole={roundState.holes[roundState.currentHole - 1]?.hole_number ?? roundState.currentHole}
                 onBack={handleBackToMain}
                 hasGroup={!!currentGroup}
                 gameMode={roundState.round.game_mode}

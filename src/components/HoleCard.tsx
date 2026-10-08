@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GolfHole, RoundPlayer, RoundScore, GameMode } from '../types';
 import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput } from '../utils/calculations';
-import { ChevronDown, Trash2, Minus } from 'lucide-react';
+import { ChevronDown, Minus } from 'lucide-react';
 import { HoleInOneModal } from './HoleInOneModal';
 import { CongratulationsModal } from './CongratulationsModal';
 
@@ -489,32 +489,6 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                           <Minus size={20} />
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newScore = {
-                              gross_strokes: 0,
-                              strokes_received: strokesReceived,
-                              net_strokes: 0,
-                              stableford_points: 0,
-                              no_paso_rojas: pendingNoPasoRojas[player.id] || false,
-                              abandoned: true,
-                              mode_points: computeModePointsForPlayer(player.id, 0, strokesReceived, true),
-                            };
-                            onScoreChange(player.id, newScore);
-                            setExpandedPlayerId(null);
-                            setFirstDigit(null);
-                            setPendingPlayerId(null);
-                            setPendingNoPasoRojas(prev => {
-                              const newState = { ...prev };
-                              delete newState[player.id];
-                              return newState;
-                            });
-                          }}
-                          className="h-11 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold transition-colors shadow-soft active:scale-95 flex items-center justify-center"
-                        >
-                          <Trash2 size={20} />
-                        </button>
                       </div>
                     </div>
 

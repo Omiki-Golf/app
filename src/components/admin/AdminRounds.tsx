@@ -429,7 +429,7 @@ function RoundDetail({
               : action === "restore"
                 ? "Volverá al estado anterior y contará otra vez para el límite de Express, aunque el total supere cuatro."
                 : action === "complete"
-                  ? "Se finalizará con las puntuaciones existentes, aunque falten hoyos. No se inventarán puntuaciones ni se recalcularán resultados."
+                  ? "Solo se finalizará si todos los jugadores tienen informados todos los hoyos. Una raya cuenta como resultado informado."
                   : "Volverá a estar en curso, conservando las puntuaciones. Dejará de aparecer entre las finalizadas."}
           </p>
           <label className="block">

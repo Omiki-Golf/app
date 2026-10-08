@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
-import { GolfCourse, GolfHole, Group, Tee, GameMode } from '../types';
+import { GolfCourse, GolfHole, Group, GameMode } from '../types';
 import { golfService } from '../services/golfService';
 import { ChevronRight, Copy, Check, LogOut, Info, Lock } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
@@ -14,6 +14,7 @@ import { ParTeeUpgradeModal } from './ParTeeUpgradeModal';
 import { trackExpressGameCreated } from '../services/expressTierGuard';
 import { supabase } from '../services/supabaseClient';
 import { getUserId } from '../utils/userId';
+import { CourseCatalogPicker } from './CourseCatalogPicker';
 
 interface RoundSetupProps {
   onRoundCreated: (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean) => void;
@@ -27,7 +28,7 @@ interface RoundSetupProps {
   isGroupCreator?: boolean;
   hasLimitedAccess?: boolean;
   planType?: 'express' | 'player' | 'team' | 'premium';
-  onShowPlans?: () => void;
+  onShowPlans?: (context?: 'express-limit') => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -61,9 +62,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [selectedCourseHoleCount, setSelectedCourseHoleCount] = useState<number>(18);
   const [numHoles, setNumHoles] = useState<9 | 18>(9);
   const [holesRange, setHolesRange] = useState<'1-9' | '10-18'>('1-9');
-  const [useSlope, setUseSlope] = useState<boolean>(false);
-  const [tees, setTees] = useState<Tee[]>([]);
-  const [selectedTeeId, setSelectedTeeId] = useState<string | null>(null);
+  const useSlope = false;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeRoundsCount, setActiveRoundsCount] = useState(0);
@@ -120,11 +119,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             setNumHoles(9);
           }
 
-          const courseTees = await golfService.getTees(selectedCourse);
-          setTees(courseTees);
-          if (courseTees.length > 0) {
-            setSelectedTeeId(courseTees[0].id);
-          }
         } catch (err) {
           console.error('Error loading course details:', err);
         }
@@ -184,7 +178,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           const existingCount = await golfService.countQuickRounds();
           if (existingCount >= MAX_EXPRESS_GAMES) {
             setError(t('roundSetup.errors.expressLimit'));
-            setShowUpgradeModal(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (onShowPlans) onShowPlans('express-limit');
+            else setShowUpgradeModal(true);
             return;
           }
         }
@@ -192,6 +188,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         const hasActive = await golfService.hasActiveQuickPlayRound();
         if (hasActive) {
           setError(t('roundSetup.errors.active'));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           setLoading(false);
           return;
         }
@@ -199,6 +196,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         const hasCompleted = await golfService.hasCompletedQuickPlayRound();
         if (hasCompleted) {
           setError(t('roundSetup.errors.archive'));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
           setLoading(false);
           return;
         }
@@ -212,6 +210,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
     if (!selectedCourse) {
       setError(t('roundSetup.errors.selectCourse'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
@@ -235,7 +234,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         numHoles,
         useSlope,
         numHoles === 9 ? holesRange : undefined,
-        useSlope ? selectedTeeId || undefined : undefined,
+        undefined,
         gameMode
       );
 
@@ -248,6 +247,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     } catch (err: any) {
       console.error('Error al crear la partida:', err);
       setError(err.message || t('roundSetup.errors.create'));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
     }
@@ -337,24 +337,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         </div>
 
         {/* Express tiene cupo; Player y Team muestran solo el total. */}
-        {!currentGroup && quickPlayRoundsCount !== null && (isExpress ? (
-          <div className="bg-amber-100 dark:bg-amber-950 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-amber-950 dark:text-amber-100 flex items-center gap-3 shadow-card">
-            <Info className="text-amber-600 dark:text-amber-300 flex-shrink-0" size={24} />
-            <div className="text-sm">
-              <p className="font-semibold">
-                {t('roundSetup.express')}
-              </p>
-              <p className="text-amber-800 dark:text-amber-200">
-                {t('roundSetup.remaining', { remaining: Math.max(0, MAX_EXPRESS_GAMES - quickPlayRoundsCount), total: MAX_EXPRESS_GAMES })}
-              </p>
-            </div>
-          </div>
-        ) : (
+        {!currentGroup && quickPlayRoundsCount !== null && !isExpress && (
           <div className="bg-card border border-line rounded-xl p-4 text-ink-2 flex items-center gap-3 shadow-card">
             <Info className="text-accent-ink flex-shrink-0" size={24} />
             <p className="text-sm">{t('roundSetup.played', { count: quickPlayRoundsCount })}</p>
           </div>
-        ))}
+        )}
 
         {/* Código de Grupo */}
         {currentGroup && !hasLimitedAccess && (
@@ -440,19 +428,15 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                   <label className="block text-sm font-semibold text-ink-2 mb-2">
                     {t('roundSetup.selectCourse')}
                   </label>
-                  <select
-                    value={selectedCourse || ''}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
-                    disabled={loading}
-                    className="w-full px-4 py-3 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent disabled:bg-gray-100"
-                  >
-                    <option value="">{t('roundSetup.coursePlaceholder')}</option>
-                    {courses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name}
-                      </option>
-                    ))}
-                  </select>
+                  <CourseCatalogPicker
+                    courses={courses}
+                    selectedCourseId={selectedCourse}
+                    onSelect={setSelectedCourse}
+                    onUnavailable={() => {
+                      setError('Este recorrido todavía no está incorporado a la base de datos.');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  />
                 </div>
 
                 <div>
@@ -482,61 +466,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     </button>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-ink-2 mb-3">
-                    {t('roundSetup.handicap')}
-                  </label>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setUseSlope(true)}
-                      className={`flex-1 py-3 rounded-lg font-bold transition-all ${
-                        useSlope
-                          ? 'bg-accent text-on-accent shadow-card'
-                          : 'bg-neutral text-ink hover:bg-neutral-hover'
-                      }`}
-                    >
-                      {t('roundSetup.withSlope')}
-                    </button>
-                    <button
-                      onClick={() => setUseSlope(false)}
-                      className={`flex-1 py-3 rounded-lg font-bold transition-all ${
-                        !useSlope
-                          ? 'bg-accent text-on-accent shadow-card'
-                          : 'bg-neutral text-ink hover:bg-neutral-hover'
-                      }`}
-                    >
-                      {t('roundSetup.withoutSlope')}
-                    </button>
-                  </div>
-                </div>
-
-                {useSlope && tees.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-semibold text-ink-2 mb-3">
-                      {t('roundSetup.selectTee')}
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {tees.map((tee) => (
-                        <button
-                          key={tee.id}
-                          onClick={() => setSelectedTeeId(tee.id)}
-                          className={`py-3 px-4 rounded-lg font-bold transition-all flex items-center gap-2 ${
-                            selectedTeeId === tee.id
-                              ? 'bg-accent text-on-accent shadow-card'
-                              : 'bg-neutral text-ink hover:bg-neutral-hover'
-                          }`}
-                        >
-                          <div
-                            className="w-4 h-4 rounded-full border-2 border-current"
-                            style={{ backgroundColor: tee.color }}
-                          />
-                          {tee.name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div>
                   <label className="block text-sm font-semibold text-ink-2 mb-3">
@@ -675,6 +604,18 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     <ChevronRight size={20} />
                   </button>
                 )}
+              </div>
+            )}
+
+            {!currentGroup && isExpress && quickPlayRoundsCount !== null && (
+              <div className="bg-amber-100 dark:bg-amber-950 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-amber-950 dark:text-amber-100 flex items-center gap-3 shadow-card">
+                <Info className="text-amber-600 dark:text-amber-300 flex-shrink-0" size={24} />
+                <div className="text-sm">
+                  <p className="font-semibold">{t('roundSetup.express')}</p>
+                  <p className="text-amber-800 dark:text-amber-200">
+                    {t('roundSetup.remaining', { remaining: Math.max(0, MAX_EXPRESS_GAMES - quickPlayRoundsCount), total: MAX_EXPRESS_GAMES })}
+                  </p>
+                </div>
               </div>
             )}
           </div>

@@ -275,7 +275,9 @@ async deleteAllRounds(groupId?: string): Promise<void> {
   const userId = getUserId();
   let query = supabase
     .from('golf_rounds')
-    .update({ status: 'deleted' });
+    .update({ status: 'deleted' })
+    .in('status', ['active', 'completed'])
+    .is('admin_withdrawn_at', null);
 
   if (groupId) {
     query = query.eq('group_id', groupId);
@@ -288,12 +290,16 @@ async deleteAllRounds(groupId?: string): Promise<void> {
 },
 
   async deleteRound(roundId: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('golf_rounds')
       .update({ status: 'deleted' })
-      .eq('id', roundId);
+      .eq('id', roundId)
+      .in('status', ['active', 'completed'])
+      .is('admin_withdrawn_at', null)
+      .select('id');
   
     if (error) throw error;
+    if (!data?.length) throw new Error('La partida no se pudo eliminar. Actualiza la lista y comprueba que sigues siendo su creador.');
   },
 
   async getCourseHoles(courseId: string, numHoles: number, holesRange?: '1-9' | '10-18'): Promise<GolfHole[]> {
@@ -516,16 +522,19 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   return data || [];
 },
   async archiveQuickPlayRound(roundId: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('golf_rounds')
     .update({ status: 'archived' })
     .eq('id', roundId)
-    .is('group_id', null); // Garantizamos que solo archive partidas sin grupo
+    .eq('status', 'completed')
+    .is('group_id', null)
+    .select('id'); // Garantizamos que solo archive partidas sin grupo y ya finalizadas
 
   if (error) {
     console.error('Error al archivar la partida rápida:', error);
     throw error;
   }
+  if (!data?.length) throw new Error('La partida debe estar finalizada antes de archivarla.');
 },
 //FBP_Fin
   async getUserRounds(): Promise<GolfRound[]> {
@@ -600,6 +609,36 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       p_actor: getUserId(),
     });
     if (error) throw error;
+  },
+
+  async finishRound(roundId: string): Promise<void> {
+    const { error } = await supabase.rpc('finish_round', {
+      p_round: roundId,
+      p_actor: getUserId(),
+    });
+    if (!error) return;
+
+    const functionIsPending = error.code === 'PGRST202'
+      || error.message?.toLowerCase().includes('finish_round')
+        && error.message?.toLowerCase().includes('schema cache');
+    if (!functionIsPending) throw error;
+
+    // Compatibility while the creator-only migration is pending on the shared
+    // database. The UI still exposes finalization exclusively to the creator.
+    const { data: round, error: roundError } = await supabase
+      .from('golf_rounds')
+      .select('group_id')
+      .eq('id', roundId)
+      .single();
+    if (roundError) throw roundError;
+    if (round?.group_id) await this.updateRoundStatus(roundId, 'completed');
+    else await this.finishExpressRound(roundId);
+  },
+
+  async recordRoundDecision(roundId: string): Promise<import('../types').DecidedResult | null> {
+    const { data, error } = await supabase.rpc('record_round_decision', { p_round: roundId });
+    if (error) throw error;
+    return data || null;
   },
 
   async updateRoundSlope(roundId: string, manualSlope: number | null): Promise<void> {
@@ -1384,7 +1423,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .from('golf_rounds')
       .select('id, created_at')
       .eq('group_id', groupId)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'archived'])
       .order('created_at', { ascending: false });
 
     if (roundsError) throw roundsError;
@@ -1814,6 +1853,13 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       return a.playingHandicap - b.playingHandicap;
     });
 
+    if (round.decided_result?.winner_player_ids?.length) {
+      const winnerIds = new Set(round.decided_result.winner_player_ids);
+      sortedPlayers.sort((a, b) =>
+        Number(winnerIds.has(b.playerId)) - Number(winnerIds.has(a.playerId))
+      );
+    }
+
     const finalRanking = sortedPlayers.map((player, index) => ({
       position: index + 1,
       player_name: player.playerName,
@@ -1891,6 +1937,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
           final_ranking: finalRanking,
           player_stats: playerStatsForArchive,
           hole_scores: holeScoresForArchive,
+          decided_result: round.decided_result || null,
+          decided_at: round.decided_at || null,
           season_id: currentSeason?.id || null,
         },
       ]);
@@ -2783,7 +2831,7 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
       .select('id')
       .eq('user_id', userId)
       .is('group_id', null)
-      .eq('status', 'completed')
+      .in('status', ['completed', 'archived'])
       .match(roundId ? { id: roundId } : {})
       .limit(1);
 
@@ -2803,7 +2851,8 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
     players: RoundPlayer[],
     scores: RoundScore[],
     holes: GolfHole[],
-    gameMode: GameMode = 'stableford'
+    gameMode: GameMode = 'stableford',
+    decidedResult: import('../types').DecidedResult | null = null
   ): any {
     const getPlayerStats = (player: RoundPlayer) => {
       const playerScores = scores.filter(s => s.player_id === player.id && !s.abandoned);
@@ -2843,6 +2892,13 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
         if (b.totalStablefordPoints !== a.totalStablefordPoints) return b.totalStablefordPoints - a.totalStablefordPoints;
         return a.player.playing_handicap - b.player.playing_handicap;
       });
+    }
+
+    if (decidedResult?.winner_player_ids?.length) {
+      const winners = new Set(decidedResult.winner_player_ids);
+      playerRankings = playerRankings.sort((a, b) =>
+        Number(winners.has(b.player.id)) - Number(winners.has(a.player.id))
+      );
     }
 
     // Awards comunes
@@ -2893,8 +2949,9 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
 
     // === MATCH (1v1) ===
     if (gameMode === 'match') {
-      const winner = playerRankings[0];
-      const loser = playerRankings[1];
+      const frozenWinnerId = decidedResult?.winner_player_ids?.[0];
+      const winner = playerRankings.find(entry => entry.player.id === frozenWinnerId) || playerRankings[0];
+      const loser = playerRankings.find(entry => entry.player.id !== winner?.player.id) || playerRankings[1];
       const margin = winner && loser ? winner.totalPoints - loser.totalPoints : 0;
       return {
         ranking: playerRankings,
@@ -2903,7 +2960,8 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
           loser: loser?.player || null,
           winnerPoints: winner?.totalPoints || 0,
           loserPoints: loser?.totalPoints || 0,
-          margin,
+          margin: decidedResult?.margin ?? margin,
+          displayText: decidedResult?.display_text || null,
         },
         awards: baseAwards,
       };
@@ -2941,7 +2999,15 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
         { team: 1, players: team1Players, totalPoints: team1Points, handicap: team1Players.reduce((sum, p) => sum + p.playing_handicap, 0), label: 'Pareja 2' },
       ].sort((a, b) => b.totalPoints - a.totalPoints || a.handicap - b.handicap);
 
-      const isTie = teamRanking[0].totalPoints === teamRanking[1].totalPoints
+      if (decidedResult?.winner_player_ids?.length) {
+        const winners = new Set(decidedResult.winner_player_ids);
+        teamRanking.sort((a, b) =>
+          Number(b.players.some(player => winners.has(player.id)))
+          - Number(a.players.some(player => winners.has(player.id)))
+        );
+      }
+
+      const isTie = !decidedResult && teamRanking[0].totalPoints === teamRanking[1].totalPoints
         && teamRanking[0].handicap === teamRanking[1].handicap;
       const margin = Math.abs(team0Points - team1Points);
 
@@ -2952,7 +3018,8 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
           isTie,
           winningTeam: isTie ? null : teamRanking[0],
           losingTeam: isTie ? null : teamRanking[1],
-          margin: isTie ? 0 : margin,
+          margin: decidedResult?.margin ?? (isTie ? 0 : margin),
+          displayText: decidedResult?.display_text || null,
         },
         awards: baseAwards,
       };

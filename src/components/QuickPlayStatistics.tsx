@@ -9,6 +9,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { calculateScoreToPar } from '../utils/calculations';
 import { safeStorage } from '../utils/safeStorage';
 import { GameMode } from '../types';
+import { ThemeToggle } from './ThemeToggle';
 
 interface QuickPlayStatisticsProps {
   onBack: () => void;
@@ -74,7 +75,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             sharedRoundData.players,
             sharedRoundData.scores,
             sharedRoundData.holes,
-            sharedRoundData.round?.game_mode || 'stableford'
+            sharedRoundData.round?.game_mode || 'stableford',
+            sharedRoundData.round?.decided_result || null
           ));
           setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
           setLoading(false);
@@ -120,7 +122,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           data.players,
           data.scores,
           data.holes,
-          data.round?.game_mode || 'stableford'
+          data.round?.game_mode || 'stableford',
+          data.round?.decided_result || null
         );
         setStats(calculatedStats);
 
@@ -241,10 +244,36 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const handleShareWhatsApp = async () => {
     if (!desktopExportRef.current) return;
 
+    const exportElement = desktopExportRef.current;
+    const exportWrapper = exportElement.closest<HTMLElement>('[data-statistics-export-wrapper]');
+    const previousWrapperStyle = exportWrapper?.getAttribute('style') ?? null;
+    const previousExportStyle = exportElement.getAttribute('style');
+
     try {
       setSharing(true);
       setShareError('');
-      const exportElement = desktopExportRef.current;
+
+      // html2canvas es inestable en algunos navegadores móviles cuando el nodo
+      // fuente está miles de píxeles fuera del viewport. Se hace renderizable
+      // durante la captura y se restaura siempre en finally.
+      if (exportWrapper) {
+        Object.assign(exportWrapper.style, {
+          position: 'fixed',
+          inset: '0 auto auto 0',
+          width: '1200px',
+          height: 'auto',
+          overflow: 'visible',
+          pointerEvents: 'none',
+          zIndex: '2147483000',
+        });
+      }
+      Object.assign(exportElement.style, {
+        display: 'block',
+        width: '1200px',
+        maxWidth: 'none',
+        height: 'auto',
+        overflow: 'visible',
+      });
 
       if (document.fonts?.ready) {
         await document.fonts.ready;
@@ -350,6 +379,12 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       console.error('Error al generar la imagen para WhatsApp:', error);
       setShareError('No se ha podido generar la imagen completa. Inténtalo de nuevo.');
     } finally {
+      if (exportWrapper) {
+        if (previousWrapperStyle === null) exportWrapper.removeAttribute('style');
+        else exportWrapper.setAttribute('style', previousWrapperStyle);
+      }
+      if (previousExportStyle === null) exportElement.removeAttribute('style');
+      else exportElement.setAttribute('style', previousExportStyle);
       setSharing(false);
     }
   };
@@ -400,11 +435,11 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
   if (loading) {
     return (
-      <div className="theme-static min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-800 p-4 md:p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-app p-4 md:p-8 flex items-center justify-center">
         <div className="absolute right-4 top-4">{messagesButton}</div>
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-white font-medium">Cargando estadísticas...</p>
+          <p className="text-ink font-medium">Cargando estadísticas...</p>
         </div>
       </div>
     );
@@ -412,7 +447,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
   if (!roundData || !stats) {
     return (
-      <div className="theme-static min-h-screen bg-gradient-to-b from-emerald-900 to-emerald-800 p-4 md:p-8">
+      <div className="min-h-screen bg-app p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
           <div className="mb-6 flex items-center justify-between"><NavigationButton destination="back"
             onClick={onBack}
@@ -841,20 +876,38 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   );
 
   return (
-    <div className="theme-static min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 p-4 md:p-8 relative overflow-hidden">
+    <div className="statistics-theme min-h-screen bg-app text-ink p-4 md:p-8 relative overflow-hidden">
+      {sharing && (
+        <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/90 p-6" role="status" aria-live="polite">
+          <div className="rounded-2xl border border-emerald-400/40 bg-slate-900 p-6 text-center text-white shadow-2xl">
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-emerald-200 border-b-emerald-500" />
+            <p className="font-bold">Generando la imagen completa…</p>
+            <p className="mt-1 text-sm text-slate-300">Puede tardar unos segundos en el móvil.</p>
+          </div>
+        </div>
+      )}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNnoiIHN0cm9rZT0iIzFmMmQzZCIgc3Ryb2tlLXdpZHRoPSIuNSIgb3BhY2l0eT0iLjMiLz48L2c+PC9zdmc+')] opacity-20"></div>
 
       <div className="max-w-7xl mx-auto relative z-10">
 
         {/* BARRA SUPERIOR / CONTROLES */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-          <NavigationButton destination="back"
-            onClick={onBack}
-            className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-all hover:scale-105 self-start md:self-auto"
-          />
+        <div className="mb-8 flex flex-col items-center gap-4">
+          <div className="relative flex min-h-11 w-full items-center justify-between">
+            <div className="flex items-center gap-2">
+              <NavigationButton destination="back"
+                onClick={onBack}
+                className="bg-card hover:bg-card-2 border border-line text-ink font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
+              />
+              <ThemeToggle />
+            </div>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+              {messagesButton}
+            </div>
+            <div className="w-[5.5rem]" aria-hidden="true" />
+          </div>
 
           <div className="text-center flex flex-col items-center gap-2">
-            <h1 className="text-3xl md:text-5xl font-black text-white drop-shadow-2xl">GAME OVER</h1>
+            <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
 
             {availableRounds.length > 0 && (
               <div className="relative flex items-center mt-1">
@@ -862,7 +915,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <select
                   value={selectedRoundId || ''}
                   onChange={(e) => handleSelectRound(e.target.value)}
-                  className="bg-emerald-950/90 text-white font-semibold pl-9 pr-8 py-2 rounded-lg border border-emerald-500/30 focus:outline-none focus:ring-2 focus:ring-emerald-400 appearance-none cursor-pointer text-sm shadow-lg"
+                  className="bg-card text-ink font-semibold pl-9 pr-8 py-2 rounded-lg border border-line-2 focus:outline-none focus:ring-2 focus:ring-accent appearance-none cursor-pointer text-sm shadow-card"
                 >
                   {availableRounds.map((r) => (
                     <option key={r.id} value={r.id} className="bg-slate-900 text-white">
@@ -880,20 +933,19 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               </div>
             )}
 
-            <p className="text-emerald-300 font-semibold text-xs md:text-sm mt-1">
+            <p className="text-accent-ink font-semibold text-xs md:text-sm mt-1">
               {course?.name} · <span className="uppercase tracking-wider">{gameMode}</span>
             </p>
           </div>
 
-          <div className="flex items-center gap-2 self-end md:self-auto">
-            {messagesButton}
+          <div className="flex w-full flex-wrap items-center justify-center gap-3">
             <button
               onClick={handleShareWhatsApp}
               disabled={sharing}
               className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105 shadow-lg disabled:opacity-50"
             >
               <MessageCircle size={20} />
-              <span className="hidden sm:inline">{sharing ? 'Generando...' : shareAsset ? 'Regenerar imagen' : 'Preparar para compartir'}</span>
+              <span>{sharing ? 'Generando...' : 'Compartir'}</span>
             </button>
 
             {!isSharedView && (
@@ -902,7 +954,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
               >
                 <Trash2 size={20} />
-                <span className="hidden sm:inline">Eliminar</span>
+                <span>Eliminar</span>
               </WriteButton>
             )}
           </div>
@@ -944,7 +996,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         )}
 
         {/* CONTENEDOR VISIBLE DE LA PWA */}
-        <div ref={statsContainerRef} className="p-4 md:p-6 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/10 shadow-2xl">
+        <div ref={statsContainerRef} className="p-4 md:p-6 rounded-2xl bg-card border border-line shadow-card">
 
           {isSindicatoMode && (
             <div
@@ -1000,7 +1052,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     </div>
                     <div className="mt-3 bg-white/10 rounded-lg px-4 py-2">
                       <p className="text-white font-bold text-lg">
-                        +{matchResult.margin}
+                        {matchResult.displayText || `+${matchResult.margin}`}
                       </p>
                       <p className="text-white/60 text-xs">diferencia</p>
                     </div>
@@ -1060,7 +1112,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     </div>
                     <div className="mt-3 bg-white/10 rounded-lg px-4 py-2">
                       <p className="text-white font-bold text-lg">
-                        {teamResult.isTie ? '0' : `+${teamResult.margin}`}
+                        {teamResult.displayText || (teamResult.isTie ? '0' : `+${teamResult.margin}`)}
                       </p>
                       <p className="text-white/60 text-xs">{teamResult.isTie ? 'empate' : 'diferencia'}</p>
                     </div>
@@ -1200,7 +1252,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           <div 
             ref={desktopExportRef}
             data-statistics-export
-            className="w-[1200px] p-8 bg-slate-900 text-white rounded-2xl border border-white/10"
+            className="theme-static w-[1200px] p-8 bg-slate-900 text-white rounded-2xl border border-white/10"
           >
             {/* Cabecera del Reporte Dinámica */}
             <div className="text-center mb-8 border-b border-white/10 pb-4">
@@ -1334,7 +1386,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
       {!isSharedView && showDeleteConfirm && (
         <ConfirmModal
-          message="¿Estás seguro de que deseas eliminar esta partida? Esta acción no se puede deshacer."
+          message="¿Eliminar las estadísticas de esta partida? Se borrará la partida junto con todos sus golpes y resultados. Esta acción no se puede deshacer y las estadísticas no se podrán regenerar."
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />

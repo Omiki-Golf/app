@@ -164,6 +164,13 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
 
         <div className="overflow-y-auto p-6">
           <div className="space-y-8">
+            {round.decided_result && (
+              <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-5 text-center">
+                <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Resultado oficial</p>
+                <p className="mt-1 text-xl font-black text-emerald-950">{round.decided_result.winner_label}</p>
+                <p className="mt-2 text-3xl font-black text-emerald-700">{round.decided_result.display_text}</p>
+              </div>
+            )}
             {!loadingData && dailyRanking.length > 0 && (
               <div>
                 <h3 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">

@@ -13,9 +13,18 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.3';
+export const APP_VERSION = '1.5.4';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.5.4',
+    date: '2026-10-07',
+    title: 'Imagen de estadísticas corregida',
+    summary: 'La imagen preparada para compartir conserva ahora el diseño completo de las estadísticas.',
+    changes: [
+      { type: 'fixed', text: 'La exportación PNG mantiene colores, tipografía, tarjetas, tablas y distribución del informe.' },
+    ],
+  },
   {
     version: '1.5.3',
     date: '2026-10-07',

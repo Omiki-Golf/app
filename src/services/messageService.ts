@@ -224,4 +224,22 @@ export const messageService = {
     await assertIdentity(null);
     return express<InboxItem>({ action: "open", ...box, delivery: id });
   },
+  async delete(userId: string | null, id: string): Promise<void> {
+    await assertIdentity(userId);
+    if (userId) {
+      await rpc<boolean>("my_message_delete", { p_delivery: id });
+      return;
+    }
+    const box = await getBox();
+    await assertIdentity(null);
+    await express<{ deleted: number }>({ action: "delete", ...box, delivery: id });
+  },
+  async deleteAll(userId: string | null): Promise<number> {
+    await assertIdentity(userId);
+    if (userId) return rpc<number>("my_message_delete_all");
+    const box = await getBox();
+    await assertIdentity(null);
+    const result = await express<{ deleted: number }>({ action: "delete_all", ...box });
+    return result.deleted;
+  },
 };

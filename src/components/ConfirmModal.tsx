@@ -1,11 +1,12 @@
 import { useReadOnly } from '../context/ReadOnlyContext';
-import React from 'react';
+import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface ConfirmModalProps {
   message: string;
   readOnlySensitive?: boolean;
+  requiredText?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -13,15 +14,18 @@ interface ConfirmModalProps {
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   readOnlySensitive = true,
+  requiredText,
   onConfirm,
   onCancel,
 }) => {
   const { t } = useTranslation();
+  const [confirmationText, setConfirmationText] = useState('');
   const restricted = useReadOnly() && readOnlySensitive;
+  const confirmationMatches = !requiredText || confirmationText === requiredText;
   const handleConfirm = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!restricted) onConfirm();
+    if (!restricted && confirmationMatches) onConfirm();
   };
 
   const handleCancel = (e: React.MouseEvent) => {
@@ -54,6 +58,23 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </p>
         </div>
 
+        {requiredText && (
+          <div className="mt-5">
+            <label className="block text-sm font-semibold text-ink-2 mb-2" htmlFor="destructive-confirmation">
+              Escribe <strong>{requiredText}</strong> para confirmar
+            </label>
+            <input
+              id="destructive-confirmation"
+              type="text"
+              value={confirmationText}
+              onChange={(event) => setConfirmationText(event.target.value)}
+              autoComplete="off"
+              autoFocus
+              className="w-full rounded-lg border-2 border-line-2 bg-card px-3 py-2 text-ink focus:border-red-500 focus:outline-none"
+            />
+          </div>
+        )}
+
         <div className="flex gap-3 mt-6">
           <button
             type="button"
@@ -64,9 +85,9 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
           <button
             type="button"
-            disabled={restricted}
+            disabled={restricted || !confirmationMatches}
             onClick={handleConfirm}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
           >
             {t('common.accept')}
           </button>

@@ -174,20 +174,6 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
             {!showAllRounds ? (
               <>
-                <div className="mb-6">
-                  <div className="text-sm text-ink-3 bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <p className="font-semibold text-blue-900">
-                      Progreso: {currentHole}/
-                      {players.length > 0
-                        ? roundsMap.get(players[0].id)?.scores
-                          ? Object.keys(roundsMap.get(players[0].id)?.scores ?? {}).length + 1
-                          : 1
-                        : 1}{' '}
-                      hoyos
-                    </p>
-                  </div>
-                </div>
-
                 <div className="space-y-3">
                   {sorted.map((stat, index) => (
                     <div

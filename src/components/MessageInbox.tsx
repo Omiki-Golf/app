@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy } from "lucide-react";
+import { Copy, Trash2 } from "lucide-react";
 import {
   messageService,
   type Inbox,
@@ -60,9 +60,50 @@ export function MessageInbox({
       window.removeEventListener("focus", tick);
     };
   }, [load]);
+  const removeOne = async (id: string) => {
+    if (busy || !window.confirm("¿Eliminar este mensaje?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await messageService.delete(userId, id);
+      if (!alive.current || identity.current !== userId) return;
+      setOpened((current) => current?.id === id ? null : current);
+      if (!opened && inbox.messages.length === 1 && page > 0) setPage((current) => current - 1);
+      else await load();
+      onRead();
+    } catch {
+      if (alive.current) setError("No se pudo eliminar el mensaje. Inténtalo de nuevo.");
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
+  const removeAll = async () => {
+    if (busy || inbox.total === 0 || !window.confirm("¿Eliminar todos los mensajes de este buzón?")) return;
+    setBusy(true);
+    setError("");
+    try {
+      await messageService.deleteAll(userId);
+      if (!alive.current || identity.current !== userId) return;
+      setOpened(null);
+      setPage(0);
+      setInbox({ messages: [], total: 0, unread: 0 });
+      onRead();
+    } catch {
+      if (alive.current) setError("No se pudieron eliminar los mensajes. Inténtalo de nuevo.");
+    } finally {
+      if (alive.current) setBusy(false);
+    }
+  };
   return (
     <section className="space-y-3 mb-7 text-ink">
-      <h2 className="font-bold text-lg">Mensajes</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-bold text-lg">Mensajes</h2>
+        {inbox.total > 0 && (
+          <button type="button" disabled={busy} onClick={() => void removeAll()} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">
+            <Trash2 size={16} /> Eliminar todos
+          </button>
+        )}
+      </div>
       {!userId && boxId && (
         <div className="bg-card border border-line rounded-xl p-3">
           <p className="text-sm">Identificador de este buzón Express</p>
@@ -112,7 +153,12 @@ export function MessageInbox({
       </button>
       {opened ? (
         <article className="bg-card border border-line rounded-xl p-4">
-          <NavigationButton onClick={() => setOpened(null)} />
+          <div className="flex items-center justify-between gap-3">
+            <NavigationButton onClick={() => setOpened(null)} />
+            <button type="button" disabled={busy} onClick={() => void removeOne(opened.id)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">
+              <Trash2 size={16} /> Eliminar
+            </button>
+          </div>
           <p className="text-sm text-ink-3 mt-3">
             {opened.sender_label || "Administración"} · {new Date(opened.sent_at).toLocaleString("es-ES")}
           </p>
@@ -128,11 +174,11 @@ export function MessageInbox({
             <p role="status">Cargando mensajes…</p>
           ) : (
             inbox.messages.map((m) => (
-              <button
-                key={m.id}
-                disabled={busy}
-                className="w-full text-left bg-card border border-line rounded-xl p-4"
-                onClick={async () => {
+              <article key={m.id} className="flex items-stretch overflow-hidden rounded-xl border border-line bg-card">
+                <button
+                  disabled={busy}
+                  className="min-w-0 flex-1 p-4 text-left"
+                  onClick={async () => {
                   if (busy) return;
                   setBusy(true);
                   try {
@@ -150,7 +196,7 @@ export function MessageInbox({
                     if (alive.current) setBusy(false);
                   }
                 }}
-              >
+                >
                 <span className="block text-xs text-ink-3">
                   {m.sender_label || "Administración"} · {new Date(m.sent_at).toLocaleString("es-ES")}
                 </span>
@@ -161,7 +207,11 @@ export function MessageInbox({
                 <span className="text-xs">
                   {m.read_at ? "Leído" : "No leído"}
                 </span>
-              </button>
+                </button>
+                <button type="button" disabled={busy} title="Eliminar mensaje" aria-label={`Eliminar ${m.title}`} onClick={() => void removeOne(m.id)} className="flex w-12 shrink-0 items-center justify-center border-l border-line text-red-600 hover:bg-red-50 disabled:opacity-50">
+                  <Trash2 size={18} />
+                </button>
+              </article>
             ))
           )}
           {!loading && !inbox.messages.length && !error && (

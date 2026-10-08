@@ -6,7 +6,6 @@ interface HandshakeModalProps {
   marginText: string;
   gameMode: string;
   onContinue: () => void;
-  onFinishRound?: () => void;
 }
 
 export const HandshakeModal: React.FC<HandshakeModalProps> = ({
@@ -15,13 +14,8 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
   marginText,
   gameMode,
   onContinue,
-  onFinishRound,
 }) => {
   if (!isOpen) return null;
-
-  const handleFinish = async () => {
-    if (onFinishRound) await onFinishRound();
-  };
 
   const modeLabel = gameMode === 'match'
     ? 'Match Play'
@@ -48,7 +42,7 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
         </div>
 
         <p className="text-sm text-ink-2 font-medium mb-4">
-          El resultado ya está decidido. ¿Quieres seguir anotando hoyos o finalizar la partida ahora?
+          El resultado oficial ya se ha guardado y no cambiará. Puedes seguir anotando los golpes que faltan.
         </p>
 
         <div className="space-y-3">
@@ -59,13 +53,6 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
           >
             Seguir jugando
           </button>
-          {onFinishRound && <button
-            type="button"
-            onClick={handleFinish}
-            className="w-full bg-neutral hover:bg-neutral-hover text-ink font-bold py-3 px-4 rounded-xl transition-colors"
-          >
-            Finalizar partida
-          </button>}
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ export interface GolfHole {
   id: string;
   course_id: string;
   hole_number: number;
-  par: 3 | 4 | 5;
+  par: 3 | 4 | 5 | 6;
   stroke_index: number;
   created_at: string;
   updated_at: string;
@@ -10,7 +10,7 @@ export interface GolfHole {
 
 export interface Hole {
   number: number;
-  par: 3 | 4 | 5;
+  par: 3 | 4 | 5 | 6;
   strokeIndex: number;
 }
 
@@ -23,6 +23,11 @@ export interface GolfCourse {
   name: string;
   description?: string;
   created_at: string;
+  catalog_key?: string | null;
+  catalog_field?: string | null;
+  catalog_route?: string | null;
+  autonomous_community?: string | null;
+  province?: string | null;
 }
 
 export interface Tee {
@@ -156,12 +161,24 @@ export interface RoundScore {
 export type GameMode = 'stableford' | 'match' | 'sindicato' | 'parejas';
 export type UserTier = 'Express' | 'Player' | 'Team';
 
+export interface DecidedResult {
+  mode: Exclude<GameMode, 'stableford'>;
+  winner_player_ids: string[];
+  winner_names: string[];
+  winner_label: string;
+  margin: number;
+  holes_remaining: number;
+  display_text: string;
+}
+
 export interface GolfRound {
   id: string;
   course_id: string;
   created_by: string;
   user_id: string;
   responsible_user_id?: string | null;
+  decided_result?: DecidedResult | null;
+  decided_at?: string | null;
   group_id?: string;
   num_holes: 9 | 18;
   holes_range?: '1-9' | '10-18';
@@ -174,6 +191,7 @@ export interface GolfRound {
   access_code: string;
   created_at: string;
   updated_at: string;
+  completed_at?: string | null;
 }
 
 export interface RoundWithDetails {

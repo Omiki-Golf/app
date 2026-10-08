@@ -419,6 +419,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const gameModeLabel = gameMode === 'match' ? 'Match' : gameMode === 'sindicato' ? 'Sindicato' : gameMode === 'parejas' ? 'Parejas' : 'Stableford';
   const requiredPlayers = gameMode === 'match' ? 2 : gameMode === 'sindicato' ? 3 : gameMode === 'parejas' ? 4 : 1;
   const canStartWithMode = players.length === requiredPlayers || gameMode === 'stableford';
+  const nextPlayerNumber = Math.min(players.length + 1, maxPlayers);
+  const playerNameLabel = gameMode === 'stableford'
+    ? `Nombre del jugador ${nextPlayerNumber} de ${maxPlayers}`
+    : gameMode === 'parejas'
+      ? `Pareja ${nextPlayerNumber <= 2 ? 1 : 2} jugador ${nextPlayerNumber % 2 === 0 ? 2 : 1}`
+      : `Jugador ${nextPlayerNumber}`;
 
   const isNewPlayer = searchTerm && !allPlayers.find(
     (p) => !p.auth_user_id && p.name.toLowerCase() === searchTerm.toLowerCase()
@@ -449,33 +455,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
             </div>
           )}
 
-          {accessCode && hasEditAccess && (
-            <div className="mb-6 bg-accent-soft border border-accent-ring rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Lock className="text-accent-ink" size={20} />
-                  <span className="text-sm font-medium text-title">
-                    Código de Acceso:
-                  </span>
-                  <code className="text-lg font-bold text-accent-ink tracking-widest">
-                    {showCode ? accessCode : '••••'}
-                  </code>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowCode(!showCode)}
-                  className="text-accent-ink hover:text-accent-ink p-1 transition-colors"
-                  title={showCode ? 'Ocultar código' : 'Mostrar código'}
-                >
-                  {showCode ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              <p className="text-xs text-accent-ink mt-2">
-                Comparte este código con otros jugadores para que puedan unirse a la partida
-              </p>
-            </div>
-          )}
-
           {!canAddMorePlayers && (
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-6">
               <p className="text-amber-800 font-semibold">
@@ -501,7 +480,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           <WriteForm onSubmit={handleAddPlayer} className="space-y-4 mb-8">
             <div className="relative player-search-container">
               <label className="block text-sm font-semibold text-ink-2 mb-2">
-                Nombre del Jugador
+                {playerNameLabel}
               </label>
               <div className="relative">
                 <input
@@ -766,14 +745,31 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           </div>
 
           <div className="space-y-3">
-            <WriteButton
-              onClick={handleOpenHoleConfigClick}
-              disabled={loading}
-              className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              <Settings size={20} />
-              Configurar Hoyos
-            </WriteButton>
+            {accessCode && hasEditAccess && (
+              <div className="bg-accent-soft border border-accent-ring rounded-lg p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Lock className="text-accent-ink shrink-0" size={20} />
+                    <span className="text-sm font-medium text-title">Código de partida:</span>
+                    <code className="text-lg font-bold text-accent-ink tracking-widest">
+                      {showCode ? accessCode : '••••'}
+                    </code>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCode(!showCode)}
+                    className="text-accent-ink p-1 transition-colors shrink-0"
+                    title={showCode ? 'Ocultar código' : 'Mostrar código'}
+                    aria-label={showCode ? 'Ocultar código de partida' : 'Mostrar código de partida'}
+                  >
+                    {showCode ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                <p className="text-xs text-accent-ink mt-2">
+                  Compártelo para que otros jugadores puedan unirse a la partida
+                </p>
+              </div>
+            )}
 
             {currentGroup ? (
               <NavigationButton

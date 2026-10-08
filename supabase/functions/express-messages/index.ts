@@ -7,7 +7,7 @@ import {
 } from "../_shared/admin.ts";
 serve(async (req, api) => {
   const input = await body(req);
-  if (!["register", "inbox", "open"].includes(String(input.action)))
+  if (!["register", "inbox", "open", "delete", "delete_all"].includes(String(input.action)))
     throw new HttpError(400, "Acción no válida.");
   if (typeof input.secret !== "string" || !/^[0-9a-f]{64}$/.test(input.secret))
     throw new HttpError(401, "Buzón no disponible.");
@@ -30,6 +30,16 @@ serve(async (req, api) => {
     return { id: data };
   }
   const id = uuidValue(input.id);
+  if (input.action === "delete" || input.action === "delete_all") {
+    const { data, error } = await api.service.rpc("express_message_delete", {
+      p_id: id,
+      p_hash: hash,
+      p_delivery: input.action === "delete" ? uuidValue(input.delivery) : null,
+    });
+    if (error)
+      throw new HttpError(error.code === "42501" ? 403 : 503, "No se pudo eliminar el mensaje.");
+    return { deleted: data };
+  }
   const page = input.page ?? 0;
   if (!Number.isInteger(page) || Number(page) < 0 || Number(page) > 100000)
     throw new HttpError(400, "Página no válida.");

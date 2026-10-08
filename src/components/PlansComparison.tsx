@@ -13,6 +13,7 @@ interface PlansComparisonProps {
   onRegisterPlan?: (plan: PaidPlan, period: BillingPeriod) => void;
   currentPlan?: PlanType;
   onStartTeamTrial?: () => Promise<void>;
+  expressLimit?: boolean;
 }
 
 const styles = {
@@ -24,8 +25,8 @@ const styles = {
 const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 const planRank: Record<PlanType, number> = { express: 0, player: 1, team: 2, premium: 3 };
 
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth, onRegisterPlan, currentPlan, onStartTeamTrial }) => {
-  const [selected, setSelected] = useState<DisplayPlan>(currentPlan ?? 'express');
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth, onRegisterPlan, currentPlan, onStartTeamTrial, expressLimit = false }) => {
+  const [selected, setSelected] = useState<DisplayPlan>(expressLimit ? 'player' : (currentPlan ?? 'express'));
   const [annual, setAnnual] = useState(true);
   const [comingSoon, setComingSoon] = useState(false);
   const [confirmPlayer, setConfirmPlayer] = useState(false);
@@ -35,6 +36,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
   const style = styles[selected];
   const isCurrentPlan = currentPlan === selected;
   const isTeamTrial = currentPlan === 'player' && selected === 'team' && !!onStartTeamTrial;
+  const visiblePlans = expressLimit ? planCatalog.filter(item => item.id === 'player') : planCatalog;
 
   return (
     <main className="min-h-screen bg-app px-4 py-5 sm:py-8">
@@ -44,9 +46,9 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
           <button type="button" onClick={onBack} aria-label="Cerrar planes" className="flex h-10 w-10 items-center justify-center rounded-full border border-line text-ink-3 hover:bg-card-2"><X size={20} /></button>
         </div>
         <header className="text-center">
-          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent-ink">Mejora tu juego</span>
-          <h1 className="mt-3 text-2xl font-bold leading-tight text-ink">Lleva tu golf al siguiente nivel</h1>
-          <p className="mt-2 text-xs leading-relaxed text-ink-3">Guarda tus partidas de por vida, analiza tus estadísticas avanzadas y únete a ligas permanentes.</p>
+          <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-bold uppercase tracking-wide text-accent-ink">{expressLimit ? 'Límite Express alcanzado' : 'Mejora tu juego'}</span>
+          <h1 className="mt-3 text-2xl font-bold leading-tight text-ink">{expressLimit ? 'Ya has utilizado tus 4 partidas Express' : 'Lleva tu golf al siguiente nivel'}</h1>
+          <p className="mt-2 text-xs leading-relaxed text-ink-3">{expressLimit ? 'Pasa a Omiki Player para seguir creando partidas sin límite y conservar tu historial en la nube.' : 'Guarda tus partidas de por vida, analiza tus estadísticas avanzadas y únete a ligas permanentes.'}</p>
         </header>
         <div className="mx-auto mb-5 mt-6 flex max-w-xs rounded-full border border-line bg-card-2 p-1" role="group" aria-label="Periodicidad del plan">
           {[false, true].map(value => (
@@ -56,7 +58,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
           ))}
         </div>
         <div className="space-y-2">
-          {planCatalog.map(item => {
+          {visiblePlans.map(item => {
             const current = styles[item.id];
             const Icon = current.icon;
             const active = selected === item.id;
@@ -93,7 +95,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
         }} className={`mt-4 w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${style.button}`}>{isCurrentPlan ? 'Plan actual' : isTeamTrial ? 'Probar Team durante 30 días' : plan.action}</button>
         {comingSoon && <p role="status" className="mt-3 rounded-xl bg-accent-soft p-3 text-center text-sm font-semibold text-accent-ink">Próximamente</p>}
         {updateError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm text-red-700">{updateError}</p>}
-        {onShowAuth && <button type="button" onClick={onShowAuth} className="mt-6 flex w-full items-center justify-center gap-2 border-t border-line pt-5 text-sm text-ink-2 hover:text-accent-ink"><LogIn size={18} className="shrink-0" /><span>¿Ya estás registrado? <span className="font-semibold underline">Inicia sesión</span></span></button>}
+        {!expressLimit && onShowAuth && <button type="button" onClick={onShowAuth} className="mt-6 flex w-full items-center justify-center gap-2 border-t border-line pt-5 text-sm text-ink-2 hover:text-accent-ink"><LogIn size={18} className="shrink-0" /><span>¿Ya estás registrado? <span className="font-semibold underline">Inicia sesión</span></span></button>}
       </div>
       {confirmPlayer && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="player-choice-title" onKeyDown={event => { if (event.key === 'Escape') setConfirmPlayer(false); }}>
         <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 shadow-card">
