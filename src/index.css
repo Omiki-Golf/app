@@ -160,3 +160,76 @@ html.theme-transition * {
 .dark .theme-static .text-yellow-900 { color: #713f12; }
 .dark .theme-static .text-orange-900 { color: #7c2d12; }
 .dark .theme-static .text-red-700 { color: #b91c1c; }
+
+/* Tablas de estadisticas: legibles en ambos temas y estables al exportar. */
+.statistics-panel {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+.statistics-table-title,
+.statistics-table-text {
+  color: var(--ink);
+}
+.statistics-table-line {
+  border-color: var(--line);
+}
+.statistics-table-row:hover {
+  background-color: var(--card-2);
+}
+.statistics-table-accent {
+  color: #047857;
+}
+.statistics-table-positive {
+  color: #15803d;
+}
+.statistics-table-warning {
+  color: #c2410c;
+}
+.statistics-table-negative {
+  color: #dc2626;
+}
+.statistics-table-total {
+  background-color: #d1fae5;
+}
+
+.dark .statistics-panel,
+.theme-static .statistics-panel {
+  background-color: rgb(255 255 255 / .1);
+  border-color: rgb(255 255 255 / .1);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / .25);
+}
+.dark .statistics-table-title,
+.dark .statistics-table-text,
+.theme-static .statistics-table-title,
+.theme-static .statistics-table-text {
+  color: #fff;
+}
+.dark .statistics-table-line,
+.theme-static .statistics-table-line {
+  border-color: rgb(255 255 255 / .15);
+}
+.dark .statistics-table-row:hover,
+.theme-static .statistics-table-row:hover {
+  background-color: rgb(255 255 255 / .05);
+}
+.dark .statistics-table-accent,
+.theme-static .statistics-table-accent {
+  color: #6ee7b7;
+}
+.dark .statistics-table-positive,
+.theme-static .statistics-table-positive {
+  color: #86efac;
+}
+.dark .statistics-table-warning,
+.theme-static .statistics-table-warning {
+  color: #fdba74;
+}
+.dark .statistics-table-negative,
+.theme-static .statistics-table-negative {
+  color: #fca5a5;
+}
+.dark .statistics-table-total,
+.theme-static .statistics-table-total {
+  background-color: rgb(6 78 59 / .5);
+}

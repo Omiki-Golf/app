@@ -707,7 +707,20 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                   {isExpanded && !isCompleted && (
                     <div className="border-t bg-card-2 p-4 md:p-6 space-y-4">
                       <div>
-                        <h3 className="font-bold text-ink mb-3">Clasificación</h3>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <h3 className="font-bold text-ink">Clasificación</h3>
+                          {!currentGroup && (
+                            <WriteButton
+                              onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                              disabled={loading}
+                              className="text-red-500 hover:bg-red-50 disabled:opacity-50 p-2 rounded-lg transition-colors"
+                              title="Eliminar partida"
+                              aria-label="Eliminar partida"
+                            >
+                              <Trash2 size={20} />
+                            </WriteButton>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           {roundStats.players
                             .map((player) => {
@@ -784,7 +797,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               e.stopPropagation();
                               handleAddPlayerClick(roundStats.round.id);
                             }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center gap-2"
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                           >
                             <UserPlus size={20} />
                             Añadir
@@ -802,16 +815,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           </WriteButton>
                         )}
 
-                        {!currentGroup && (
-                          <WriteButton
-                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
-                            disabled={loading}
-                            className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Trash2 size={20} />
-                            Eliminar
-                          </WriteButton>
-                        )}
                       </div>
                     </div>
                   )}

@@ -13,9 +13,23 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.4';
+export const APP_VERSION = '1.5.5';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.5.5',
+    date: '2026-10-12',
+    title: 'Estadísticas y tarjeta más fiables',
+    summary: 'Mejoras de legibilidad, cálculos y controles para completar y compartir las partidas con seguridad.',
+    changes: [
+      { type: 'fixed', text: 'Las tablas de estadísticas conservan el contraste correcto en los modos claro y oscuro.' },
+      { type: 'fixed', text: 'La imagen para compartir se valida y reintenta automáticamente en móviles antes de marcarla como preparada.' },
+      { type: 'fixed', text: 'El resumen Stableford suma únicamente los hoyos de la tarjeta actual.' },
+      { type: 'improved', text: 'La tarjeta avisa mediante una ventana cuando quedan resultados pendientes al completar el último hoyo.' },
+      { type: 'improved', text: 'Los controles para añadir jugadores y eliminar partidas quedan mejor alineados en móvil.' },
+      { type: 'improved', text: 'La pantalla de acceso identifica con claridad la cuenta Omiki.' },
+    ],
+  },
   {
     version: '1.5.4',
     date: '2026-10-07',

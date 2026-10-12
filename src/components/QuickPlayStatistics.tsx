@@ -41,6 +41,43 @@ interface AvailableRound {
   game_mode?: string;
 }
 
+const waitForNextPaint = () => new Promise<void>((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+});
+
+const canvasToPngBlob = (canvas: HTMLCanvasElement) => new Promise<Blob>((resolve, reject) => {
+  const timeout = window.setTimeout(() => reject(new Error('La conversión de la imagen ha tardado demasiado.')), 15000);
+  canvas.toBlob((result) => {
+    window.clearTimeout(timeout);
+    if (result && result.size >= 10_000) resolve(result);
+    else reject(new Error('El navegador ha generado una imagen vacía o incompleta.'));
+  }, 'image/png');
+});
+
+const validatePngBlob = (blob: Blob, minimumWidth: number, minimumHeight: number) => new Promise<void>((resolve, reject) => {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  const finish = (error?: Error) => {
+    URL.revokeObjectURL(url);
+    window.clearTimeout(timeout);
+    if (error) reject(error);
+    else resolve();
+  };
+  const timeout = window.setTimeout(
+    () => finish(new Error('El navegador no ha podido verificar la imagen generada.')),
+    15000
+  );
+  image.onload = () => {
+    if (image.naturalWidth < minimumWidth || image.naturalHeight < minimumHeight) {
+      finish(new Error('La imagen generada tiene dimensiones incompletas.'));
+      return;
+    }
+    finish();
+  };
+  image.onerror = () => finish(new Error('El archivo de imagen generado no se puede abrir.'));
+  image.src = url;
+});
+
 export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, sharedRoundData = null, messagesButton }) => {
   const isSharedView = !!sharedRoundData;
   const [loading, setLoading] = useState(true);
@@ -252,6 +289,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     try {
       setSharing(true);
       setShareError('');
+      setShareAsset(null);
 
       // html2canvas es inestable en algunos navegadores móviles cuando el nodo
       // fuente está miles de píxeles fuera del viewport. Se hace renderizable
@@ -293,82 +331,97 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         })
       );
 
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
+      await waitForNextPaint();
 
       const exportWidth = Math.ceil(Math.max(1200, exportElement.scrollWidth));
       const exportHeight = Math.ceil(exportElement.scrollHeight);
-      const maxCanvasSide = 8192;
-      const maxCanvasPixels = 16_000_000;
-      const scale = Math.max(0.1, Math.min(
-        2,
-        maxCanvasSide / exportWidth,
-        maxCanvasSide / exportHeight,
-        Math.sqrt(maxCanvasPixels / (exportWidth * exportHeight))
-      ));
-
       const { default: html2canvas } = await import('html2canvas-pro');
-      const canvas = await html2canvas(exportElement, {
-        scale,
-        useCORS: true,
-        backgroundColor: '#0f172a',
-        logging: false,
-        scrollX: 0,
-        scrollY: 0,
-        width: exportWidth,
-        height: exportHeight,
-        windowWidth: exportWidth,
-        windowHeight: exportHeight,
-        onclone: (clonedDocument) => {
-          const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
-          const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
+      const maxCanvasSide = 4096;
+      const scaleLimits = [8_000_000, 5_000_000, 3_000_000];
+      let blob: Blob | null = null;
+      let lastCaptureError: unknown = null;
 
-          if (clonedWrapper) {
-            clonedWrapper.style.position = 'absolute';
-            clonedWrapper.style.inset = '0 auto auto 0';
-            clonedWrapper.style.width = `${exportWidth}px`;
-            clonedWrapper.style.height = `${exportHeight}px`;
-            clonedWrapper.style.overflow = 'visible';
-          }
+      for (const maxCanvasPixels of scaleLimits) {
+        try {
+          const scale = Math.max(0.5, Math.min(
+            1.5,
+            maxCanvasSide / exportWidth,
+            maxCanvasSide / exportHeight,
+            Math.sqrt(maxCanvasPixels / (exportWidth * exportHeight))
+          ));
 
-          if (clonedExport) {
-            clonedExport.style.width = `${exportWidth}px`;
-            clonedExport.style.height = 'auto';
-            clonedExport.style.maxWidth = 'none';
-            clonedExport.style.overflow = 'visible';
+          await waitForNextPaint();
+          const canvas = await html2canvas(exportElement, {
+            scale,
+            useCORS: true,
+            backgroundColor: '#0f172a',
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            width: exportWidth,
+            height: exportHeight,
+            windowWidth: exportWidth,
+            windowHeight: exportHeight,
+            onclone: (clonedDocument) => {
+              const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
+              const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
 
-            // Evita que los contenedores de la pantalla recorten el informe completo.
-            let ancestor = clonedExport.parentElement;
-            while (ancestor) {
-              ancestor.style.overflow = 'visible';
-              ancestor.style.maxHeight = 'none';
-              ancestor = ancestor.parentElement;
-            }
-
-            clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
-              element.style.animation = 'none';
-              element.style.transition = 'none';
-              if (
-                element.classList.contains('overflow-x-auto') ||
-                element.classList.contains('overflow-hidden')
-              ) {
-                element.style.overflow = 'visible';
+              if (clonedWrapper) {
+                clonedWrapper.style.position = 'absolute';
+                clonedWrapper.style.inset = '0 auto auto 0';
+                clonedWrapper.style.width = `${exportWidth}px`;
+                clonedWrapper.style.height = `${exportHeight}px`;
+                clonedWrapper.style.overflow = 'visible';
               }
-              if (element.classList.contains('sticky')) {
-                element.style.position = 'static';
-              }
-            });
-          }
-        },
-      });
 
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((result) => {
-          if (result) resolve(result);
-          else reject(new Error('No se pudo convertir la captura en imagen.'));
-        }, 'image/png');
-      });
+              if (clonedExport) {
+                clonedExport.style.width = `${exportWidth}px`;
+                clonedExport.style.height = 'auto';
+                clonedExport.style.maxWidth = 'none';
+                clonedExport.style.overflow = 'visible';
+
+                let ancestor = clonedExport.parentElement;
+                while (ancestor) {
+                  ancestor.style.overflow = 'visible';
+                  ancestor.style.maxHeight = 'none';
+                  ancestor = ancestor.parentElement;
+                }
+
+                clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
+                  element.style.animation = 'none';
+                  element.style.transition = 'none';
+                  if (
+                    element.classList.contains('overflow-x-auto') ||
+                    element.classList.contains('overflow-hidden')
+                  ) {
+                    element.style.overflow = 'visible';
+                  }
+                  if (element.classList.contains('sticky')) {
+                    element.style.position = 'static';
+                  }
+                });
+              }
+            },
+          });
+
+          if (canvas.width < 600 || canvas.height < 600) {
+            throw new Error('La captura devuelta por el navegador está incompleta.');
+          }
+          const candidate = await canvasToPngBlob(canvas);
+          await validatePngBlob(candidate, canvas.width, canvas.height);
+          blob = candidate;
+          break;
+        } catch (captureError) {
+          lastCaptureError = captureError;
+          console.warn('Reintentando la captura de estadísticas con menor resolución:', captureError);
+        }
+      }
+
+      if (!blob) {
+        throw lastCaptureError instanceof Error
+          ? lastCaptureError
+          : new Error('No se pudo generar una imagen válida.');
+      }
 
       const dateStr = new Date(roundData?.round?.created_at || Date.now()).toLocaleDateString('es-ES');
       const fileName = `Estadisticas_Golf_${dateStr.replace(/\//g, '-')}.png`;
@@ -624,29 +677,29 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     <>
           {/* TABLA COMPLETA */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-500 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-500 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">Detalle contra Par</h3>
+            <h3 className="statistics-table-title text-2xl font-black mb-6">Detalle contra Par</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-3">Jugador</th>
-                    <th className="text-center text-white font-bold p-3">Puntos</th>
-                    <th className="text-center text-white font-bold p-3">vs Par</th>
-                    <th className="text-center text-white font-bold p-3">Eagles+</th>
-                    <th className="text-center text-white font-bold p-3">Birdies</th>
-                    <th className="text-center text-white font-bold p-3">Pares</th>
-                    <th className="text-center text-white font-bold p-3">Bogeys</th>
-                    <th className="text-center text-white font-bold p-3">Doble+</th>
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-3">Jugador</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Puntos</th>
+                    <th className="statistics-table-text text-center font-bold p-3">vs Par</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Eagles+</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Birdies</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Pares</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Bogeys</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Doble+</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...highlights].sort((a, b) => b.totalPoints - a.totalPoints).map((h, index) => (
-                    <tr key={h.playerId} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                      <td className="text-white font-semibold p-3">
+                    <tr key={h.playerId} className="statistics-table-line statistics-table-row border-b transition-colors">
+                      <td className="statistics-table-text font-semibold p-3">
                         <div className="flex items-center gap-2">
                           <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
                             index === 0 ? 'bg-yellow-400 text-yellow-900' :
@@ -659,19 +712,19 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           {h.playerName}
                         </div>
                       </td>
-                      <td className="text-center text-emerald-300 font-bold p-3 text-lg">{h.totalPoints}</td>
+                      <td className="statistics-table-accent text-center font-bold p-3 text-lg">{h.totalPoints}</td>
                       <td className={`text-center font-bold p-3 text-lg ${
-                        h.scoreToPar.value === 0 ? 'text-white' :
-                        h.scoreToPar.value < 0 ? 'text-green-300' :
-                        'text-red-300'
+                        h.scoreToPar.value === 0 ? 'statistics-table-text' :
+                        h.scoreToPar.value < 0 ? 'statistics-table-positive' :
+                        'statistics-table-negative'
                       }`}>
                         {h.scoreToPar.display}
                       </td>
-                      <td className="text-center text-white p-3">{h.eagles}</td>
-                      <td className="text-center text-white p-3">{h.birdies}</td>
-                      <td className="text-center text-white p-3">{h.pares}</td>
-                      <td className="text-center text-white p-3">{h.bogeys}</td>
-                      <td className="text-center text-white p-3">{h.doubleBogeyPlus}</td>
+                      <td className="statistics-table-text text-center p-3">{h.eagles}</td>
+                      <td className="statistics-table-text text-center p-3">{h.birdies}</td>
+                      <td className="statistics-table-text text-center p-3">{h.pares}</td>
+                      <td className="statistics-table-text text-center p-3">{h.bogeys}</td>
+                      <td className="statistics-table-text text-center p-3">{h.doubleBogeyPlus}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -681,11 +734,11 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
           {/* PUNTOS POR HOYO */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-700 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-700 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">
+            <h3 className="statistics-table-title text-2xl font-black mb-6">
               {isMatchMode ? 'Puntos por Hoyo (Match)' :
                isSindicatoMode ? 'Puntos por Hoyo (Sindicato)' :
                isParejasMode ? 'Puntos por Hoyo (Parejas)' :
@@ -694,23 +747,23 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-2">
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-2">
                       {isParejasMode ? 'Pareja' : 'Jugador'}
                     </th>
                     {holes.map((hole: any) => (
-                      <th key={hole.hole_number} className="text-center text-white font-bold p-2 min-w-[40px]">
+                      <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
                     ))}
-                    <th className="text-center text-white font-bold p-2 bg-emerald-900/50">Total</th>
+                    <th className="statistics-table-text statistics-table-total text-center font-bold p-2">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {holeTableRows.map((row) => {
                     return (
-                      <tr key={row.key} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="text-white font-semibold p-2">
+                      <tr key={row.key} className="statistics-table-line statistics-table-row border-b transition-colors">
+                        <td className="statistics-table-text font-semibold p-2">
                           <span className="flex items-center gap-2">
                             <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
                               row.rank === 0 ? 'bg-yellow-400 text-yellow-900' :
@@ -732,7 +785,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                           if (isAbandoned) {
                             return (
-                              <td key={hole.hole_number} className="text-center p-2 font-bold text-white">
+                              <td key={hole.hole_number} className="statistics-table-text text-center p-2 font-bold">
                                 0
                               </td>
                             );
@@ -741,22 +794,22 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           return (
                             <td key={hole.hole_number} className={`text-center p-2 font-bold ${
                               isMatchMode || isSindicatoMode || isParejasMode ? (
-                                points > 0 ? 'text-emerald-300' :
-                                points === 0 ? 'text-red-300' :
-                                'text-white'
+                                points > 0 ? 'statistics-table-accent' :
+                                points === 0 ? 'statistics-table-negative' :
+                                'statistics-table-text'
                               ) : (
-                                points >= 4 ? 'text-green-300' :
-                                points === 3 ? 'text-emerald-300' :
-                                points === 2 ? 'text-white' :
-                                points === 1 ? 'text-orange-300' :
-                                'text-red-300'
+                                points >= 4 ? 'statistics-table-positive' :
+                                points === 3 ? 'statistics-table-accent' :
+                                points === 2 ? 'statistics-table-text' :
+                                points === 1 ? 'statistics-table-warning' :
+                                'statistics-table-negative'
                               )
                             }`}>
                               {points}
                             </td>
                           );
                         })}
-                        <td className="text-center text-emerald-300 font-black p-2 text-lg bg-emerald-900/50">
+                        <td className="statistics-table-accent statistics-table-total text-center font-black p-2 text-lg">
                           {row.totalPoints}
                         </td>
                       </tr>
@@ -769,22 +822,22 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
           {/* TABLA DE GOLPES */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-600 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-600 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">Tabla de Golpes</h3>
+            <h3 className="statistics-table-title text-2xl font-black mb-6">Tabla de Golpes</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-2">Jugador</th>
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-2">Jugador</th>
                     {holes.map((hole: any) => (
-                      <th key={hole.hole_number} className="text-center text-white font-bold p-2 min-w-[40px]">
+                      <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
                     ))}
-                    <th className="text-center text-white font-bold p-2 bg-emerald-900/50">Total</th>
+                    <th className="statistics-table-text statistics-table-total text-center font-bold p-2">Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -796,8 +849,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     }, 0);
 
                     return (
-                      <tr key={entry.player.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="text-white font-semibold p-2">
+                      <tr key={entry.player.id} className="statistics-table-line statistics-table-row border-b transition-colors">
+                        <td className="statistics-table-text font-semibold p-2">
                           <div className="flex items-center gap-2">
                             <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
                               index === 0 ? 'bg-yellow-400 text-yellow-900' :
@@ -814,12 +867,12 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           const score = playerScores.find((s: any) => s.hole_number === hole.hole_number);
                           const value = getEffectiveGrossStrokes(score, hole);
                           return (
-                            <td key={hole.hole_number} className="text-center text-white p-2 font-bold">
+                            <td key={hole.hole_number} className="statistics-table-text text-center p-2 font-bold">
                               {value}
                             </td>
                           );
                         })}
-                        <td className="text-center text-emerald-300 font-black p-2 text-lg bg-emerald-900/50">{totalGross}</td>
+                        <td className="statistics-table-accent statistics-table-total text-center font-black p-2 text-lg">{totalGross}</td>
                       </tr>
                     );
                   })}
@@ -831,11 +884,11 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           {/* PREMIOS ESPECIALES */}
           {(awards.reyDelBosque || awards.noPasoRojas || awards.holeInOne || awards.hoyoMuerte || awards.hoyoGloria) && (
             <div
-              className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl transition-all duration-1000 ${
+              className={`statistics-panel backdrop-blur-md rounded-2xl p-6 transition-all duration-1000 ${
                 exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              <h3 className="text-2xl font-black text-white mb-6">Premios Especiales</h3>
+              <h3 className="statistics-table-title text-2xl font-black mb-6">Premios Especiales</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={exporting ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
                 {awards.reyDelBosque && (
                   <div className="bg-gradient-to-br from-rose-500/20 to-rose-600/20 border-2 border-rose-400 rounded-xl p-4">
@@ -843,7 +896,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <TrendingDown size={20} className="text-rose-400" />
                       <p className="text-rose-300 font-bold text-sm">Rey del Bosque</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.reyDelBosque.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.reyDelBosque.player.name}</p>
                     <p className="text-rose-300 text-sm">Mayor número de dobles bogeys o peor</p>
                   </div>
                 )}
@@ -854,7 +907,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Flag size={20} className="text-amber-400" />
                       <p className="text-amber-300 font-bold text-sm">No Pasó Rojas</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.noPasoRojas.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.noPasoRojas.player.name}</p>
                     <p className="text-amber-300 text-sm">Premio a la salida más corta</p>
                   </div>
                 )}
@@ -865,7 +918,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Zap size={20} className="text-yellow-400" />
                       <p className="text-yellow-300 font-bold text-sm">Hole in One</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.holeInOne.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.holeInOne.player.name}</p>
                     <p className="text-yellow-300 text-sm">¡Hoyo en uno increíble!</p>
                   </div>
                 )}
