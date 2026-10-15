@@ -28,7 +28,7 @@ interface RoundSetupProps {
   isGroupCreator?: boolean;
   hasLimitedAccess?: boolean;
   planType?: 'express' | 'player' | 'team' | 'premium';
-  onShowPlans?: (context?: 'express-limit') => void;
+  onShowPlans?: (context?: 'express-limit' | 'express-modes') => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -51,7 +51,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const isExpress = planType === 'express';
   const handleGameModeClick = (mode: GameMode) => {
     if (isExpress && mode !== 'stableford') {
-      setShowUpgradeModal(true);
+      if (onShowPlans) onShowPlans('express-modes');
+      else setShowUpgradeModal(true);
       return;
     }
     setGameMode(mode);
@@ -328,21 +329,15 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             <h1 className="text-4xl md:text-5xl font-bold text-title">
               {currentGroup?.group_code === 'DIVEND'
                 ? 'Partideta dels divendres'
-                : (currentGroup?.name || 'OmkiGolf')}
+                : currentGroup?.name || (
+                  <img src="/images/omiki-badge.png" alt="Omiki Golf" width={550} height={192} decoding="async" className="h-16 w-auto md:h-20" />
+                )}
             </h1>
           </div>
-          <p className="text-accent-ink text-lg">
-            {currentGroup ? t('roundSetup.manager') : t('roundSetup.quick')}
-          </p>
+          {currentGroup && (
+            <p className="text-accent-ink text-lg">{t('roundSetup.manager')}</p>
+          )}
         </div>
-
-        {/* Express tiene cupo; Player y Team muestran solo el total. */}
-        {!currentGroup && quickPlayRoundsCount !== null && !isExpress && (
-          <div className="bg-card border border-line rounded-xl p-4 text-ink-2 flex items-center gap-3 shadow-card">
-            <Info className="text-accent-ink flex-shrink-0" size={24} />
-            <p className="text-sm">{t('roundSetup.played', { count: quickPlayRoundsCount })}</p>
-          </div>
-        )}
 
         {/* Código de Grupo */}
         {currentGroup && !hasLimitedAccess && (

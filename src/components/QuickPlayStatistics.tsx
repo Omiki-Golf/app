@@ -341,6 +341,83 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       let blob: Blob | null = null;
       let lastCaptureError: unknown = null;
 
+      const prepareClonedExport = (clonedDocument: Document) => {
+        const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
+        const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
+
+        if (clonedWrapper) {
+          clonedWrapper.style.position = 'absolute';
+          clonedWrapper.style.inset = '0 auto auto 0';
+          clonedWrapper.style.width = `${exportWidth}px`;
+          clonedWrapper.style.height = `${exportHeight}px`;
+          clonedWrapper.style.overflow = 'visible';
+        }
+
+        if (clonedExport) {
+          clonedExport.style.width = `${exportWidth}px`;
+          clonedExport.style.height = 'auto';
+          clonedExport.style.maxWidth = 'none';
+          clonedExport.style.overflow = 'visible';
+
+          let ancestor = clonedExport.parentElement;
+          while (ancestor) {
+            ancestor.style.overflow = 'visible';
+            ancestor.style.maxHeight = 'none';
+            ancestor = ancestor.parentElement;
+          }
+
+          clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
+            element.style.animation = 'none';
+            element.style.transition = 'none';
+            if (
+              element.classList.contains('overflow-x-auto') ||
+              element.classList.contains('overflow-hidden')
+            ) {
+              element.style.overflow = 'visible';
+            }
+            if (element.classList.contains('sticky')) {
+              element.style.position = 'static';
+            }
+          });
+        }
+      };
+
+      const captureStatistics = (scale: number) => html2canvas(exportElement, {
+        scale,
+        useCORS: true,
+        backgroundColor: '#0f172a',
+        logging: false,
+        scrollX: 0,
+        scrollY: 0,
+        width: exportWidth,
+        height: exportHeight,
+        windowWidth: exportWidth,
+        windowHeight: exportHeight,
+        onclone: prepareClonedExport,
+      });
+
+      // Algunos navegadores móviles devuelven incompleta la primera captura aunque
+      // el canvas tenga dimensiones válidas. La generamos y descartamos para que la
+      // captura que recibe el usuario se haga con fuentes y estilos ya renderizados.
+      try {
+        await waitForNextPaint();
+        const warmupScale = Math.max(0.35, Math.min(
+          0.5,
+          maxCanvasSide / exportWidth,
+          maxCanvasSide / exportHeight,
+          Math.sqrt(2_000_000 / (exportWidth * exportHeight))
+        ));
+        const warmupCanvas = await captureStatistics(warmupScale);
+        await canvasToPngBlob(warmupCanvas);
+        warmupCanvas.width = 1;
+        warmupCanvas.height = 1;
+      } catch (warmupError) {
+        console.warn('La captura de preparación de estadísticas no se completó:', warmupError);
+      }
+
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+      await waitForNextPaint();
+
       for (const maxCanvasPixels of scaleLimits) {
         try {
           const scale = Math.max(0.5, Math.min(
@@ -351,64 +428,17 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           ));
 
           await waitForNextPaint();
-          const canvas = await html2canvas(exportElement, {
-            scale,
-            useCORS: true,
-            backgroundColor: '#0f172a',
-            logging: false,
-            scrollX: 0,
-            scrollY: 0,
-            width: exportWidth,
-            height: exportHeight,
-            windowWidth: exportWidth,
-            windowHeight: exportHeight,
-            onclone: (clonedDocument) => {
-              const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
-              const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
-
-              if (clonedWrapper) {
-                clonedWrapper.style.position = 'absolute';
-                clonedWrapper.style.inset = '0 auto auto 0';
-                clonedWrapper.style.width = `${exportWidth}px`;
-                clonedWrapper.style.height = `${exportHeight}px`;
-                clonedWrapper.style.overflow = 'visible';
-              }
-
-              if (clonedExport) {
-                clonedExport.style.width = `${exportWidth}px`;
-                clonedExport.style.height = 'auto';
-                clonedExport.style.maxWidth = 'none';
-                clonedExport.style.overflow = 'visible';
-
-                let ancestor = clonedExport.parentElement;
-                while (ancestor) {
-                  ancestor.style.overflow = 'visible';
-                  ancestor.style.maxHeight = 'none';
-                  ancestor = ancestor.parentElement;
-                }
-
-                clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
-                  element.style.animation = 'none';
-                  element.style.transition = 'none';
-                  if (
-                    element.classList.contains('overflow-x-auto') ||
-                    element.classList.contains('overflow-hidden')
-                  ) {
-                    element.style.overflow = 'visible';
-                  }
-                  if (element.classList.contains('sticky')) {
-                    element.style.position = 'static';
-                  }
-                });
-              }
-            },
-          });
+          const canvas = await captureStatistics(scale);
 
           if (canvas.width < 600 || canvas.height < 600) {
             throw new Error('La captura devuelta por el navegador está incompleta.');
           }
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
           const candidate = await canvasToPngBlob(canvas);
-          await validatePngBlob(candidate, canvas.width, canvas.height);
+          canvas.width = 1;
+          canvas.height = 1;
+          await validatePngBlob(candidate, canvasWidth, canvasHeight);
           blob = candidate;
           break;
         } catch (captureError) {

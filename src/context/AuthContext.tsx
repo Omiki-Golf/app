@@ -3,7 +3,7 @@ import { effectivePlan } from '../utils/effectivePlan';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabaseClient';
-import { setAuthenticatedUserId } from '../utils/userId';
+import { getDeviceUserId, setAuthenticatedUserId } from '../utils/userId';
 
 export interface UserSubscription {
   planType: string;
@@ -29,6 +29,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [subscription, setSubscription] = useState<UserSubscription | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const claimedForUser = useRef<string | null>(null);
+  // Las partidas Express creadas en este dispositivo pasan a la cuenta al iniciar sesión.
+  const claimDeviceRoundsOnce = async (userId: string) => {
+    const deviceId = getDeviceUserId();
+    if (!deviceId || claimedForUser.current === userId) return;
+    claimedForUser.current = userId;
+    try {
+      const { userService } = await import('../services/userService');
+      await userService.claimDeviceRounds(deviceId);
+    } catch (error) {
+      // Si la migración aún no está aplicada o falla la red, se reintentará en el próximo inicio de sesión.
+      claimedForUser.current = null;
+      console.warn('No se han podido recuperar las partidas Express de este dispositivo:', error);
+    }
+  };
 
   const fetchSubscription = async (userId: string) => {
     const request = ++requestVersion.current;
@@ -84,6 +100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // queries (including the golf-course list). Run it after the callback.
           window.setTimeout(() => {
             void fetchSubscription(currentSession.user.id);
+            void claimDeviceRoundsOnce(currentSession.user.id);
           }, 0);
         } else {
           setSubscription(null);

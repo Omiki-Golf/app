@@ -19,6 +19,12 @@ export function registrationError(fields: { nick: string; email: string; passwor
   if (!fields.acceptedTerms) return 'Debes aceptar los términos y la política de privacidad.';
   return null;
 }
+// Con la protección contra enumeración de correos, Supabase no da error si el correo ya existe:
+// devuelve un usuario sin identidades y no envía ningún correo.
+export function isExistingAccountSignup(user: { identities?: unknown[] | null } | null | undefined, error?: { message?: string } | null): boolean {
+  if (error?.message?.toLowerCase().includes('already registered')) return true;
+  return !!user && Array.isArray(user.identities) && user.identities.length === 0;
+}
 export function playerSignupMetadata(intent: PlayerIntent, fields: { nick: string; displayName: string; avatarUrl: string; handicap: string; country: string; postalCode: string; age: string }) {
   return {
     registration_pending: true, player_checkout: intent,

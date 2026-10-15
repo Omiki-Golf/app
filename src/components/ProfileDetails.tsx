@@ -1,5 +1,6 @@
 import { WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
 import React, { useEffect, useState } from 'react';
 import { Check, CheckCircle2, Copy, Loader2, Save, User, X } from 'lucide-react';
 import { UserProfile } from '../types';
@@ -13,6 +14,7 @@ interface ProfileDetailsProps {
   email?: string;
   onBack: () => void;
   onSaved: () => Promise<void> | void;
+  messagesButton?: React.ReactNode;
 }
 
 export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
@@ -21,6 +23,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   email,
   onBack,
   onSaved,
+  messagesButton,
 }) => {
   const { t } = useTranslation();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
@@ -33,6 +36,10 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [supportIdCopied, setSupportIdCopied] = useState(false);
+  const [handicap, setHandicap] = useState(profile?.exact_handicap?.toString() ?? '');
+  const [country, setCountry] = useState(profile?.country ?? '');
+  const [postalCode, setPostalCode] = useState(profile?.postal_code ?? '');
+  const [age, setAge] = useState(profile?.age?.toString() ?? '');
 
   const copySupportId = async () => {
     try {
@@ -56,6 +63,10 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setNick(profile?.nick ?? '');
     setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url ?? DEFAULT_AVATAR_URL));
     setShowSelectedAvatar(Boolean(profile?.avatar_url));
+    setHandicap(profile?.exact_handicap?.toString() ?? '');
+    setCountry(profile?.country ?? '');
+    setPostalCode(profile?.postal_code ?? '');
+    setAge(profile?.age?.toString() ?? '');
   }, [profile]);
 
   const checkNick = async () => {
@@ -97,7 +108,15 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!displayName.trim()) return;
+    if (!profile && !displayName.trim()) return;
+    if (handicap.trim() && !Number.isFinite(Number(handicap))) {
+      setError('Introduce un hándicap válido.');
+      return;
+    }
+    if (age.trim() && (!Number.isInteger(Number(age)) || Number(age) < 14)) {
+      setError('La edad debe ser un número entero de al menos 14 años.');
+      return;
+    }
     if (!profile && !(await checkNick())) {
       setError(t('auth.errors.nick'));
       return;
@@ -109,8 +128,13 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     try {
       if (profile) {
         await userService.updateProfile(profile.user_id, {
-          display_name: displayName.trim(),
+          // null (no undefined) para que vaciar un campo lo borre de verdad en la base de datos.
+          display_name: displayName.trim() || null,
           avatar_url: avatarUrl,
+          exact_handicap: handicap.trim() ? Number(handicap) : 0,
+          country: country.trim() || null,
+          postal_code: postalCode.trim() || null,
+          age: age.trim() ? Number(age) : null,
         });
       } else {
         await userService.createProfile({
@@ -136,10 +160,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   return (
     <div className="min-h-screen bg-app transition-colors">
       <main className="max-w-lg mx-auto px-4 py-6">
-        <NavigationButton destination="back"
-          onClick={onBack}
-          className="flex items-center gap-2 text-ink-3 hover:text-ink mb-6"
-        />
+        <TopBar left={<NavigationButton destination="back" onClick={onBack} />} center={messagesButton} />
 
         <section className="bg-card rounded-2xl shadow-card p-6">
           <div className="text-center mb-7">
@@ -236,11 +257,73 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                     setDisplayName(event.target.value);
                     setSaved(false);
                   }}
-                  required
+                  required={!profile}
                   maxLength={60}
                   className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
               </div>
+
+              {profile && (
+                <>
+                  <div>
+                    <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">Hándicap exacto</label>
+                    <input
+                      id="profile-handicap"
+                      type="number"
+                      step="0.1"
+                      inputMode="decimal"
+                      value={handicap}
+                      onChange={(event) => { setHandicap(event.target.value); setSaved(false); }}
+                      placeholder="Ej: 12.4"
+                      className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div>
+                      <label htmlFor="profile-country" className="block text-sm font-medium text-ink-2 mb-2">País</label>
+                      <input
+                        id="profile-country"
+                        value={country}
+                        onChange={(event) => { setCountry(event.target.value); setSaved(false); }}
+                        maxLength={60}
+                        className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="profile-postal-code" className="block text-sm font-medium text-ink-2 mb-2">Código postal</label>
+                      <input
+                        id="profile-postal-code"
+                        value={postalCode}
+                        onChange={(event) => { setPostalCode(event.target.value); setSaved(false); }}
+                        maxLength={12}
+                        autoComplete="postal-code"
+                        className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="profile-age" className="block text-sm font-medium text-ink-2 mb-2">Edad</label>
+                      <input
+                        id="profile-age"
+                        type="number"
+                        min={14}
+                        step={1}
+                        inputMode="numeric"
+                        value={age}
+                        onChange={(event) => { setAge(event.target.value); setSaved(false); }}
+                        className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="flex items-center gap-2 text-sm text-ink-3">
+                    {profile.accepted_terms ? <CheckCircle2 size={16} className="text-accent-ink" /> : <X size={16} className="text-red-500" />}
+                    {profile.accepted_terms
+                      ? 'Términos y política de privacidad aceptados. Mayor de 14 años confirmado.'
+                      : 'Términos y política de privacidad pendientes de aceptar.'}
+                  </p>
+                </>
+              )}
 
               <fieldset>
                 <legend className="block text-sm font-medium text-ink-2 mb-3">{t('auth.avatar')}</legend>
@@ -275,7 +358,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
               <button
                 type="submit"
-                disabled={saving || !displayName.trim() || (!profile && !nick.trim())}
+                disabled={saving || (!profile && (!displayName.trim() || !nick.trim()))}
                 className="w-full flex items-center justify-center gap-2 bg-accent text-on-accent px-6 py-3 rounded-xl hover:bg-accent-hover font-semibold disabled:opacity-50"
               >
                 {saving ? <Loader2 size={19} className="animate-spin" /> : <Save size={19} />}

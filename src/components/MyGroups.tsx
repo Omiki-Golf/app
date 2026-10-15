@@ -1,5 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
 import React, { useEffect, useState } from 'react';
 import { Users, Copy, Check, Trash2, Crown } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -13,7 +14,7 @@ interface MyGroupsProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   onGroupSelected: (group: Group) => void;
-  onLogout: () => void;
+  messagesButton?: React.ReactNode;
 }
 
 interface GroupWithCode {
@@ -25,7 +26,7 @@ interface GroupWithCode {
   user_auth_id?: string;
 }
 
-export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onLogout }: MyGroupsProps) {
+export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, messagesButton }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
   const [groups, setGroups] = useState<GroupWithCode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -119,11 +120,6 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
     onGroupSelected(group);
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: 'local' });
-    onLogout();
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-app p-4 flex items-center justify-center">
@@ -139,14 +135,11 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
     <div className="min-h-screen bg-app p-4">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-2xl shadow-card p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <NavigationButton destination={backDestination}
-              onClick={onBack}
-              className="flex items-center gap-2 text-ink-3 hover:text-ink transition-colors"
-            />
-
-            {/* ─── ICONOS SUPERIOR DERECHA ─── */}
-            <div className="flex items-center gap-2">
+          <TopBar
+            className="mb-4"
+            left={<NavigationButton destination={backDestination} onClick={onBack} />}
+            center={messagesButton}
+            right={<>
               {/* Icono Premium (solo si NO es premium y terminó de cargar) */}
               {!subLoading && !isPremium && (
                 <button
@@ -170,13 +163,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   <Crown size={18} className="text-accent-ink" />
                 </div>
               )}
-
-              <NavigationButton destination="logout"
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-red-600 hover:text-red-700 transition-colors text-sm font-medium"
-              />
-            </div>
-          </div>
+            </>}
+          />
 
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-3">
@@ -194,11 +182,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
           {groups.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-ink-3 mb-4">{t('groups.empty')}</p>
-              <NavigationButton destination={backDestination}
-                onClick={onBack}
-                className="text-accent-ink hover:text-accent-ink font-medium"
-              />
+              <p className="text-ink-3">{t('groups.empty')}</p>
             </div>
           ) : (
             <div className="space-y-3">

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { checkoutIntent, prices, allowedOrigin, subscriptionStatus } from '../supabase/functions/_shared/stripe-domain.ts';
-import { planCatalog, annualPlanPrice } from '../src/data/planCatalog.ts';
+import { planCatalog } from '../src/data/planCatalog.ts';
 import { serverKeys, isServerRequest } from '../supabase/functions/_shared/server-credentials.ts';
 test('Stripe setup accepts only a provisioned server secret on apikey',()=>{
  const secret='sb_secret_test_server_credential';
@@ -20,9 +20,10 @@ test('Stripe setup accepts only a provisioned server secret on apikey',()=>{
 const uid='00000000-0000-4000-8000-000000000001';
 const intent='00000000-0000-4000-8000-000000000002';
 test('Stripe server catalog matches displayed totals; malformed intents and origins are rejected',()=>{
- for(const plan of planCatalog.filter(p=>p.id!=='express')) {
+ // Weekend es un pago único todavía sin precio en Stripe.
+ for(const plan of planCatalog.filter(p=>p.id!=='express' && p.id!=='weekend')) {
   assert.equal(prices[plan.id].monthly,Math.round(plan.monthly*100));
-  assert.equal(prices[plan.id].annual,Math.round(annualPlanPrice(plan.monthly)*100));
+  assert.equal(prices[plan.id].annual,Math.round(plan.annual*100));
  }
  for(const patch of [{plan:'__proto__'},{period:'weekly'},{id:'not-a-uuid'}]) assert.throws(()=>checkoutIntent({player_checkout:{id:intent,period:'monthly',...patch}}));
  assert.equal(checkoutIntent({player_checkout:{id:intent,period:'monthly'}}).plan,'player');

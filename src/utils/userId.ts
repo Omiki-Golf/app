@@ -15,6 +15,12 @@ export const setAuthenticatedUserId = (userId: string | null): void => {
   }
 };
 
+/** Identificador Express de este dispositivo, si existe. No lo crea. */
+export const getDeviceUserId = (): string | null => {
+  const deviceId = safeStorage.getItem(ANONYMOUS_USER_KEY);
+  return deviceId && deviceId.startsWith('anon_') ? deviceId : null;
+};
+
 export const getUserId = (): string => {
   if (authenticatedUserId) return authenticatedUserId;
   try {

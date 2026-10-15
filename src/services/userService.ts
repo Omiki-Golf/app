@@ -90,6 +90,13 @@ export const userService = {
     return effectivePlan(data);
   },
 
+  /** Pasa a la cuenta las partidas rápidas creadas en este dispositivo como Express. */
+  async claimDeviceRounds(deviceId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('claim_device_rounds', { p_device_id: deviceId });
+    if (error) throw error;
+    return typeof data === 'number' ? data : 0;
+  },
+
   async startTeamTrial(): Promise<string> {
     const { data, error } = await supabase.rpc('start_team_trial');
     if (error) throw new Error(error.message || 'No se ha podido activar la prueba Team.');

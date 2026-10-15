@@ -521,6 +521,45 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
   return data || [];
 },
+  /** Partidas rápidas finalizadas de la cuenta, con jugadores, golpes y campos, para "Mis estadísticas". */
+  async getCareerData(userId: string) {
+    const { data: rounds, error: roundsError } = await supabase
+      .from('golf_rounds')
+      .select('id, created_at, game_mode, num_holes, course_id, decided_result')
+      .eq('user_id', userId)
+      .in('status', ['completed', 'archived'])
+      .is('group_id', null)
+      .is('admin_withdrawn_at', null)
+      .order('created_at', { ascending: false });
+    if (roundsError) throw roundsError;
+    const roundList = rounds ?? [];
+    if (roundList.length === 0) return { rounds: [], players: [], scores: [], courseNames: {} as Record<string, string> };
+
+    // Por lotes, para no superar la longitud máxima de la URL con muchas partidas.
+    const inChunks = async <T,>(table: string, columns: string, column: string, ids: string[]): Promise<T[]> => {
+      const rows: T[] = [];
+      for (let start = 0; start < ids.length; start += 100) {
+        const { data, error } = await supabase.from(table).select(columns).in(column, ids.slice(start, start + 100));
+        if (error) throw error;
+        rows.push(...((data ?? []) as T[]));
+      }
+      return rows;
+    };
+    const roundIds = roundList.map(round => round.id);
+    const courseIds = [...new Set(roundList.map(round => round.course_id))];
+    const [players, scores, courses] = await Promise.all([
+      inChunks<import('../utils/careerStats').CareerPlayer>('round_players', 'id, round_id, user_id, name, playing_handicap, created_at', 'round_id', roundIds),
+      inChunks<import('../utils/careerStats').CareerScore>('round_scores', 'round_id, player_id, gross_strokes, stableford_points, mode_points, no_paso_rojas, spanish_hands, abandoned', 'round_id', roundIds),
+      inChunks<{ id: string; name: string }>('golf_courses', 'id, name', 'id', courseIds),
+    ]);
+    return {
+      rounds: roundList as import('../utils/careerStats').CareerRound[],
+      players,
+      scores,
+      courseNames: Object.fromEntries(courses.map(course => [course.id, course.name])) as Record<string, string>,
+    };
+  },
+
   async archiveQuickPlayRound(roundId: string): Promise<void> {
   const { data, error } = await supabase
     .from('golf_rounds')
@@ -1181,7 +1220,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     name: string,
     exactHandicap: number,
     useSlope: boolean,
-    playerId?: string
+    playerId?: string,
+    accountUserId?: string
   ): Promise<RoundPlayer> {
     const { data: round, error: roundError } = await supabase
       .from('golf_rounds')
@@ -1213,6 +1253,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         {
           round_id: roundId,
           player_id: playerId || null,
+          // Vincula al jugador con la cuenta que juega (estadísticas acumuladas).
+          user_id: accountUserId || null,
           name,
           exact_handicap: exactHandicap,
           exact_handicap_18: exactHandicap,
@@ -2961,7 +3003,9 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
           winnerPoints: winner?.totalPoints || 0,
           loserPoints: loser?.totalPoints || 0,
           margin: decidedResult?.margin ?? margin,
-          displayText: decidedResult?.display_text || null,
+          displayText: decidedResult && decidedResult.holes_remaining > 0
+            ? decidedResult.display_text
+            : (margin > 0 ? `${margin} UP` : null),
         },
         awards: baseAwards,
       };
@@ -3019,7 +3063,9 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
           winningTeam: isTie ? null : teamRanking[0],
           losingTeam: isTie ? null : teamRanking[1],
           margin: decidedResult?.margin ?? (isTie ? 0 : margin),
-          displayText: decidedResult?.display_text || null,
+          displayText: decidedResult && decidedResult.holes_remaining > 0
+            ? decidedResult.display_text
+            : (!isTie && margin > 0 ? `${margin} UP` : null),
         },
         awards: baseAwards,
       };

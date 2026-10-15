@@ -60,13 +60,13 @@ export interface UserProfile {
   id: string;
   user_id: string;
   nick: string;
-  display_name?: string;
+  display_name?: string | null;
   avatar_url?: string;
   exact_handicap: number;
   default_tee: string;
-  country?: string;
-  postal_code?: string;
-  age?: number;
+  country?: string | null;
+  postal_code?: string | null;
+  age?: number | null;
   accepted_terms: boolean;
   created_at: string;
   updated_at: string;

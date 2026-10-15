@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { intentPlan } from '../utils/playerRegistration';
 import { CheckCircle2, FlaskConical } from 'lucide-react';
 import { playerCheckoutService } from '../services/playerCheckoutService';
-import { annualPlanPrice, planCatalog } from '../data/planCatalog';
+import { planCatalog, planPrice } from '../data/planCatalog';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -41,9 +41,8 @@ export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, 
     finally { working.current = false; if (mounted.current) setBusy(false); }
   };
   const plan = planCatalog.find(plan => plan.id === (state ? intentPlan(state.intent) : 'player'))!;
-  const price = plan.monthly;
   const annual = state?.intent.period === 'annual';
-  const amount = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(annual ? annualPlanPrice(price) : price);
+  const amount = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(planPrice(plan, annual));
   return <main className="min-h-screen bg-app px-4 py-6">
     <div className="mx-auto max-w-md">
       <div className="mb-6 flex items-center justify-between"><NavigationButton destination="home" onClick={onBack} /><ThemeToggle /></div>

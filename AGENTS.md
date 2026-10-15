@@ -1,6 +1,6 @@
 # Entorno de trabajo
 
-- Entorno principal: ordenador local Windows, proyecto `C:\Users\VORPC\OneDrive\Escritorio\Fede\00-LaPartideta_Test\project`. La terminal es PowerShell.
+- Entorno principal: ordenador local Windows, proyecto `C:\Users\user\Desktop\Trabajo\La Partideta KF\project`. La terminal es PowerShell.
 - Guía principal: `LOCAL_SETUP.md`. Codespaces es una alternativa; consultar `CODESPACE_SETUP.md` si se trabaja allí.
 - Usar Node.js 24, instalar las dependencias fijadas con `npm ci` y arrancar con `npm run dev` (normalmente `http://localhost:5173`). En Codespaces usar `npm run dev:codespace`.
 - Las variables públicas de la web están en `.env.local`, excluido de Git. Mantener credenciales, claves SSH y copias de seguridad fuera del repositorio.

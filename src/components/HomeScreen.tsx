@@ -67,7 +67,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </button>
 
             {!isAuthenticated && <ThemeToggle />}
-            {isAuthenticated && <LanguageSwitcher />}
           </div>
 
           <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">

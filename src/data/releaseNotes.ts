@@ -13,9 +13,29 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.5';
+export const APP_VERSION = '1.6.0';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.6.0',
+    date: '2026-10-15',
+    title: 'Mis estadísticas, nuevos planes y resultados finales',
+    summary: 'Estadísticas acumuladas para jugadores registrados, planes actualizados con Omiki Weekend y una tarjeta más clara de principio a fin.',
+    changes: [
+      { type: 'new', text: 'Mis estadísticas reúne los resultados acumulados de todas tus partidas: victorias, Stableford medio, mejor partida, campos y modalidades.' },
+      { type: 'new', text: 'Al registrarte, las partidas rápidas creadas en tu dispositivo como Express pasan a tu cuenta.' },
+      { type: 'new', text: 'Botón «Añadirme a la partida» para vincular tu jugador con tu cuenta.' },
+      { type: 'new', text: 'Nuevo plan Omiki Weekend y precios mensuales y anuales iguales a los de la web.' },
+      { type: 'new', text: 'Los jugadores Player pueden elegir entre la prueba gratuita de 30 días de Team o suscribirse.' },
+      { type: 'new', text: 'Ventana de resultado final en Match, Sindicato y Parejas cuando la partida se decide en el último hoyo; el empate lo gana el hándicap más bajo.' },
+      { type: 'improved', text: 'Solo el creador puede finalizar la partida; el resto ve «Pendiente de finalizar» o «Finalizada».' },
+      { type: 'improved', text: 'En Parejas la clasificación muestra una sola ficha por pareja.' },
+      { type: 'improved', text: 'Cabeceras alineadas en la tarjeta, la clasificación y la ficha del jugador, con idioma y modo claro/oscuro en la ficha.' },
+      { type: 'improved', text: 'Mis datos de registro muestra y permite editar todos los datos pedidos al registrarse.' },
+      { type: 'improved', text: 'Icono de la app para instalarla o crear un acceso directo.' },
+      { type: 'fixed', text: 'Al registrarse con un correo ya existente se avisa y se ofrece recuperar la contraseña.' },
+    ],
+  },
   {
     version: '1.5.5',
     date: '2026-10-12',

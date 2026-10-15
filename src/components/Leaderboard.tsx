@@ -1,8 +1,9 @@
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, GameMode } from '../types';
-import { Trophy, Medal, Flame, Eye, RefreshCw } from 'lucide-react';
+import { Trophy, Medal, Eye, RefreshCw } from 'lucide-react';
 import { golfService } from '../services/golfService';
+import { ThemeToggle } from './ThemeToggle';
 
 interface LeaderboardProps {
   players: RoundPlayer[];
@@ -16,6 +17,7 @@ interface LeaderboardProps {
   backDestination?: 'back' | 'home';
   hasGroup?: boolean;
   gameMode?: GameMode;
+  messagesButton?: React.ReactNode;
 }
 
 interface RoundStats {
@@ -31,6 +33,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   onBack, backDestination = 'back',
   hasGroup = false,
   gameMode = 'stableford',
+  messagesButton,
 }) => {
   const isModeScoring = gameMode !== 'stableford';
   const [allActiveRounds, setAllActiveRounds] = useState<RoundStats[]>([]);
@@ -103,6 +106,39 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     return b.holesCompleted - a.holesCompleted;
   });
 
+  // En Parejas ambos miembros suman los mismos puntos por hoyo: se muestra una sola ficha por pareja.
+  const isTeamView = gameMode === 'parejas' && players.length === 4;
+  const entries = isTeamView
+    ? [players.slice(0, 2), players.slice(2, 4)].map((members) => {
+        const memberStats = members.map((member) => playerStats.find((stat) => stat.player.id === member.id)!);
+        return {
+          key: members.map((member) => member.id).join('-'),
+          name: members.map((member) => member.name).join(' / '),
+          hasGuest: members.some((member) => member.is_guest),
+          handicapText: members.map((member) => member.playing_handicap).join(' + '),
+          handicap: members.reduce((sum, member) => sum + member.playing_handicap, 0),
+          totalPoints: memberStats[0].totalPoints,
+          holesCompleted: Math.min(...memberStats.map((stat) => stat.holesCompleted)),
+          badges: memberStats.flatMap((stat) => [
+            ...stat.noPasoRojasHoles.map((holeNumber) => ({ kind: 'red' as const, holeNumber, owner: stat.player.name as string | null })),
+            ...stat.spanishHandsHoles.map((holeNumber) => ({ kind: 'sh' as const, holeNumber, owner: stat.player.name as string | null })),
+          ]),
+        };
+      }).sort((a, b) => b.totalPoints - a.totalPoints || a.handicap - b.handicap)
+    : sorted.map((stat) => ({
+        key: stat.player.id,
+        name: stat.player.name,
+        hasGuest: !!stat.player.is_guest,
+        handicapText: String(stat.player.playing_handicap),
+        handicap: stat.player.playing_handicap,
+        totalPoints: stat.totalPoints,
+        holesCompleted: stat.holesCompleted,
+        badges: [
+          ...stat.noPasoRojasHoles.map((holeNumber) => ({ kind: 'red' as const, holeNumber, owner: null as string | null })),
+          ...stat.spanishHandsHoles.map((holeNumber) => ({ kind: 'sh' as const, holeNumber, owner: null as string | null })),
+        ],
+      }));
+
   const getMedalIcon = (position: number) => {
     if (position === 0) return <Trophy size={24} className="text-yellow-500" />;
     if (position === 1) return <Medal size={24} className="text-ink-4" />;
@@ -126,10 +162,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-lg shadow-card overflow-hidden">
           <div className="bg-accent-deep p-6 md:p-8">
-            <NavigationButton destination={backDestination}
-              onClick={onBack}
-              className="mb-4 px-3 bg-accent hover:bg-accent-hover text-on-accent font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors"
-            />
+            <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div className="flex items-center gap-2">
+                <NavigationButton destination={backDestination} onClick={onBack} />
+                <ThemeToggle className="!h-11 !w-11" />
+              </div>
+              <div className="flex justify-center">{messagesButton}</div>
+              <div />
+            </div>
             <div className="flex items-center gap-3 mb-2">
               <Trophy size={32} className="text-yellow-400" />
               <h1 className="text-3xl md:text-4xl font-bold text-white">
@@ -138,7 +178,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             </div>
             {!showAllRounds && (
               <p className="text-on-deep">
-                Hoyo {currentHole} - {sorted[0]?.player.name || 'En Juego'}
+                Hoyo {currentHole} - {entries[0]?.name || 'En Juego'}
               </p>
             )}
           </div>
@@ -175,9 +215,9 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             {!showAllRounds ? (
               <>
                 <div className="space-y-3">
-                  {sorted.map((stat, index) => (
+                  {entries.map((entry, index) => (
                     <div
-                      key={stat.player.id}
+                      key={entry.key}
                       className={`border-2 rounded-lg p-4 flex items-center gap-4 transition-all ${
                         index === 0
                           ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-400'
@@ -196,22 +236,20 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                             index === 0 ? 'text-title' : 'text-ink'
                           }`}
                         >
-                          {stat.player.name}{stat.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
+                          {entry.name}{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
                         </p>
                         <div className="flex gap-4 text-sm text-ink-3">
-                          <span>HCP: {stat.player.playing_handicap}</span>
-                          <span>Hoyos: {stat.holesCompleted}</span>
+                          <span>HCP: {entry.handicapText}</span>
+                          <span>Hoyos: {entry.holesCompleted}</span>
                         </div>
-                        {hasGroup && (stat.noPasoRojasHoles.length > 0 || stat.spanishHandsHoles.length > 0) && (
+                        {hasGroup && entry.badges.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {stat.noPasoRojasHoles.map(holeNumber => (
-                              <span key={`red-${holeNumber}`} className="bg-red-600 text-white text-[10px] font-bold rounded-full px-2 py-0.5">
-                                Rojas H{holeNumber}
-                              </span>
-                            ))}
-                            {stat.spanishHandsHoles.map(holeNumber => (
-                              <span key={`sh-${holeNumber}`} className="bg-accent text-on-accent text-[10px] font-bold rounded-full px-2 py-0.5">
-                                Spanish Hands H{holeNumber}
+                            {entry.badges.map(badge => (
+                              <span
+                                key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
+                                className={`${badge.kind === 'red' ? 'bg-red-600 text-white' : 'bg-accent text-on-accent'} text-[10px] font-bold rounded-full px-2 py-0.5`}
+                              >
+                                {badge.kind === 'red' ? 'Rojas' : 'Spanish Hands'} H{badge.holeNumber}{badge.owner ? ` · ${badge.owner}` : ''}
                               </span>
                             ))}
                           </div>
@@ -224,19 +262,17 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                             index === 0 ? 'text-yellow-600' : 'text-accent-ink'
                           }`}
                         >
-                          {stat.totalPoints}
+                          {entry.totalPoints}
                         </p>
                         <p className="text-xs text-ink-3">
-                          {isModeScoring ? 'Puntos Modal.' : 'Puntos Obtenidos'}
+                          {isModeScoring ? 'Puntos' : 'Puntos Obtenidos'}
                         </p>
                       </div>
-
-                      {index === 0 && <Flame size={24} className="text-orange-500 animate-pulse" />}
                     </div>
                   ))}
                 </div>
 
-                {sorted.length === 0 && (
+                {entries.length === 0 && (
                   <div className="text-center py-8">
                     <p className="text-ink-3 text-lg">No hay jugadores en la partida</p>
                   </div>

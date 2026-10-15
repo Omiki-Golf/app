@@ -13,7 +13,8 @@ Deno.serve(async req => {
     const catalog:Record<string,string>={};
     for (const [plan,periods] of Object.entries(prices)) {
       for (const [period,amount] of Object.entries(periods)) {
-        const lookup=`omiki_${plan}_${period}_v1`;
+        // Bump the version whenever an amount changes: Stripe prices are immutable.
+        const lookup=`omiki_${plan}_${period}_v2`;
         const existing=await stripe.prices.list({lookup_keys:[lookup],active:true,limit:1});
         const price=existing.data[0] ?? await stripe.prices.create({
           currency:'eur',unit_amount:amount,lookup_key:lookup,

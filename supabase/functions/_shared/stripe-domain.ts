@@ -1,8 +1,8 @@
 export const sandboxAccount = 'acct_1UIWPn3OErhJmu5v';
 export const prices = {
-  player: { monthly: 299, annual: 2899 },
-  team: { monthly: 599, annual: 5799 },
-  premium: { monthly: 799, annual: 7699 },
+  player: { monthly: 289, annual: 1999 },
+  team: { monthly: 589, annual: 3999 },
+  premium: { monthly: 789, annual: 4999 },
 } as const;
 export type Plan = keyof typeof prices;
 export type Period = 'monthly' | 'annual';

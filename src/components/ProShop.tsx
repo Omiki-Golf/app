@@ -1,14 +1,16 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
 import React, { useState } from 'react';
 import { Users, Palette, Plane, Check, Info} from 'lucide-react';
 import { PaymentSelector } from './PaymentSelector';
 
 interface ProShopProps {
-  groupId: string;
+  groupId: string | null;
   userId: string;
   onBack: () => void;
   onPurchaseComplete: () => void;
+  messagesButton?: React.ReactNode;
 }
 
 interface Product {
@@ -51,7 +53,7 @@ const products: Product[] = [
   },
 ];
 
-export const ProShop: React.FC<ProShopProps> = ({ groupId, userId, onBack, onPurchaseComplete }) => {
+export const ProShop: React.FC<ProShopProps> = ({ groupId, userId, onBack, onPurchaseComplete, messagesButton }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [purchased, setPurchased] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, userId, onBack, onPur
   };
 
   const handlePaymentSuccess = async () => {
-    if (!selectedProduct) return;
+    if (!selectedProduct || !groupId) return;
     setPurchased(selectedProduct.type);
     setShowPayment(false);
 
@@ -103,15 +105,18 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, userId, onBack, onPur
   return (
     <div className="min-h-screen bg-app transition-colors">
       <div className="max-w-lg mx-auto px-4 py-6">
-        <NavigationButton destination="back"
-          onClick={onBack}
-          className="flex items-center gap-2 text-ink-3 hover:text-ink mb-6"
-        />
+        <TopBar left={<NavigationButton destination="back" onClick={onBack} />} center={messagesButton} />
 
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-ink">Pro-Shop</h1>
           <p className="text-sm text-ink-3">Ampliaciones para tu Team</p>
         </div>
+
+        {!groupId && (
+          <div className="rounded-2xl border border-line bg-card p-5 text-center text-sm text-ink-3 shadow-card">
+            Abre uno de tus grupos para ver y contratar sus ampliaciones.
+          </div>
+        )}
 
         {purchased && (
           <div className="bg-accent-soft border border-accent-ring rounded-xl p-4 mb-5 text-center">
@@ -120,7 +125,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, userId, onBack, onPur
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className={`space-y-4 ${groupId ? '' : 'hidden'}`}>
           {products.map((product, i) => (
             <div key={i} className="bg-card rounded-2xl shadow-card p-5">
               <div className="flex items-start gap-4 mb-4">

@@ -11,6 +11,9 @@ import { golfService } from '../services/golfService';
 import { getStrokesReceived, calculateScoreToPar } from '../utils/calculations';
 import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
+import { ThemeToggle } from './ThemeToggle';
+import { FinalResultModal } from './FinalResultModal';
+import { calculateFinalResult, isDecidedBeforeLastHole, type FinalResult } from '../utils/finalResult';
 
 interface ScorecardProps {
   holes: GolfHole[];
@@ -28,6 +31,7 @@ interface ScorecardProps {
   hasEditAccess?: boolean;
   isCreator?: boolean;
   canFinishRound?: boolean;
+  isRoundFinished?: boolean;
   courseName?: string;
   groupCode?: string | null;
   gameMode?: GameMode;
@@ -54,6 +58,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   hasEditAccess = true,
   isCreator = false,
   canFinishRound = false,
+  isRoundFinished = false,
   courseName = '',
   groupCode = null,
   gameMode = 'stableford',
@@ -182,7 +187,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
   useEffect(() => {
     if (handshakeAcknowledged) return;
-    if (decidedResult && !handshakeData?.isOpen) {
+    if (decidedResult && isDecidedBeforeLastHole(decidedResult) && !handshakeData?.isOpen) {
       setHandshakeData({
         isOpen: true,
         winner: decidedResult.winner_label,
@@ -191,29 +196,51 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     }
   }, [decidedResult, handshakeAcknowledged, handshakeData?.isOpen]);
 
+  const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
+  const wereScoresComplete = useRef(allScoresComplete);
+
+  useEffect(() => {
+    setFinalResult(null);
+    wereScoresComplete.current = allScoresComplete;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, gameMode]);
+
+  useEffect(() => {
+    const justCompleted = allScoresComplete && !wereScoresComplete.current;
+    wereScoresComplete.current = allScoresComplete;
+    if (!justCompleted || !isModeScoring || isDecidedBeforeLastHole(decidedResult)) return;
+    setFinalResult(calculateFinalResult(
+      gameMode,
+      players,
+      Object.fromEntries(players.map((p) => [p.id, roundsMap.get(p.id)?.scores])),
+    ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allScoresComplete]);
+
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <NavigationButton destination={backDestination}
-              onClick={onResetGame}
-              className="bg-neutral hover:bg-neutral-hover text-ink p-2 rounded-lg transition-colors"
-            />
-            <h1 className="flex-1 text-center text-lg font-bold text-title sm:text-2xl md:text-3xl">
-              <span className="sm:hidden">Tarjeta</span><span className="hidden sm:inline">Tarjeta de Puntuación</span>
-            </h1>
-            <div className="flex shrink-0 items-center gap-2">
-              {messagesButton}
+          <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div className="flex items-center gap-2">
+              <NavigationButton destination={backDestination} onClick={onResetGame} />
+              <ThemeToggle className="!h-11 !w-11" />
+            </div>
+            <div className="flex justify-center">{messagesButton}</div>
+            <div className="flex justify-end">
               <button
                 onClick={onShowLeaderboard}
-                className="bg-accent hover:bg-accent-hover text-on-accent px-3 sm:px-4 py-2 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                aria-label="Clasificación"
               >
                 <Trophy size={20} />
                 <span className="hidden sm:inline">Clasificación</span>
               </button>
             </div>
           </div>
+          <h1 className="mb-6 text-center text-2xl font-bold text-title md:text-3xl">
+            Tarjeta de Puntuación
+          </h1>
 
           <div className="mb-4 bg-accent rounded-lg p-4 text-on-accent">
             <div className="flex items-center justify-between">
@@ -338,7 +365,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               Anterior
             </button>
 
-            {isLastHole && allScoresComplete && canFinishRound ? (
+            {isLastHole && allScoresComplete && canFinishRound && !isRoundFinished ? (
               <WriteButton
                 onClick={handleFinishWithConfirm}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -346,6 +373,16 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 <Trophy size={20} />
                 Finalizar Partida
               </WriteButton>
+            ) : isLastHole && (isRoundFinished || (allScoresComplete && !canFinishRound)) ? (
+              <button
+                type="button"
+                disabled
+                title={isRoundFinished ? 'El creador ha finalizado la partida' : 'Solo el creador puede finalizar la partida'}
+                className="flex-1 bg-neutral text-ink-3 font-semibold py-3 rounded-lg flex items-center justify-center gap-2 cursor-not-allowed"
+              >
+                {isRoundFinished ? <Lock size={20} /> : <Trophy size={20} />}
+                {isRoundFinished ? 'Finalizada' : 'Pendiente de finalizar'}
+              </button>
             ) : (
               <button
                 onClick={() => onHoleChange(Math.min(playableHoles.length, currentHole + 1))}
@@ -358,10 +395,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             )}
           </div>
 
-          {isLastHole && allScoresComplete && !canFinishRound && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900">
-              La tarjeta está completa. Solo el creador puede finalizar la partida.
-            </div>
+          {isLastHole && allScoresComplete && !canFinishRound && !isRoundFinished && (
+            <p className="-mt-3 mb-6 text-center text-sm text-ink-3">
+              Solo el creador de la partida puede finalizarla.
+            </p>
           )}
 
           <div className="border-t pt-4">
@@ -849,6 +886,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             setHandshakeData(null);
           }}
         />
+      )}
+
+      {finalResult && (
+        <FinalResultModal result={finalResult} onClose={() => setFinalResult(null)} />
       )}
     </div>
   );

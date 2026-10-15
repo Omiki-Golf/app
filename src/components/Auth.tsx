@@ -6,6 +6,8 @@ import { Mail, Lock, User, AlertCircle, Eye, EyeOff, Check, X } from 'lucide-rea
 import { clearStoredAuthSession, supabase } from '../services/supabaseClient';
 import { UserTier } from '../types';
 import { EmailSentModal } from './EmailSentModal';
+import { ExistingAccountNotice } from './ExistingAccountNotice';
+import { isExistingAccountSignup } from '../utils/playerRegistration';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
 import { useTranslation } from 'react-i18next';
@@ -31,6 +33,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [showEmailSentModal, setShowEmailSentModal] = useState(false);
+  const [existingEmail, setExistingEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [selectedTier, setSelectedTier] = useState<UserTier>('Express');
@@ -147,6 +150,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
     setLoading(true);
     setError('');
+    setExistingEmail('');
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -167,6 +171,10 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         },
       });
 
+      if (isExistingAccountSignup(data.user, error)) {
+        setExistingEmail(email.trim());
+        return;
+      }
       if (error) throw error;
 
       if (data.user && data.session) {
@@ -542,6 +550,12 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
               </div>
             </div>
 
+            {existingEmail && (
+              <ExistingAccountNotice
+                email={existingEmail}
+                onLogin={() => { setExistingEmail(''); setPassword(''); setConfirmPassword(''); setMode('login'); }}
+              />
+            )}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-2">
                 <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />

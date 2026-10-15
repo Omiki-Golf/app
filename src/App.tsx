@@ -27,6 +27,7 @@ import MyGroups from './components/MyGroups';
 import { PremiumModal } from './components/PremiumModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
+import { CareerStatistics } from './components/CareerStatistics';
 import { PlayerCheckout } from './components/PlayerCheckout';
 import { playerIntent, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -43,7 +44,7 @@ import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
 
-type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop';
+type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics';
 
 interface RoundState {
   round: GolfRound | null;
@@ -58,7 +59,7 @@ interface RoundState {
 }
 
 const GlobalThemeSwitch = () => (
-  <div className="fixed right-3 top-3 z-[100]">
+  <div className="absolute right-3 top-3 z-[100]">
     <ThemeToggle />
   </div>
 );
@@ -75,7 +76,7 @@ function App() {
   const [currentView, setCurrentView] = useState<ViewType>('main');
   const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
   const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
-  const [plansContext, setPlansContext] = useState<'default' | 'express-limit'>('default');
+  const [plansContext, setPlansContext] = useState<'default' | 'express-limit' | 'express-modes'>('default');
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
     () => new URLSearchParams(window.location.search).get('email-confirmed') === '1'
@@ -430,7 +431,8 @@ function App() {
 
   useEffect(() => {
     const roundId = roundState.round?.id;
-    if (!roundId || roundState.round?.group_id) return;
+    if (!roundId) return;
+    const isGroupRound = !!roundState.round?.group_id;
     let live = true;
     const refreshRound = async () => {
       try {
@@ -444,6 +446,20 @@ function App() {
           return;
         }
         if (!live) return;
+        if (isGroupRound) {
+          // En grupos los permisos de edición se calculan aparte; aquí solo se sigue el estado.
+          setRoundState(prev => prev.round?.id === roundId
+            ? { ...prev, round: data, hasEditAccess: data.status === 'active' && prev.hasEditAccess }
+            : prev);
+          return;
+        }
+        if (data.status === 'completed' && data.user_id !== getUserId()) {
+          // El creador ha finalizado: el invitado sigue viendo la tarjeta, ya en solo lectura.
+          accessCodeStorage.removeAccessCode(roundId);
+          storageUtils.clearActiveRound();
+          setRoundState(prev => prev.round?.id === roundId ? { ...prev, round: data, hasEditAccess: false } : prev);
+          return;
+        }
         if (data.status !== 'active' && data.user_id !== getUserId()) {
           accessCodeStorage.removeAccessCode(roundId);
           storageUtils.clearActiveRound();
@@ -917,7 +933,8 @@ function App() {
     </>
   );
 
-  const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'scorecard' || currentView === 'quickplay-statistics';
+  const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
+    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
     {!usesInlineMessages && <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} belowWarning={isIncognito} />}
@@ -954,12 +971,13 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <PlansComparison backDestination={returnToProfile ? 'back' : 'home'}
             onBack={() => {
-              if (plansContext === 'express-limit') {
+              if (plansContext === 'express-limit' || plansContext === 'express-modes') {
                 setPlansContext('default');
                 setCurrentView('setup');
               } else backFromProfileSection('main');
             }}
             expressLimit={plansContext === 'express-limit'}
+            expressModes={plansContext === 'express-modes'}
             currentPlan={user ? activePlanType : undefined}
             onStartTeamTrial={user && activePlanType === 'player' ? async () => {
               await userService.startTeamTrial();
@@ -1046,12 +1064,28 @@ function App() {
               await logout();
               setCurrentView('main');
             }}
-            onShowStats={() => openFromProfile(currentGroup ? 'statistics' : 'quickplay-statistics')}
-            onShowHistory={() => openFromProfile('active-rounds')}
-            onShowUpgrade={() => openFromProfile('plans')}
+            onShowRoundStats={() => openFromProfile(currentGroup ? 'statistics' : 'quickplay-statistics')}
+            onShowCareerStats={() => setCurrentView('career-statistics')}
+            onShowPlans={() => { setPlansContext('default'); openFromProfile('plans'); }}
             onShowProShop={() => setCurrentView('pro-shop')}
             onShowGroups={() => openFromProfile('my-groups')}
             onShowSettings={() => setCurrentView('profile-details')}
+            messagesButton={inlineMessagesButton}
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (currentView === 'career-statistics' && user) {
+    return withMessages(
+      <>
+        <IncognitoWarning />
+        <div className={isIncognito ? 'pt-10' : ''}>
+          <CareerStatistics
+            account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
+            onBack={() => setCurrentView('profile')}
+            messagesButton={inlineMessagesButton}
           />
         </div>
       </>
@@ -1073,6 +1107,7 @@ function App() {
               setProfileSaved(true);
               setCurrentView('profile');
             }}
+            messagesButton={inlineMessagesButton}
           />
         </div>
       </>
@@ -1097,17 +1132,18 @@ function App() {
     );
   }
 
-  if (currentView === 'pro-shop' && currentGroup && user) {
-    return (
+  if (currentView === 'pro-shop' && user) {
+    // Sin grupo activo se muestra igualmente, con botón atrás, para no dejar al usuario atrapado.
+    return withMessages(
       <>
         <IncognitoWarning />
-        {!user && <GlobalThemeSwitch />}
         <div className={isIncognito ? 'pt-10' : ''}>
           <ProShop
-            groupId={currentGroup.id}
+            groupId={currentGroup?.id ?? null}
             userId={user.id}
             onBack={() => setCurrentView('profile')}
             onPurchaseComplete={() => setCurrentView('profile')}
+            messagesButton={inlineMessagesButton}
           />
         </div>
       </>
@@ -1150,11 +1186,7 @@ function App() {
               setReturnToProfile(false);
               void handleGroupJoined(group);
             }}
-            onLogout={async () => {
-              await logout(); // 👈 Uso de logout global
-              setReturnToProfile(false);
-              setCurrentView('main');
-            }}
+            messagesButton={inlineMessagesButton}
           />
         </div>
       </>
@@ -1219,7 +1251,7 @@ function App() {
   return withMessages(
     <div className="min-h-screen bg-app">
       <IncognitoWarning />
-      {!user && currentView !== 'active-rounds' && currentView !== 'quickplay-statistics' && <GlobalThemeSwitch />}
+      {!user && !['active-rounds', 'quickplay-statistics', 'scorecard', 'leaderboard'].includes(currentView) && <GlobalThemeSwitch />}
       <div className={isIncognito ? 'pt-10' : ''}>
       {currentView === 'main' && currentGroup && (
         <RoundSetup
@@ -1288,6 +1320,9 @@ function App() {
             onHolesChanged={handleHolesChanged}
             onBack={handleBackToMain}
             loading={loading}
+            account={user && profile && roundState.isCreator
+              ? { userId: user.id, nick: profile.nick, displayName: profile.display_name, handicap: profile.exact_handicap ?? 0 }
+              : null}
           />
         </>
       )}
@@ -1315,6 +1350,7 @@ function App() {
           hasEditAccess={roundState.hasEditAccess && !readOnly}
           isCreator={roundState.isCreator}
           canFinishRound={roundState.isCreator}
+          isRoundFinished={roundState.round.status === 'completed' || roundState.round.status === 'archived'}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
           gameMode={roundState.round.game_mode}
@@ -1347,6 +1383,7 @@ function App() {
           onBack={() => setCurrentView('scorecard')}
           hasGroup={!!currentGroup}
           gameMode={roundState.round.game_mode}
+          messagesButton={inlineMessagesButton}
         />
       )}
 
@@ -1355,6 +1392,7 @@ function App() {
           onBack={() => backFromProfileSection(currentGroup ? 'main' : 'setup')}
           onJoinRound={handleJoinRound}
           currentGroup={currentGroup}
+          messagesButton={inlineMessagesButton}
         />
       )}
 
@@ -1366,6 +1404,7 @@ function App() {
         <Statistics backDestination={returnToProfile ? 'back' : 'home'}
           onBack={() => backFromProfileSection('main')}
           currentGroup={currentGroup}
+          messagesButton={inlineMessagesButton}
         />
       )}
 

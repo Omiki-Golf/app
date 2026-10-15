@@ -1,4 +1,5 @@
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
 import React, { useState, useEffect } from 'react';
 import { golfService } from '../services/golfService';
 import { User, Users, MapPin, TrendingUp, Trophy, Award, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine } from 'lucide-react';
@@ -11,11 +12,12 @@ interface StatisticsProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   currentGroup: Group;
+  messagesButton?: React.ReactNode;
 }
 
 type TabType = 'player' | 'group' | 'course';
 
-export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup }) => {
+export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup, messagesButton }) => {
   const [activeTab, setActiveTab] = useState<TabType>('player');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -481,10 +483,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
     return (
       <div className="min-h-screen bg-app p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
-          <NavigationButton destination={backDestination}
-            onClick={onBack}
-            className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors mb-6"
-          />
+          <TopBar left={<NavigationButton destination={backDestination} onClick={onBack} />} center={messagesButton} />
 
           <div className="bg-card rounded-lg shadow-card p-8 text-center">
             <TrendingUp size={64} className="mx-auto text-ink-4 mb-4" />
@@ -501,15 +500,8 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <NavigationButton destination={backDestination}
-            onClick={onBack}
-            className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors"
-          />
-
-          <h1 className="text-3xl font-bold text-title">Estadísticas</h1>
-          <div className="w-24"></div>
-        </div>
+        <TopBar className="mb-3" left={<NavigationButton destination={backDestination} onClick={onBack} />} center={messagesButton} />
+        <h1 className="mb-6 text-center text-3xl font-bold text-title">Estadísticas</h1>
 
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-6">

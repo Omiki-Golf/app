@@ -59,7 +59,7 @@ La casilla «Invitado: solo juega esta partida» debe empezar desmarcada. Sin ma
 
 ## Entorno principal local y alternativa Codespaces
 
-Proyecto local: `C:\Users\VORPC\OneDrive\Escritorio\Fede\00-LaPartideta_Test\project`, Windows/PowerShell, Node.js `v24.11.0`. Copia sincronizada con `origin/main`; `npm ci` y `npm run build` correctos. `.env.local` configurado y excluido de Git. La web funciona en `http://localhost:5173`, con inicio de sesión y acceso al grupo comprobados por el usuario.
+Proyecto local: `C:\Users\user\Desktop\Trabajo\La Partideta KF\project`, Windows/PowerShell, Node.js `v24.11.0`. Copia sincronizada con `origin/main`; `npm ci` y `npm run build` correctos. `.env.local` configurado y excluido de Git. La web funciona en `http://localhost:5173`, con inicio de sesión y acceso al grupo comprobados por el usuario.
 
 Accesos locales comprobados el 16/09/2026:
 

@@ -1,6 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
+import { TopBar } from './TopBar';
 import React, { useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, Group } from '../types';
 import { golfService } from '../services/golfService';
@@ -34,12 +35,14 @@ interface ActiveRoundsViewerProps {
   backDestination?: 'back' | 'home';
   onJoinRound: (roundId: string) => void;
   currentGroup?: Group | null;
+  messagesButton?: React.ReactNode;
 }
 
 export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   onBack, backDestination = 'back',
   onJoinRound,
   currentGroup,
+  messagesButton,
 }) => {
   const [rounds, setRounds] = useState<RoundStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -433,23 +436,20 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       <div className="max-w-4xl mx-auto">
         {showGlobalLeaderboard ? (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <NavigationButton destination="back"
-                  onClick={() => setShowGlobalLeaderboard(false)}
-                  className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
-                />
-                <ThemeToggle />
-              </div>
+            <TopBar
+              className="mb-3"
+              left={<>
+                <NavigationButton destination="back" onClick={() => setShowGlobalLeaderboard(false)} />
+                <ThemeToggle className="!h-11 !w-11" />
+              </>}
+              center={messagesButton}
+            />
 
-              <h1 className="text-3xl font-bold text-title">
-                {currentGroup
-                  ? `Clasificación ${currentGroup.name || 'del Grupo'}`
-                  : 'Clasificación'}
-              </h1>
-
-              <div className="w-[5.5rem]"></div>
-            </div>
+            <h1 className="mb-6 text-center text-3xl font-bold text-title">
+              {currentGroup
+                ? `Clasificación ${currentGroup.name || 'del Grupo'}`
+                : 'Clasificación'}
+            </h1>
 
             <div className="bg-card rounded-lg shadow-card p-6">
               <div className="space-y-3">
@@ -525,21 +525,20 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         ) : (
           <>
             <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <div className="flex items-center gap-2">
-                  <NavigationButton destination={backDestination}
-                    onClick={onBack}
-                    className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors"
-                  />
-                  <ThemeToggle />
+                  <NavigationButton destination={backDestination} onClick={onBack} />
+                  <ThemeToggle className="!h-11 !w-11" />
                 </div>
+                <div className="flex justify-center">{messagesButton}</div>
 
-                <div className="flex gap-2 flex-wrap">
-                  {rounds.length > 0 && (
+              {rounds.length > 0 && (
+                <div className="flex flex-wrap justify-end gap-2">
                     <>
                       <button
                         onClick={() => setShowGlobalLeaderboard(true)}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
+                        className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold h-11 px-4 rounded-lg flex items-center gap-2 transition-colors"
+                        aria-label="Clasificación"
                       >
                         <Trophy size={20} />
                         <span className="hidden sm:inline">
@@ -576,20 +575,15 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         </WriteButton>
                       )}
                     </>
-                  )}
                 </div>
+              )}
               </div>
 
-              <div>
-                <h1 className="text-3xl font-bold text-title">
-                  {currentGroup
-                    ? `Partidas ${currentGroup.name || 'del Grupo'}`
-                    : 'Mi Partida'}
-                </h1>
-                <p className="text-accent-ink text-sm mt-1">
-                  {rounds.length} {rounds.length === 1 ? 'partida' : 'partidas'}
-                </p>
-              </div>
+              <h1 className="text-3xl font-bold text-title">
+                {currentGroup
+                  ? `Partidas ${currentGroup.name || 'del Grupo'}`
+                  : 'Mi Partida'}
+              </h1>
             </div>
 
         {error && (

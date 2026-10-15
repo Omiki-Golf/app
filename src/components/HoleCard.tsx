@@ -154,6 +154,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   };
 
   const matchStatus = getMatchStatus();
+  const allPlayersEntered = players.length > 0 && players.every(p => !!scores[p.id]);
 
   const handleToggleExpanded = (playerId: string, isCurrentlyExpanded: boolean) => {
     if (readonly) return;
@@ -354,30 +355,36 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   (() => {
                     // Es raya si está marcado como abandonado
                     const isRaya = score.abandoned === true;
-                    const isParejas = gameMode === 'parejas';
-                
-                    const displayPoints = isModeScoring ? (score.mode_points ?? 0) : score.stableford_points;
-                    const modeText = isRaya
+
+                    // En modalidades se muestra siempre el resultado (golpes); los puntos
+                    // dependen del resto de jugadores y solo aparecen cuando todos han informado
+                    const modeText = isRaya || isModeScoring
                       ? `${score.gross_strokes}` // Mostrar el gross_strokes (PAR + 2) cuando es raya
-                      : isParejas
-                      ? `${score.gross_strokes}`
-                      : isModeScoring
-                      ? `${displayPoints} pts`
                       : getPointsText(score.stableford_points, isRaya);
                     return (
-                      <div
-                        className={`px-4 py-2 rounded-lg border-2 font-bold text-lg flex items-center justify-center min-w-[75px] relative ${getScoreColor(
-                          isParejas ? score.stableford_points : (isModeScoring ? displayPoints : score.stableford_points),
-                          isRaya
-                        )}`}
-                      >
-                        {modeText}
-                        {isRaya && (
-                          <div 
-                            className="absolute w-full h-0.5 bg-white/90 opacity-90"
-                            style={{ width: '60px', transform: 'rotate(45deg)' }}
-                          />
+                      <div className="flex items-center gap-2">
+                        {isModeScoring && allPlayersEntered && (
+                          <div
+                            className="px-3 py-2 rounded-lg border-2 border-accent-ring bg-accent-soft text-accent-ink font-bold text-lg flex items-center justify-center min-w-[64px]"
+                            title="Puntos asignados en el hoyo"
+                          >
+                            {score.mode_points ?? 0} pts
+                          </div>
                         )}
+                        <div
+                          className={`px-4 py-2 rounded-lg border-2 font-bold text-lg flex items-center justify-center min-w-[75px] relative ${getScoreColor(
+                            score.stableford_points,
+                            isRaya
+                          )}`}
+                        >
+                          {modeText}
+                          {isRaya && (
+                            <div
+                              className="absolute w-full h-0.5 bg-white/90 opacity-90"
+                              style={{ width: '60px', transform: 'rotate(45deg)' }}
+                            />
+                          )}
+                        </div>
                       </div>
                     );
                   })()
@@ -510,7 +517,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                         </div>
                         <div>
                           <p className="text-ink-3">{isModeScoring ? 'Modal' : 'Puntos'}</p>
-                          <p className="font-bold text-accent-ink">{isModeScoring ? (score?.mode_points ?? 0) : (score?.stableford_points || 0)}</p>
+                          <p className="font-bold text-accent-ink">{isModeScoring ? (allPlayersEntered ? (score?.mode_points ?? 0) : '-') : (score?.stableford_points || 0)}</p>
                         </div>
                       </div>
                     </div>

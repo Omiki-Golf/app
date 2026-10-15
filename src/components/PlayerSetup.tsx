@@ -28,7 +28,12 @@ interface PlayerSetupProps {
   onBack?: () => void;
   backDestination?: 'back' | 'home';
   loading?: boolean;
+  /** Cuenta con sesión iniciada: su jugador queda vinculado para las estadísticas acumuladas. */
+  account?: { userId: string; nick: string; displayName?: string | null; handicap: number } | null;
 }
+
+const normalizeName = (value: string | null | undefined) =>
+  (value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   roundId,
@@ -46,8 +51,24 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   onHolesChanged,
   onBack, backDestination = 'back',
   loading = false,
+  account = null,
 }) => {
   const { user } = useAuth();
+  // El jugador de la cuenta: vinculado por id o, si aún no lo está, por coincidir con el nick o el nombre.
+  const isAccountName = (name: string) => !!account && [account.nick, account.displayName]
+    .some(candidate => normalizeName(candidate) !== '' && normalizeName(candidate) === normalizeName(name));
+  const accountInRound = !!account && players.some(player => player.user_id === account.userId);
+  const canAddSelf = !!account && !currentGroup && !accountInRound && !players.some(player => isAccountName(player.name));
+  const prefillSelf = () => {
+    if (!account) return;
+    setSelectedPlayer(null);
+    setCreatingUnlinked(false);
+    setSearchTerm(account.nick);
+    // El hándicap del perfil es el exacto; el campo pide el de los hoyos de la partida.
+    const forHoles = numHoles === 18 ? account.handicap : account.handicap / 2;
+    setHandicap(String(Math.round(forHoles * 10) / 10));
+    setShowDropdown(false);
+  };
   const playerLoadVersion = useRef(0);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [playersInActiveRounds, setPlayersInActiveRounds] = useState<string[]>([]);
@@ -274,7 +295,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         }
 
         localStorage.setItem('quickPlayPlayers', JSON.stringify(playersArray));
-        newPlayer = await golfService.addPlayerToRound(roundId, playerName, handicapFor9Holes, useSlope);
+        const linkedUserId = isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
+        newPlayer = await golfService.addPlayerToRound(roundId, playerName, handicapFor9Holes, useSlope, undefined, linkedUserId);
       }
 
       onPlayersUpdated([...players, newPlayer]);
@@ -458,12 +480,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           {!canAddMorePlayers && (
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-6">
               <p className="text-amber-800 font-semibold">
-                {gameMode === 'match'
-                  ? 'Match requiere exactamente 2 jugadores'
-                  : gameMode === 'sindicato'
-                  ? 'Sindicato requiere exactamente 3 jugadores'
-                  : gameMode === 'parejas'
-                  ? 'Parejas requiere exactamente 4 jugadores (2 parejas)'
+                {gameMode === 'match' || gameMode === 'sindicato' || gameMode === 'parejas'
+                  ? `Partida completa, ya hay ${maxPlayers} jugadores`
                   : 'Límite alcanzado: Máximo 4 jugadores por partida'}
               </p>
             </div>
@@ -478,6 +496,15 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           )}
 
           <WriteForm onSubmit={handleAddPlayer} className="space-y-4 mb-8">
+            {canAddSelf && account && (
+              <button
+                type="button"
+                onClick={prefillSelf}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-ring bg-accent-soft px-4 py-3 font-semibold text-accent-ink transition-colors hover:bg-card-2"
+              >
+                <Plus size={18} /> Añadirme a la partida ({account.nick})
+              </button>
+            )}
             <div className="relative player-search-container">
               <label className="block text-sm font-semibold text-ink-2 mb-2">
                 {playerNameLabel}
@@ -532,6 +559,17 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                           >
                             <Edit2 size={18} />
                           </WriteButton>
+                          {!currentGroup && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeletePlayerFromMemory(player.id, e)}
+                              className="px-3 py-3 text-ink-3 hover:text-red-600 transition-colors"
+                              title="Quitar de las sugerencias"
+                              aria-label={`Quitar a ${player.name} de las sugerencias`}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -689,7 +727,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
           <div className="border-t pt-6 mb-6">
             <h2 className="text-lg font-semibold text-ink mb-4">
-              Jugadores Agregados ({players.length} de {maxPlayers})
+              Jugadores de la partida ({players.length}/{maxPlayers})
             </h2>
 
             {players.length === 0 ? (
