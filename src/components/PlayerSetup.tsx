@@ -23,6 +23,8 @@ interface PlayerSetupProps {
   gameMode?: GameMode;
   onPlayersUpdated: (players: RoundPlayer[]) => void;
   onStartRound: () => void;
+  /** En grupos: guardar la partida y volver al inicio del grupo para preparar otra salida. */
+  onSaveAndReturn?: () => void;
   onOpenHoleConfig: () => void;
   onHolesChanged?: (numHoles: 9 | 18, holes: any[]) => void;
   onBack?: () => void;
@@ -47,6 +49,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   gameMode = 'stableford',
   onPlayersUpdated,
   onStartRound,
+  onSaveAndReturn,
   onOpenHoleConfig,
   onHolesChanged,
   onBack, backDestination = 'back',
@@ -809,16 +812,20 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               </div>
             )}
 
-            {currentGroup ? (
-              <NavigationButton
-                destination="home"
-                aria-label="Guardar y volver al inicio"
-                title="Guardar y volver al inicio"
-                onClick={onStartRound}
-                disabled={!canStartRound || loading || !canStartWithMode}
-                className="bg-accent hover:bg-accent-hover text-on-accent py-3 px-3 disabled:bg-neutral-hover disabled:text-ink-3 disabled:cursor-not-allowed transition-colors"
-              />
-            ) : <WriteButton
+            {currentGroup && onSaveAndReturn && (
+              <div className="flex items-center gap-3">
+                <NavigationButton
+                  destination="home"
+                  aria-label="Guardar y volver al inicio del grupo"
+                  title="Guardar y volver al inicio del grupo"
+                  onClick={onSaveAndReturn}
+                  disabled={!canStartRound || loading || !canStartWithMode}
+                  className="shrink-0 bg-card border border-line text-ink-2 py-3 px-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                />
+                <p className="text-xs text-ink-3">Guarda la partida y vuelve al grupo para preparar otra salida.</p>
+              </div>
+            )}
+            <WriteButton
               onClick={onStartRound}
               disabled={!canStartRound || loading || !canStartWithMode}
               className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${
@@ -828,7 +835,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               }`
             }>
               Comenzar Partida
-            </WriteButton>}
+            </WriteButton>
           </div>
         </div>
       </div>

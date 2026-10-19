@@ -94,7 +94,7 @@ export default function ComingSoonModal({ onClose }: ComingSoonModalProps) {
 
             <div className="bg-accent-soft rounded-xl p-5 border-2 border-accent-ring">
               <p className="text-center text-ink-2 font-medium">
-                Mientras tanto, disfruta de La Partideta sin límites.
+                Mientras tanto, disfruta de Omiki Golf sin límites.
                 <br />
                 <span className="text-accent-ink font-bold">La diversión no espera.</span>
               </p>

@@ -6,7 +6,8 @@ import type { GroupMember } from '../types';
 import { WriteButton, useReadOnly } from '../context/ReadOnlyContext';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
 
-export function GroupMemberList({ groupId }: { groupId: string }) {
+// ownerId: creador del grupo. Solo él nombra o retira administradores, y su propio rol no se toca.
+export function GroupMemberList({ groupId, ownerId }: { groupId: string; ownerId?: string }) {
   const { user } = useAuth();
   const userId = user?.id;
   const [state, setState] = useState<{ identity: string; members: GroupMember[] } | null>(null);
@@ -53,6 +54,17 @@ export function GroupMemberList({ groupId }: { groupId: string }) {
       setConfirm(false);
     } finally { busyRef.current = false; setBusy(false); }
   };
+  const isOwner = !!userId && userId === ownerId;
+  const toggleRole = async (member: GroupMember) => {
+    if (readOnly || busyRef.current) return;
+    busyRef.current = true; setBusy(true); setError('');
+    try {
+      await userService.updateMemberRole(groupId, member.user_id, member.role === 'admin' ? 'member' : 'admin');
+      setRefresh(value => value + 1);
+    } catch (err) {
+      setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se pudo cambiar el rol');
+    } finally { busyRef.current = false; setBusy(false); }
+  };
   const start = (member: GroupMember, action: 'handicap' | 'remove') => {
     setEdit({ member, action, identity }); setHandicap(member.handicap_18?.toString() ?? ''); setConfirm(false); setError('');
   };
@@ -66,6 +78,7 @@ export function GroupMemberList({ groupId }: { groupId: string }) {
     </div>
     <p className="text-sm text-ink-3">Cuentas incorporadas al grupo. Las invitaciones pendientes no aparecen hasta que se aceptan.</p>
     {loadError && <p role="alert" className="text-red-600">{loadError}</p>}
+    {!edit && error && <p role="alert" className="text-red-600">{error}</p>}
     {!members && !loadError && <p role="status">Cargando miembros…</p>}
     {members?.map(member => <article key={member.id} className="bg-card border border-line rounded-xl p-3">
       <div className="flex items-center gap-3">
@@ -73,15 +86,17 @@ export function GroupMemberList({ groupId }: { groupId: string }) {
         <div className="min-w-0">
           <p className="font-semibold break-words">{member.profile?.nick || member.profile?.display_name || 'Registro pendiente de completar'}</p>
           {member.profile?.display_name && <p className="text-sm break-words">{member.profile.display_name}</p>}
-          <p className="text-sm text-ink-3">{member.role === 'admin' ? 'Administrador del Grupo' : 'Miembro'}</p>
+          <p className="text-sm text-ink-3">{member.user_id === ownerId ? 'Creador del grupo' : member.role === 'admin' ? 'Administrador del Grupo' : 'Miembro'}</p>
           <p className="text-sm">{member.handicap_18 === null ? 'Hándicap pendiente' : `Hándicap del grupo (18 hoyos): ${member.handicap_18}`}</p>
         </div>
       </div>
       <details className="text-xs text-ink-3 mt-3"><summary>Detalles</summary><p className="break-all">UUID de cuenta: {member.user_id}</p><p className="break-all">Ficha: {member.player_id}</p></details>
-      {member.can_manage && <div className="flex flex-wrap gap-2 mt-3">
-        <WriteButton className="border border-line rounded-xl px-3 py-2" onClick={() => start(member, 'handicap')}>Editar hándicap</WriteButton>
-        {member.can_remove && <WriteButton className="border border-red-400 text-red-500 rounded-xl px-3 py-2" onClick={() => start(member, 'remove')}>Eliminar del grupo</WriteButton>}
+      {(member.can_manage || (isOwner && member.user_id !== ownerId)) && <div className="flex flex-wrap gap-2 mt-3">
+        {member.can_manage && <WriteButton className="border border-line rounded-xl px-3 py-2" onClick={() => start(member, 'handicap')}>Editar hándicap</WriteButton>}
+        {isOwner && member.user_id !== ownerId && <WriteButton disabled={busy} className="border border-accent text-accent-ink rounded-xl px-3 py-2 disabled:opacity-50" onClick={() => void toggleRole(member)}>{member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'}</WriteButton>}
+        {member.can_manage && member.can_remove && <WriteButton className="border border-red-400 text-red-500 rounded-xl px-3 py-2" onClick={() => start(member, 'remove')}>Eliminar del grupo</WriteButton>}
       </div>}
+      {isOwner && member.user_id !== ownerId && member.role === 'admin' && <p className="text-xs text-ink-3 mt-2">Puede crear partidas y gestionar el grupo contigo.</p>}
     </article>)}
     {members?.length === 0 && !loadError && <p className="text-ink-3">No hay miembros visibles para esta cuenta.</p>}
     {edit?.identity === identity && <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">

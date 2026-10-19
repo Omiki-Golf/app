@@ -2,11 +2,12 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useState } from 'react';
-import { Users, Copy, Check, Trash2, Crown } from 'lucide-react';
+import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { PremiumModal } from './PremiumModal';
+import { GroupMemberList } from './GroupMemberList';
 import { useSubscription } from '../hooks/useSubscription';
 import { useTranslation } from 'react-i18next';
 
@@ -24,16 +25,25 @@ interface GroupWithCode {
   created_at: string;
   created_by?: string;
   user_auth_id?: string;
+  hoyo_19_enabled?: boolean;
 }
+
+interface MyGroup extends GroupWithCode {
+  // owner: lo creó esta cuenta; admin: le han nombrado administrador; member: miembro invitado.
+  access: 'owner' | 'admin' | 'member';
+}
+
+const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled';
 
 export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, messagesButton }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
-  const [groups, setGroups] = useState<GroupWithCode[]>([]);
+  const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState('');
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
+  const [openMembers, setOpenMembers] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
 
   // ─── PREMIUM ───
@@ -60,15 +70,31 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
       setUserEmail(user.email || '');
 
-      const { data, error: fetchError } = await supabase
-        .from('groups')
-        .select('id, name, group_code, created_at, created_by, user_auth_id')
-        .eq('user_auth_id', user.id)
-        .order('created_at', { ascending: false });
+      const [owned, memberships] = await Promise.all([
+        supabase.from('groups').select(GROUP_COLUMNS).eq('user_auth_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('group_members').select('role, group_id').eq('user_id', user.id),
+      ]);
+      if (owned.error) throw owned.error;
+      if (memberships.error) throw memberships.error;
 
-      if (fetchError) throw fetchError;
+      const ownedGroups: MyGroup[] = (owned.data || []).map(group => ({ ...group, access: 'owner' }));
+      const ownedIds = new Set(ownedGroups.map(group => group.id));
+      const roles = new Map((memberships.data || [])
+        .filter(membership => !ownedIds.has(membership.group_id))
+        .map(membership => [membership.group_id, membership.role === 'admin' ? 'admin' as const : 'member' as const]));
 
-      setGroups(data || []);
+      let joinedGroups: MyGroup[] = [];
+      if (roles.size > 0) {
+        const { data, error: joinedError } = await supabase
+          .from('groups')
+          .select(GROUP_COLUMNS)
+          .in('id', [...roles.keys()])
+          .order('created_at', { ascending: false });
+        if (joinedError) throw joinedError;
+        joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member' }));
+      }
+
+      setGroups([...ownedGroups, ...joinedGroups]);
     } catch (err: any) {
       setError(err.message || t('groups.loadError'));
     } finally {
@@ -116,8 +142,15 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       group_code: groupWithCode.group_code,
       created_at: groupWithCode.created_at,
       created_by: groupWithCode.user_auth_id || groupWithCode.created_by,
+      hoyo_19_enabled: groupWithCode.hoyo_19_enabled,
     };
     onGroupSelected(group);
+  };
+
+  const accessLabel: Record<MyGroup['access'], string> = {
+    owner: 'Creado por ti',
+    admin: 'Administrador',
+    member: 'Miembro',
   };
 
   if (loading) {
@@ -156,8 +189,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
               {/* Icono Premium activo (verde, decorativo) */}
               {isPremium && (
-                <div 
-                  className="bg-emerald-500/10 border border-emerald-500/30 rounded-full p-2" 
+                <div
+                  className="bg-emerald-500/10 border border-emerald-500/30 rounded-full p-2"
                   title={t('groups.premiumActive')}
                 >
                   <Crown size={18} className="text-accent-ink" />
@@ -189,29 +222,34 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="bg-card-2 rounded-xl p-4 hover:bg-card-2 transition-colors border border-line"
+                  className="bg-card-2 rounded-xl p-4 transition-colors border border-line"
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-ink text-lg">{group.name}</h3>
-                    <WriteButton
-                      onClick={() => handleDeleteGroup(group.id)}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                      title={t('groups.delete')}
-                    >
-                      <Trash2 size={18} />
-                    </WriteButton>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-ink text-lg break-words">{group.name}</h3>
+                      <p className="text-xs font-medium text-ink-3">{accessLabel[group.access]}</p>
+                    </div>
+                    {group.access === 'owner' && (
+                      <WriteButton
+                        onClick={() => handleDeleteGroup(group.id)}
+                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                        title={t('groups.delete')}
+                      >
+                        <Trash2 size={18} />
+                      </WriteButton>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
+                    <div className="min-w-0 flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
                       <p className="text-xs text-ink-3 mb-1">{t('groups.accessCode')}</p>
-                      <p className="text-xl font-mono font-bold text-accent-ink tracking-wider">
+                      <p className="truncate text-xl font-mono font-bold text-accent-ink tracking-wider">
                         {group.group_code}
                       </p>
                     </div>
                     <button
                       onClick={() => handleCopyCode(group.group_code)}
-                      className="px-4 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors flex items-center gap-2"
+                      className="shrink-0 px-4 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors flex items-center gap-2"
                       title={t('groups.copyCode')}
                     >
                       {copiedCode === group.group_code ? (
@@ -234,6 +272,23 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   >
                     {t('groups.select')}
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setOpenMembers(openMembers === group.id ? null : group.id)}
+                    aria-expanded={openMembers === group.id}
+                    className="mt-2 w-full flex items-center justify-center gap-2 border border-line bg-card text-ink-2 px-4 py-2 rounded-lg hover:bg-neutral-hover transition-colors font-medium"
+                  >
+                    <Users size={18} aria-hidden="true" />
+                    Jugadores y administradores
+                    {openMembers === group.id ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+                  </button>
+
+                  {openMembers === group.id && (
+                    <div className="mt-4">
+                      <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} />
+                    </div>
+                  )}
 
                   <p className="text-xs text-ink-3 mt-2">
                     {t('groups.created', { date: new Intl.DateTimeFormat(i18n.resolvedLanguage).format(new Date(group.created_at)) })}

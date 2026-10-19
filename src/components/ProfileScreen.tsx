@@ -16,6 +16,8 @@ interface ProfileScreenProps {
   onShowPlans: () => void;
   onShowProShop: () => void;
   onShowGroups: () => void;
+  /** La cuenta pertenece a algún grupo (aunque su plan no permita crear uno). */
+  hasGroups?: boolean;
   onShowSettings: () => void;
   messagesButton?: React.ReactNode;
 }
@@ -30,6 +32,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onShowPlans,
   onShowProShop,
   onShowGroups,
+  hasGroups = false,
   onShowSettings,
   messagesButton,
 }) => {
@@ -43,14 +46,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   // Mis partidas: estadísticas de cada partida. Mis estadísticas: acumuladas de todas.
-  const menuItems = [
-    { icon: Gamepad2, label: t('profile.rounds'), onClick: onShowRoundStats, show: true, comingSoon: false },
-    { icon: BarChart3, label: t('profile.stats'), onClick: onShowCareerStats, show: true, comingSoon: false },
-    { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },
-    { icon: Gem, label: t('profile.plans'), onClick: onShowPlans, show: true },
-    { icon: Crown, label: t('profile.groups'), onClick: onShowGroups, show: isTeam },
-    { icon: CreditCard, label: 'Pro-Shop', onClick: onShowProShop, show: isTeam },
-  ];
+  // Primer bloque: lo personal del jugador. Segundo bloque, tras el separador: tienda y planes.
+  const menuSections = [
+    [
+      { icon: Gamepad2, label: t('profile.rounds'), onClick: onShowRoundStats, show: true, comingSoon: false },
+      { icon: BarChart3, label: t('profile.stats'), onClick: onShowCareerStats, show: true, comingSoon: false },
+      { icon: Crown, label: t('profile.groups'), onClick: onShowGroups, show: isTeam || hasGroups },
+      { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },
+    ],
+    [
+      { icon: CreditCard, label: 'Pro-Shop', onClick: onShowProShop, show: isTeam },
+      { icon: Gem, label: t('profile.plans'), onClick: onShowPlans, show: true },
+    ],
+  ].map((section) => section.filter((item) => item.show)).filter((section) => section.length > 0);
 
   return (
     <div className="min-h-screen bg-app transition-colors">
@@ -95,19 +103,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
         {/* Menu items */}
         <div className="bg-card rounded-2xl shadow-card overflow-hidden">
-          {menuItems.filter(m => m.show).map((item, i) => (
-            <button
-              key={item.label}
-              onClick={item.onClick}
-              disabled={item.comingSoon}
-              className={`w-full flex items-center gap-3 px-5 py-4 transition-colors enabled:hover:bg-card-2 disabled:cursor-not-allowed ${i > 0 ? 'border-t border-line' : ''}`}
-            >
-              <item.icon size={20} className={item.comingSoon ? 'text-ink-4' : 'text-ink-3'} />
-              <span className={`flex-1 text-left font-medium ${item.comingSoon ? 'text-ink-4' : 'text-ink'}`}>{item.label}</span>
-              {item.comingSoon
-                ? <span className="rounded-full bg-card-2 px-2 py-0.5 text-[10px] font-bold uppercase text-ink-3">Próximamente</span>
-                : <ChevronRight size={18} className="text-ink-4" />}
-            </button>
+          {menuSections.map((section, sectionIndex) => (
+            <React.Fragment key={sectionIndex}>
+              {sectionIndex > 0 && <div role="separator" className="h-2 border-y border-line bg-app" />}
+              {section.map((item, i) => (
+                <button
+                  key={item.label}
+                  onClick={item.onClick}
+                  disabled={item.comingSoon}
+                  className={`w-full flex items-center gap-3 px-5 py-4 transition-colors enabled:hover:bg-card-2 disabled:cursor-not-allowed ${i > 0 ? 'border-t border-line' : ''}`}
+                >
+                  <item.icon size={20} className={item.comingSoon ? 'text-ink-4' : 'text-ink-3'} />
+                  <span className={`flex-1 text-left font-medium ${item.comingSoon ? 'text-ink-4' : 'text-ink'}`}>{item.label}</span>
+                  {item.comingSoon
+                    ? <span className="rounded-full bg-card-2 px-2 py-0.5 text-[10px] font-bold uppercase text-ink-3">Próximamente</span>
+                    : <ChevronRight size={18} className="text-ink-4" />}
+                </button>
+              ))}
+            </React.Fragment>
           ))}
         </div>
 

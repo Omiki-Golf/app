@@ -152,6 +152,33 @@ export const golfService = {
     return data;
   },
 
+  /** Grupo que administra la cuenta (los planes Team y Premium incluyen uno). */
+  async getOwnedGroup(userId: string): Promise<Group | null> {
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('user_auth_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? { ...data, created_by: data.user_auth_id || data.created_by } : null;
+  },
+
+  /** Rol de la cuenta dentro del grupo, o null si no es miembro. */
+  async getMemberRole(groupId: string, userId: string): Promise<'admin' | 'member' | null> {
+    const { data, error } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data?.role === 'admin' || data?.role === 'member' ? data.role : null;
+  },
+
   async getGroupByCode(groupCode: string): Promise<Group | null> {
     const { data, error } = await supabase
       .from('groups')
@@ -1493,7 +1520,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
             const players = playersData.data || [];
             const scores = scoresData.data || [];
 
-            return players.filter(player => !player.is_guest).map((player) => {
+            // Los invitados aparecen en la clasificación del día (isGuest) pero no ajustan hándicap.
+            return players.map((player) => {
               const playerScores = scores.filter((s) => s.player_id === player.id);
               const totalPoints = playerScores.reduce((sum, s) => sum + s.stableford_points, 0);
               const noPasoRojasHoles = playerScores
@@ -1509,6 +1537,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
                 totalPoints,
                 roundId,
                 noPasoRojasHoles,
+                isGuest: !!player.is_guest,
               };
             });
           });
@@ -1726,7 +1755,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     const lastRanking = rankings[0];
     // A day with only guests still has rounds to archive, without member adjustments.
-    const standings = lastRanking.standings || [];
+    const standings = (lastRanking.standings || []).filter((standing: any) => !standing.isGuest);
 
     const sortedPlayers = [...standings].sort((a: any, b: any) => {
       if (b.totalPoints !== a.totalPoints) {

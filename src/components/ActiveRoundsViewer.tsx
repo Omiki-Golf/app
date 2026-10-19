@@ -51,6 +51,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [showGlobalLeaderboard, setShowGlobalLeaderboard] = useState(false);
   const [playerToDelete, setPlayerToDelete] = useState<{ playerId: string; playerName: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Archivar no se puede deshacer: siempre se pide confirmación.
+  const [roundToArchive, setRoundToArchive] = useState<string | null>(null);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [roundToDelete, setRoundToDelete] = useState<string | null>(null);
   const [roundToFinishAndArchive, setRoundToFinishAndArchive] = useState<string | null>(null);
@@ -658,13 +660,13 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             <WriteButton
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleArchiveRoundClick(roundStats.round.id);
+                                setRoundToArchive(roundStats.round.id);
                               }}
                               className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
                               title="Archivar partida"
                             >
                               <Archive size={16} />
-                              <span className="hidden sm:inline">Archivar</span>
+                              <span>Archivar</span>
                             </WriteButton>
                           )}
                           <WriteButton
@@ -832,7 +834,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               }
                               return a.player.playing_handicap - b.player.playing_handicap;
                             })
-                            .slice(0, 3)
                             .map((item, index) => (
                               <div
                                 key={item.player.id}
@@ -874,7 +875,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           </button>
                         )}
                         <WriteButton
-                          onClick={() => handleArchiveRoundClick(roundStats.round.id)}
+                          onClick={() => setRoundToArchive(roundStats.round.id)}
                           className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
                           <Archive size={20} />
@@ -942,6 +943,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           message="¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express."
           onConfirm={handleConfirmDeleteRound}
           onCancel={() => setRoundToDelete(null)}
+        />
+      )}
+
+      {roundToArchive && (
+        <ConfirmModal
+          message="¿Archivar esta partida? Pasará al historial y ya no se podrá editar."
+          onConfirm={() => { const id = roundToArchive; setRoundToArchive(null); void handleArchiveRoundClick(id); }}
+          onCancel={() => setRoundToArchive(null)}
         />
       )}
 

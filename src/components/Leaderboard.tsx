@@ -70,12 +70,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const playerStats = players.map((player) => {
     const round = roundsMap.get(player.id);
     const totalPoints = isModeScoring
-      ? round ? Object.values(round.scores).reduce((sum, s) => {
-          const allRaya = gameMode === 'parejas'
-            && players.length === 4
-            && players.every(p => roundsMap.get(p.id)?.scores[s.hole_number]?.abandoned);
-          return sum + (allRaya ? 0.5 : (s.mode_points ?? 0));
-        }, 0) : 0
+      ? round ? Object.values(round.scores).reduce((sum, s) => sum + (s.mode_points ?? 0), 0) : 0
       : round?.totalStablefordPoints ?? 0;
 
     return {
@@ -299,7 +294,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       {gameMode === 'parejas' && (
                         <div className="bg-blue-50 p-3 rounded border border-blue-200">
                           <p className="font-semibold text-blue-900">Parejas (2 vs 2)</p>
-                          <p className="text-xs text-blue-700">1 punto por hoyo ganado por la pareja, 0.5 por empatado. Gana la pareja con mas hoyos.</p>
+                          <p className="text-xs text-blue-700">En cada hoyo, la pareja con la mejor bola neta gana 1 punto y la de mejor peor bola neta gana 0,5. Los empates no puntúan. Gana la pareja con más puntos.</p>
                         </div>
                       )}
                     </div>

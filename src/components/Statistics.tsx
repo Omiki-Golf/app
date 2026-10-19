@@ -50,7 +50,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   const [showArchivedRoundsModal, setShowArchivedRoundsModal] = useState(false);
   const [selectedArchivedRound, setSelectedArchivedRound] = useState<any>(null);
 
-  const isDivend = currentGroup.group_code === 'DIVEND';
+  // Rojas y cervezas: grupos con la gamificación Hoyo 19 activada (DIVEND siempre).
+  const isDivend = currentGroup.group_code === 'DIVEND' || !!currentGroup.hoyo_19_enabled;
 
   useEffect(() => {
     loadArchivedRounds();
@@ -444,6 +445,34 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
     );
   };
 
+  const renderSpanishHandsStats = () => {
+    const playerRounds = archivedRounds.filter((round) =>
+      round.player_stats?.some((ps: any) => ps.player_name === selectedPlayer)
+    );
+
+    let totalSpanishHands = 0;
+    let roundsWithSpanishHands = 0;
+    playerRounds.forEach((round) => {
+      const count = round.player_stats.find((ps: any) => ps.player_name === selectedPlayer)?.spanish_hands_count || 0;
+      totalSpanishHands += count;
+      if (count > 0) roundsWithSpanishHands += 1;
+    });
+
+    if (playerRounds.length === 0) return null;
+
+    return (
+      <div className="bg-gradient-to-r from-sky-50 to-sky-100 rounded-lg p-6 border border-sky-200">
+        <h3 className="text-xl font-bold text-sky-900 mb-4">Spanish Hands</h3>
+        <div className="text-center">
+          <p className="text-5xl font-bold text-sky-700">{totalSpanishHands}</p>
+          <p className="text-sm text-ink-3 mt-2">
+            en {roundsWithSpanishHands} de {playerRounds.length} partidas
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const renderNoPasoRojasStats = () => {
     const playerRounds = archivedRounds.filter((round) =>
       round.player_stats?.some((ps: any) => ps.player_name === selectedPlayer)
@@ -725,6 +754,8 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                         {renderNoPasoRojasStats()}
                       </>
                     )}
+
+                    {renderSpanishHandsStats()}
                   </div>
                 )}
               </div>

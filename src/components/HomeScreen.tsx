@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
-import { Zap, LogIn, Plus, Share2, User, ChevronRight, FlaskConical } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -14,6 +14,8 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
+  /** Nombre del grupo propio; si existe, el botón de Team entra en él en lugar de crear otro. */
+  teamName?: string;
   onShowProfile: () => void;
   onShowAuth: () => void;
   onShowShare: () => void;
@@ -31,6 +33,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onQuickPlay,
   onJoinQuickPlay,
   onCreateTeam,
+  teamName,
   onShowProfile,
   onShowAuth,
   onShowShare,
@@ -90,8 +93,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           ) : (
             <div className="flex shrink-0 items-center gap-2">
-              <div className="text-right">
-                <p className="text-xs font-bold capitalize text-ink">{planType}</p>
+              <div className="min-w-0 text-right">
+                <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
                 <p className="text-xs text-ink-3">HCP {profile?.exact_handicap ?? 0}</p>
               </div>
               <button
@@ -142,8 +145,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onClick={onCreateTeam}
               className="w-full flex items-center justify-center gap-3 bg-amber-500 text-white px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
             >
-              <Plus className="w-6 h-6" />
-              {t('home.createTeam')}
+              {teamName ? <Users className="w-6 h-6" aria-hidden="true" /> : <Plus className="w-6 h-6" aria-hidden="true" />}
+              <span className="truncate">{teamName || t('home.createTeam')}</span>
             </WriteButton>
           )}
         </div>

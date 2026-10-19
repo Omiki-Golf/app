@@ -13,9 +13,29 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.6.1';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.6.1',
+    date: '2026-10-19',
+    title: 'Parejas, grupos Team y mejoras de las pruebas',
+    summary: 'Nuevo reparto de puntos en Parejas, grupos más fáciles de crear y gestionar, y correcciones detectadas en las pruebas del plan Team.',
+    changes: [
+      { type: 'improved', text: 'Parejas: en cada hoyo la mejor bola neta gana 1 punto y la peor 0,5; los empates no puntúan.' },
+      { type: 'new', text: 'Mis grupos muestra también los grupos de los que eres miembro, con un apartado de Jugadores y administradores.' },
+      { type: 'new', text: 'El creador del grupo puede nombrar administradores, que también pueden crear partidas.' },
+      { type: 'improved', text: 'El botón de Team de la pantalla principal muestra el nombre de tu grupo y entra directamente en él.' },
+      { type: 'improved', text: 'En los grupos, Comenzar partida abre la tarjeta y al finalizar se vuelve a las partidas del grupo.' },
+      { type: 'improved', text: 'No pasó de rojas y las cervezas funcionan en todos los grupos con la gamificación Hoyo 19.' },
+      { type: 'improved', text: 'Los invitados aparecen en la clasificación del día, sin afectar al hándicap del grupo.' },
+      { type: 'improved', text: 'Puntos de juego pasa a llamarse Clasificación y jugadores, con el nuevo hándicap más fácil de leer en el móvil.' },
+      { type: 'new', text: 'Las estadísticas del jugador incluyen sus Spanish Hands.' },
+      { type: 'fixed', text: 'Crear un grupo eligiendo Más tarde ya lo crea, y volver atrás tras crearlo no da error.' },
+      { type: 'fixed', text: 'Spanish Hands ya no se queda marcado en los hoyos siguientes.' },
+      { type: 'fixed', text: 'Archivar una partida pide confirmación.' },
+    ],
+  },
   {
     version: '1.6.0',
     date: '2026-10-15',

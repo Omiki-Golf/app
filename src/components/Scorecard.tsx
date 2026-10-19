@@ -34,6 +34,7 @@ interface ScorecardProps {
   isRoundFinished?: boolean;
   courseName?: string;
   groupCode?: string | null;
+  hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   decidedResult?: DecidedResult | null;
   onHoleChange: (holeNumber: number) => void;
@@ -61,6 +62,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   isRoundFinished = false,
   courseName = '',
   groupCode = null,
+  hoyo19Enabled,
   gameMode = 'stableford',
   decidedResult = null,
   onHoleChange,
@@ -71,7 +73,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onCourseChanged,
   messagesButton,
 }) => {
-  const isDivend = groupCode === 'DIVEND';
+  const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isModeScoring = gameMode !== 'stableford';
   const modeLabels: Record<GameMode, string> = {
     stableford: 'Stableford',
@@ -332,6 +334,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 )}
                 readonly={!hasEditAccess}
                 groupCode={groupCode}
+                hoyo19Enabled={isDivend}
                 gameMode={gameMode}
                 teamAssignments={gameMode === 'parejas' && players.length === 4 ? Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1])) : undefined}
                 onScoreChange={(playerId, score) => {
@@ -587,9 +590,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                               return s ? s.mode_points ?? 0 : null;
                             });
                             if (ps.every((v) => v !== null)) {
-                              const allRaya = scoresForHole.every(s => s?.abandoned);
-                              t0Accum += allRaya ? 0.5 : (ps[0] ?? 0);
-                              t1Accum += allRaya ? 0.5 : (ps[2] ?? 0);
+                              t0Accum += ps[0] ?? 0;
+                              t1Accum += ps[2] ?? 0;
                             }
                           });
                           const label = `${t0Accum}-${t1Accum}`;
@@ -630,9 +632,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                 roundsMap.get(p.id)?.scores[h.hole_number]
                               );
                               if (scoresForHole.every(Boolean)) {
-                                const allRaya = scoresForHole.every(s => s?.abandoned);
-                                t0 += allRaya ? 0.5 : (scoresForHole[0]?.mode_points ?? 0);
-                                t1 += allRaya ? 0.5 : (scoresForHole[2]?.mode_points ?? 0);
+                                t0 += scoresForHole[0]?.mode_points ?? 0;
+                                t1 += scoresForHole[2]?.mode_points ?? 0;
                               }
                             });
                             const label = `${t0}-${t1}`;

@@ -273,7 +273,7 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
               <Flag className="w-8 h-8 text-accent-ink" />
             </div>
-            <h1 className="text-3xl font-bold text-ink mb-2">La Partideta Golf</h1>
+            <h1 className="text-3xl font-bold text-ink mb-2">Omiki Golf</h1>
             <p className="text-ink-3">Tu compañero de golf</p>
           </div>
 

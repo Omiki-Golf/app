@@ -42,8 +42,10 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
   const [addPlayersNow, setAddPlayersNow] = useState(true);
-  const [assignAdmin, setAssignAdmin] = useState(false);
   const [hoyo19, setHoyo19] = useState(true);
+  // Los planes Team y Premium incluyen un grupo: si ya existe, no se ofrece crear otro.
+  const [existingGroup, setExistingGroup] = useState<{ id: string; name: string } | null>(null);
+  const [checkingExisting, setCheckingExisting] = useState(true);
   const [searchNick, setSearchNick] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [selectedPlayers, setSelectedPlayers] = useState<UserProfile[]>([]);
@@ -76,9 +78,28 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
     return code;
   };
 
+  useEffect(() => {
+    let active = true;
+    supabase
+      .from('groups')
+      .select('id, name')
+      .eq('user_auth_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .then(({ data }) => {
+        if (!active) return;
+        setExistingGroup(data?.[0] ?? null);
+        setCheckingExisting(false);
+      });
+    return () => { active = false; };
+  }, [userId]);
+
   const handleCreate = async () => {
     if (!groupName.trim()) { setError('El nombre del grupo es obligatorio'); return; }
-    if (!groupCode) { setGroupCode(generateCode()); }
+    // El grupo ya se creó en este asistente: no se vuelve a insertar.
+    if (createdGroupId) { setStep(4); return; }
+    const code = groupCode.trim() || generateCode();
+    setGroupCode(code);
 
     setLoading(true);
     setError('');
@@ -87,7 +108,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         .from('groups')
         .insert({
           name: groupName.trim(),
-          group_code: groupCode || generateCode(),
+          group_code: code,
           user_auth_id: userId,
           hoyo_19_enabled: hoyo19,
           max_players: 20,
@@ -96,7 +117,11 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         .select()
         .single();
 
-      if (groupError) throw groupError;
+      if (groupError) {
+        if (groupError.code === '23505') throw new Error('Ese código de acceso ya lo usa otro grupo. Vuelve al primer paso y elige otro o pulsa Generar.');
+        if (groupError.message?.includes('un grupo')) throw new Error(groupError.message);
+        throw groupError;
+      }
       setCreatedGroupId(groupData.id);
 
 
@@ -129,11 +154,40 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   return (
     <div className="min-h-screen bg-app transition-colors">
       <div className="max-w-lg mx-auto px-4 py-6">
-        <NavigationButton destination={step === 1 ? "home" : "back"}
-          onClick={() => step === 1 ? onBack() : setStep(step - 1)}
+        <NavigationButton destination={step === 1 || existingGroup ? "home" : "back"}
+          onClick={() => {
+            // Con el grupo ya creado no se vuelve a los pasos del asistente.
+            if (createdGroupId) onTeamCreated(createdGroupId);
+            else if (step === 1 || existingGroup) onBack();
+            else setStep(step === 4 ? 2 : step - 1);
+          }}
           className="flex items-center gap-2 text-ink-3 hover:text-ink mb-6"
         />
 
+        {checkingExisting && (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-accent" />
+          </div>
+        )}
+
+        {!checkingExisting && existingGroup && !createdGroupId && (
+          <div className="bg-card rounded-2xl shadow-card p-6 text-center">
+            <div className="w-16 h-16 bg-accent-soft rounded-full flex items-center justify-center mx-auto mb-4">
+              <Users className="text-accent-ink" size={32} />
+            </div>
+            <h2 className="text-xl font-bold text-ink mb-2">Ya tienes tu grupo</h2>
+            <p className="text-ink-3 mb-1">{existingGroup.name}</p>
+            <p className="text-sm text-ink-4 mb-6">Tu plan incluye un grupo. Desde Mis grupos puedes gestionar sus jugadores y administradores.</p>
+            <button
+              onClick={() => onTeamCreated(existingGroup.id)}
+              className="w-full bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors"
+            >
+              Ir a Mis grupos
+            </button>
+          </div>
+        )}
+
+        {!checkingExisting && (!existingGroup || createdGroupId) && <>
         {/* Step indicator */}
         <div className="flex items-center gap-2 mb-6">
           {[1, 2, 3].map(s => (
@@ -223,28 +277,10 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                 </div>
               </div>
 
-              {/* Q2: Assign admin */}
-              <div className="border border-line rounded-xl p-4">
-                <div className="flex items-start gap-2 mb-3">
-                  <p className="text-sm font-medium text-ink flex-1">
-                    Quieres asignar un administrador que te ayude a crear las partidas del grupo?
-                  </p>
-                  <Tooltip text="Un administrador puede crear partidas y gestionar jugadores del grupo. Puedes anadirlo ahora o despues." />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setAssignAdmin(true)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${assignAdmin ? 'bg-accent text-on-accent' : 'bg-card-2 text-ink-3'}`}
-                  >
-                    Si
-                  </button>
-                  <button
-                    onClick={() => setAssignAdmin(false)}
-                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${!assignAdmin ? 'bg-accent text-on-accent' : 'bg-card-2 text-ink-3'}`}
-                  >
-                    No
-                  </button>
-                </div>
+              {/* Administradores: se nombran cuando los invitados ya son miembros. */}
+              <div className="flex items-start gap-2 rounded-xl bg-card-2 p-4 text-sm text-ink-3">
+                <Info size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                <p>Podrás nombrar administradores que te ayuden a crear partidas desde <span className="font-semibold text-ink-2">Mis grupos → Jugadores y administradores</span>, cuando los invitados hayan aceptado.</p>
               </div>
 
               {/* Q3: Hoyo 19 */}
@@ -273,12 +309,13 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => setStep(addPlayersNow ? 3 : 4)}
-                className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors"
+              <WriteButton
+                onClick={() => addPlayersNow ? setStep(3) : void handleCreate()}
+                disabled={loading}
+                className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                {addPlayersNow ? 'Buscar jugadores' : 'Crear grupo'}
-              </button>
+                {addPlayersNow ? 'Buscar jugadores' : loading ? 'Creando...' : 'Crear grupo'}
+              </WriteButton>
             </div>
           </div>
         )}
@@ -383,6 +420,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
             </button>
           </div>
         )}
+        </>}
       </div>
     </div>
   );

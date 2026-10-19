@@ -14,6 +14,8 @@ interface HoleCardProps {
   allHoleScores?: Record<string, Record<number, RoundScore | undefined>>;
   readonly?: boolean;
   groupCode?: string | null;
+  /** Gamificación Hoyo 19 del grupo (No pasó de rojas). */
+  hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   teamAssignments?: Record<string, 0 | 1>;
   onScoreChange: (playerId: string, score: any) => void;
@@ -60,12 +62,13 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   allHoles,
   readonly = false,
   groupCode = null,
+  hoyo19Enabled,
   gameMode = 'stableford',
   teamAssignments = {},
   allHoleScores = {},
   onScoreChange,
 }) => {
-  const isDivend = groupCode === 'DIVEND';
+  const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isModeScoring = gameMode !== 'stableford';
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [firstDigit, setFirstDigit] = useState<number | null>(null);
@@ -175,6 +178,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         delete newState[playerId];
         return newState;
       });
+      setPendingSpanishHands(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
     } else {
       // Abriendo el desplegable
       setExpandedPlayerId(playerId);
@@ -205,6 +213,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         delete newState[playerId];
         return newState;
       });
+      setPendingSpanishHands(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
     } else if (num === 1) {
       // Marcando el 1, esperar segundo dígito
       setFirstDigit(1);
@@ -226,6 +239,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
       setFirstDigit(null);
       setPendingPlayerId(null);
       setPendingNoPasoRojas(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
+      setPendingSpanishHands(prev => {
         const newState = { ...prev };
         delete newState[playerId];
         return newState;
@@ -257,6 +275,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
     setFirstDigit(null);
     setPendingPlayerId(null);
     setPendingNoPasoRojas(prev => {
+      const newState = { ...prev };
+      if (pendingPlayerId) delete newState[pendingPlayerId];
+      return newState;
+    });
+    setPendingSpanishHands(prev => {
       const newState = { ...prev };
       if (pendingPlayerId) delete newState[pendingPlayerId];
       return newState;
@@ -460,6 +483,11 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                               delete newState[player.id];
                               return newState;
                             });
+                            setPendingSpanishHands(prev => {
+                              const newState = { ...prev };
+                              delete newState[player.id];
+                              return newState;
+                            });
                           }}
                           className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-lg transition-colors shadow-soft active:scale-95"
                         >
@@ -486,6 +514,11 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                             setFirstDigit(null);
                             setPendingPlayerId(null);
                             setPendingNoPasoRojas(prev => {
+                              const newState = { ...prev };
+                              delete newState[player.id];
+                              return newState;
+                            });
+                            setPendingSpanishHands(prev => {
                               const newState = { ...prev };
                               delete newState[player.id];
                               return newState;

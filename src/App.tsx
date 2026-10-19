@@ -71,6 +71,8 @@ function App() {
   const [authUser, setAuthUser] = useState<any>(null);
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [isGroupCreator, setIsGroupCreator] = useState(false);
+  const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
+  const [hasGroupMembership, setHasGroupMembership] = useState(false);
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>('main');
@@ -318,9 +320,7 @@ function App() {
 
         if (group) {
           console.log('✅ Group found:', group.group_code);
-          const { getUserId } = await import('./utils/userId');
-          const currentUserId = getUserId();
-          const isCreator = group.group_code === 'DIVEND' || currentUserId === group.created_by;
+          const isCreator = await resolveGroupManager(group);
           const limitedAccess = storageUtils.hasLimitedAccess();
           storageUtils.saveCurrentGroup(group.id, group.group_code, isCreator, limitedAccess);
           setIsGroupCreator(isCreator);
@@ -493,18 +493,41 @@ function App() {
     storageUtils.saveCurrentGroup(group.id, group.group_code, true, false);
   };
 
-  const handleGroupJoined = async (group: Group) => {
-    const { supabase } = await import('./services/supabaseClient');
-    const { data: { user } } = await supabase.auth.getUser();
+  // El botón de Team de la pantalla de inicio muestra el grupo propio cuando ya existe.
+  useEffect(() => {
+    if (!user?.id || currentView !== 'main') return;
+    let active = true;
+    golfService.getOwnedGroup(user.id)
+      .then((group) => { if (active) setOwnedTeam(group); })
+      .catch(() => { if (active) setOwnedTeam(null); });
+    return () => { active = false; };
+  }, [user?.id, currentView]);
 
-    let isCreator = false;
-    if (user) {
-      isCreator = group.group_code === 'DIVEND' || user.id === group.created_by;
-    } else {
-      const { getUserId } = await import('./utils/userId');
-      const currentUserId = getUserId();
-      isCreator = group.group_code === 'DIVEND' || currentUserId === group.created_by;
+  // Mis grupos aparece en el perfil de cualquier miembro de un grupo, también con plan Player.
+  useEffect(() => {
+    if (!user?.id || currentView !== 'profile') return;
+    let active = true;
+    supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', user.id)
+      .then(({ count }) => { if (active) setHasGroupMembership((count ?? 0) > 0); });
+    return () => { active = false; };
+  }, [user?.id, currentView]);
+
+  // Gestiona el grupo (crea partidas) su creador o cualquier administrador del grupo.
+  const resolveGroupManager = async (group: Group): Promise<boolean> => {
+    if (group.group_code === 'DIVEND') return true;
+    const { data: { user: authAccount } } = await supabase.auth.getUser();
+    const currentUserId = authAccount?.id ?? getUserId();
+    if (currentUserId === group.created_by) return true;
+    if (!authAccount) return false;
+    try {
+      return (await golfService.getMemberRole(group.id, authAccount.id)) === 'admin';
+    } catch {
+      return false;
     }
+  };
+
+  const handleGroupJoined = async (group: Group) => {
+    const isCreator = await resolveGroupManager(group);
 
     const limitedAccess = storageUtils.hasLimitedAccess();
     storageUtils.saveCurrentGroup(group.id, group.group_code, isCreator, limitedAccess);
@@ -610,11 +633,7 @@ function App() {
   };
 
   const handleStartRound = () => {
-    if (currentGroup) {
-      setCurrentView('main');
-    } else {
-      setCurrentView('scorecard');
-    }
+    setCurrentView('scorecard');
   };
 
   const handleHoleChange = (holeNumber: number) => {
@@ -905,7 +924,8 @@ function App() {
           setCurrentView('setup');
         }
       } else if (currentGroup) {
-        setCurrentView('statistics');
+        // En grupos se vuelve a las partidas del grupo, donde se ve el resumen y se archiva.
+        setCurrentView('active-rounds');
       } else {
         setCurrentView('setup');
       }
@@ -1069,6 +1089,7 @@ function App() {
             onShowPlans={() => { setPlansContext('default'); openFromProfile('plans'); }}
             onShowProShop={() => setCurrentView('pro-shop')}
             onShowGroups={() => openFromProfile('my-groups')}
+            hasGroups={hasGroupMembership}
             onShowSettings={() => setCurrentView('profile-details')}
             messagesButton={inlineMessagesButton}
           />
@@ -1208,7 +1229,8 @@ function App() {
               setShowAccessCodeModal(true);
               setAccessCodeError('');
             }}
-            onCreateTeam={() => setCurrentView('team-creation')}
+            teamName={ownedTeam?.name || ownedTeam?.group_code}
+            onCreateTeam={() => ownedTeam ? void handleGroupJoined(ownedTeam) : setCurrentView('team-creation')}
             onShowProfile={() => setCurrentView('profile')}
             onShowAuth={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}
@@ -1316,6 +1338,7 @@ function App() {
             gameMode={roundState.round.game_mode}
             onPlayersUpdated={handlePlayersUpdated}
             onStartRound={handleStartRound}
+            onSaveAndReturn={() => setCurrentView('main')}
             onOpenHoleConfig={() => setShowHoleConfig(true)}
             onHolesChanged={handleHolesChanged}
             onBack={handleBackToMain}
@@ -1353,6 +1376,7 @@ function App() {
           isRoundFinished={roundState.round.status === 'completed' || roundState.round.status === 'archived'}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
+          hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
           gameMode={roundState.round.game_mode}
           decidedResult={roundState.round.decided_result}
           onHoleChange={handleHoleChange}

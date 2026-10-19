@@ -376,23 +376,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </div>
         )}
 
-        {/* Unirse con Código */}
-        {currentGroup && !hasLimitedAccess && (
-          <div
-            onClick={onJoinWithCode}
-            className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
-          >
-            <h2 className="text-2xl font-bold text-purple-900 mb-4">{t('roundSetup.joinTitle')}</h2>
-            <p className="text-ink-2 mb-6">
-              {t('roundSetup.joinDescription')}
-            </p>
-            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-              {t('roundSetup.enterCode')}
-              <ChevronRight size={20} />
-            </button>
-          </div>
-        )}
-
         {/* Salir del Grupo */}
         {currentGroup && hasLimitedAccess && (
           <button
@@ -616,7 +599,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </div>
         </div>
 
-        {/* Puntos de juego */}
+        {/* Clasificación y jugadores */}
         {currentGroup && (
           <div
             onClick={onViewGamePoints}
