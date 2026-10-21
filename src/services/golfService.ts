@@ -128,6 +128,7 @@ export const golfService = {
       .from('groups')
       .select('*')
       .eq('group_code', groupCode)
+      .is('archived_at', null)
       .maybeSingle();
 
     if (error) throw error;
@@ -158,6 +159,7 @@ export const golfService = {
       .from('groups')
       .select('*')
       .eq('user_auth_id', userId)
+      .is('archived_at', null)
       .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -184,6 +186,7 @@ export const golfService = {
       .from('groups')
       .select('*')
       .eq('group_code', groupCode)
+      .is('archived_at', null)
       .maybeSingle();
 
     if (error) throw error;

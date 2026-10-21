@@ -7,7 +7,7 @@ import { WriteButton, useReadOnly } from '../context/ReadOnlyContext';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
 
 // ownerId: creador del grupo. Solo él nombra o retira administradores, y su propio rol no se toca.
-export function GroupMemberList({ groupId, ownerId }: { groupId: string; ownerId?: string }) {
+export function GroupMemberList({ groupId, ownerId, archived = false }: { groupId: string; ownerId?: string; archived?: boolean }) {
   const { user } = useAuth();
   const userId = user?.id;
   const [state, setState] = useState<{ identity: string; members: GroupMember[] } | null>(null);
@@ -44,7 +44,7 @@ export function GroupMemberList({ groupId, ownerId }: { groupId: string; ownerId
     return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', focus); };
   }, [groupId, userId, identity, refresh]);
   const apply = async () => {
-    if (!edit || edit.identity !== identity || readOnly || busyRef.current) return;
+    if (!edit || edit.identity !== identity || readOnly || archived || busyRef.current) return;
     busyRef.current = true; setBusy(true); setError('');
     try {
       await userService.manageGroupMember(edit.member, edit.action, edit.action === 'handicap' ? Number(handicap.replace(',', '.')) : undefined);
@@ -56,7 +56,7 @@ export function GroupMemberList({ groupId, ownerId }: { groupId: string; ownerId
   };
   const isOwner = !!userId && userId === ownerId;
   const toggleRole = async (member: GroupMember) => {
-    if (readOnly || busyRef.current) return;
+    if (readOnly || archived || busyRef.current) return;
     busyRef.current = true; setBusy(true); setError('');
     try {
       await userService.updateMemberRole(groupId, member.user_id, member.role === 'admin' ? 'member' : 'admin');
@@ -91,7 +91,7 @@ export function GroupMemberList({ groupId, ownerId }: { groupId: string; ownerId
         </div>
       </div>
       <details className="text-xs text-ink-3 mt-3"><summary>Detalles</summary><p className="break-all">UUID de cuenta: {member.user_id}</p><p className="break-all">Ficha: {member.player_id}</p></details>
-      {(member.can_manage || (isOwner && member.user_id !== ownerId)) && <div className="flex flex-wrap gap-2 mt-3">
+      {!archived && (member.can_manage || (isOwner && member.user_id !== ownerId)) && <div className="flex flex-wrap gap-2 mt-3">
         {member.can_manage && <WriteButton className="border border-line rounded-xl px-3 py-2" onClick={() => start(member, 'handicap')}>Editar hándicap</WriteButton>}
         {isOwner && member.user_id !== ownerId && <WriteButton disabled={busy} className="border border-accent text-accent-ink rounded-xl px-3 py-2 disabled:opacity-50" onClick={() => void toggleRole(member)}>{member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'}</WriteButton>}
         {member.can_manage && member.can_remove && <WriteButton className="border border-red-400 text-red-500 rounded-xl px-3 py-2" onClick={() => start(member, 'remove')}>Eliminar del grupo</WriteButton>}

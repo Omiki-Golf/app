@@ -111,7 +111,21 @@ function App() {
     ? { groupId: currentGroup.id }
     : { roundId: roundState.round?.group_id ? null : roundState.round?.id, accessCode: roundState.round?.id ? accessCodeStorage.getAccessCode(roundState.round.id) : null };
   const {count: pendingInvitations, refresh: refreshNotifications} = useNotificationCount(user?.id ?? null, currentView, activityScope);
-  const handleNotificationsRefresh = useCallback(() => { void refreshNotifications(); }, [refreshNotifications]);
+  const refreshGroupMembership = useCallback(async () => {
+    if (!user?.id) {
+      setHasGroupMembership(false);
+      return;
+    }
+    const { count, error } = await supabase
+      .from('group_members')
+      .select('group_id', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+    if (!error) setHasGroupMembership((count ?? 0) > 0);
+  }, [user?.id]);
+  const handleNotificationsRefresh = useCallback(() => {
+    void refreshNotifications();
+    void refreshGroupMembership();
+  }, [refreshNotifications, refreshGroupMembership]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -141,13 +155,6 @@ function App() {
     setSimulatedPlan(null);
     setSimulatorUpdating(false);
   }, [user?.id]);
-
-  useEffect(() => {
-    if (currentView === 'my-groups' && !subscriptionLoading && activePlanType !== 'team' && activePlanType !== 'premium' && !readOnly) {
-      setReturnToProfile(false);
-      setCurrentView('main');
-    }
-  }, [activePlanType, currentView, subscriptionLoading, readOnly]);
 
   useEffect(() => {
     if (currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'viewer') {
@@ -506,11 +513,8 @@ function App() {
   // Mis grupos aparece en el perfil de cualquier miembro de un grupo, también con plan Player.
   useEffect(() => {
     if (!user?.id || currentView !== 'profile') return;
-    let active = true;
-    supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', user.id)
-      .then(({ count }) => { if (active) setHasGroupMembership((count ?? 0) > 0); });
-    return () => { active = false; };
-  }, [user?.id, currentView]);
+    void refreshGroupMembership();
+  }, [user?.id, currentView, refreshGroupMembership]);
 
   // Gestiona el grupo (crea partidas) su creador o cualquier administrador del grupo.
   const resolveGroupManager = async (group: Group): Promise<boolean> => {
@@ -1203,6 +1207,19 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <MyGroups backDestination={returnToProfile ? 'back' : 'home'}
             onBack={() => backFromProfileSection('main')}
+            onGroupArchived={(groupId, archivedAt) => {
+              setOwnedTeam(current => current?.id === groupId ? null : current);
+              setCurrentGroup(current => current?.id === groupId ? { ...current, archived_at: archivedAt } : current);
+            }}
+            onGroupDeleted={(groupId) => {
+              setOwnedTeam(current => current?.id === groupId ? null : current);
+              setCurrentGroup(current => {
+                if (current?.id !== groupId) return current;
+                storageUtils.clearCurrentGroup();
+                return null;
+              });
+              void refreshGroupMembership();
+            }}
             onGroupSelected={(group) => {
               setReturnToProfile(false);
               void handleGroupJoined(group);

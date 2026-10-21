@@ -2,7 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useState } from 'react';
-import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
 import { ConfirmModal } from './ConfirmModal';
@@ -15,6 +15,8 @@ interface MyGroupsProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   onGroupSelected: (group: Group) => void;
+  onGroupArchived?: (groupId: string, archivedAt: string) => void;
+  onGroupDeleted?: (groupId: string) => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -26,6 +28,7 @@ interface GroupWithCode {
   created_by?: string;
   user_auth_id?: string;
   hoyo_19_enabled?: boolean;
+  archived_at?: string | null;
 }
 
 interface MyGroup extends GroupWithCode {
@@ -33,9 +36,9 @@ interface MyGroup extends GroupWithCode {
   access: 'owner' | 'admin' | 'member';
 }
 
-const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled';
+const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at';
 
-export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, messagesButton }: MyGroupsProps) {
+export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, messagesButton }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
   const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState('');
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
+  const [groupToArchive, setGroupToArchive] = useState<string | null>(null);
   const [openMembers, setOpenMembers] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
 
@@ -112,18 +116,30 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
     setGroupToDelete(groupId);
   };
 
+  const confirmArchiveGroup = async () => {
+    if (!groupToArchive) return;
+    try {
+      const { data, error: archiveError } = await supabase.rpc('archive_owned_group', { p_group: groupToArchive });
+      if (archiveError) throw archiveError;
+      setGroups(current => current.map(group => group.id === groupToArchive ? { ...group, archived_at: data } : group));
+      onGroupArchived?.(groupToArchive, data);
+      setGroupToArchive(null);
+    } catch (err: any) {
+      setError(err.message || 'No se pudo archivar el grupo');
+      setGroupToArchive(null);
+    }
+  };
+
   const confirmDeleteGroup = async () => {
     if (!groupToDelete) return;
 
     try {
-      const { error: deleteError } = await supabase
-        .from('groups')
-        .delete()
-        .eq('id', groupToDelete);
+      const { error: deleteError } = await supabase.rpc('delete_archived_owned_group', { p_group: groupToDelete });
 
       if (deleteError) throw deleteError;
 
       setGroups(groups.filter(g => g.id !== groupToDelete));
+      onGroupDeleted?.(groupToDelete);
       setGroupToDelete(null);
     } catch (err: any) {
       setError(err.message || t('groups.deleteError'));
@@ -143,6 +159,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       created_at: groupWithCode.created_at,
       created_by: groupWithCode.user_auth_id || groupWithCode.created_by,
       hoyo_19_enabled: groupWithCode.hoyo_19_enabled,
+      archived_at: groupWithCode.archived_at,
     };
     onGroupSelected(group);
   };
@@ -228,14 +245,15 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     <div className="min-w-0">
                       <h3 className="font-semibold text-ink text-lg break-words">{group.name}</h3>
                       <p className="text-xs font-medium text-ink-3">{accessLabel[group.access]}</p>
+                      {group.archived_at && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Archivado</span>}
                     </div>
                     {group.access === 'owner' && (
                       <WriteButton
-                        onClick={() => handleDeleteGroup(group.id)}
+                        onClick={() => group.archived_at ? handleDeleteGroup(group.id) : setGroupToArchive(group.id)}
                         className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                        title={t('groups.delete')}
+                        title={group.archived_at ? 'Eliminar definitivamente' : 'Archivar grupo'}
                       >
-                        <Trash2 size={18} />
+                        {group.archived_at ? <Trash2 size={18} /> : <Archive size={18} />}
                       </WriteButton>
                     )}
                   </div>
@@ -286,7 +304,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
                   {openMembers === group.id && (
                     <div className="mt-4">
-                      <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} />
+                      <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} archived={Boolean(group.archived_at)} />
                     </div>
                   )}
 
@@ -302,9 +320,17 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
       {groupToDelete && (
         <ConfirmModal
-          message={t('groups.deleteConfirm')}
+          message="Se borrarán definitivamente el grupo, todas sus partidas, clasificaciones y estadísticas. Esta acción no se puede deshacer."
           onConfirm={confirmDeleteGroup}
           onCancel={cancelDeleteGroup}
+          requiredText="ELIMINAR"
+        />
+      )}
+      {groupToArchive && (
+        <ConfirmModal
+          message="El grupo quedará en modo consulta y podrás crear uno nuevo. No se podrán crear más partidas en este grupo."
+          onConfirm={confirmArchiveGroup}
+          onCancel={() => setGroupToArchive(null)}
         />
       )}
 

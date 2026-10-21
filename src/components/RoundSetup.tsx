@@ -49,6 +49,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
+  const isArchivedGroup = Boolean(currentGroup?.archived_at);
   const handleGameModeClick = (mode: GameMode) => {
     if (isExpress && mode !== 'stableford') {
       if (onShowPlans) onShowPlans('express-modes');
@@ -169,6 +170,10 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   };
 
   const handleCreateRound = async () => {
+    if (isArchivedGroup) {
+      setError('Este grupo está archivado y no admite nuevas partidas.');
+      return;
+    }
     const isGroupRound = Boolean(currentGroup?.id || currentGroup?.group_code);
 
     if (!isGroupRound) {
@@ -339,8 +344,15 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           )}
         </div>
 
+        {isArchivedGroup && (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-center text-amber-900">
+            <p className="font-bold">Grupo archivado</p>
+            <p className="text-sm">Está disponible en modo consulta. Puedes ver clasificación, jugadores y estadísticas.</p>
+          </div>
+        )}
+
         {/* Código de Grupo */}
-        {currentGroup && !hasLimitedAccess && (
+        {currentGroup && !hasLimitedAccess && !isArchivedGroup && (
           <div className="bg-card rounded-lg shadow-card p-6">
             <div className="flex items-start justify-between mb-3">
               <h3 className="text-lg font-semibold text-ink">{t('roundSetup.groupCode')}</h3>
@@ -389,9 +401,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </button>
         )}
 
-        <div className={`grid grid-cols-1 ${(isGroupCreator && !hasLimitedAccess) ? 'md:grid-cols-2 md:items-stretch' : ''} gap-4`}>
+        <div className={`grid grid-cols-1 ${(isGroupCreator && !hasLimitedAccess && !isArchivedGroup) ? 'md:grid-cols-2 md:items-stretch' : ''} gap-4`}>
           {/* Nueva Partida */}
-          {isGroupCreator && !hasLimitedAccess && (
+          {isGroupCreator && !hasLimitedAccess && !isArchivedGroup && (
             <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
               <h2 className="text-2xl font-bold text-title mb-6">{t('roundSetup.newRound')}</h2>
 
@@ -520,7 +532,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           {/* Columna derecha: Mi Partida y Estadísticas */}
           <div className="flex flex-col gap-4 h-full">
             {/* Ver Partida Activa */}
-            <div
+            {!isArchivedGroup && <div
               onClick={onViewActiveRounds}
               className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-2 border-amber-300 dark:border-amber-700 rounded-lg shadow-card cursor-pointer hover:shadow-2xl transition-shadow flex-[2] flex flex-col"
             >
@@ -543,7 +555,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                 {t('roundSetup.viewRound')}
                 <ChevronRight size={20} />
               </button>
-            </div>
+            </div>}
 
             {/* Sección de Estadísticas para Partida Rápida */}
             {!currentGroup && onViewStatistics && (

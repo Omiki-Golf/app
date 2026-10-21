@@ -84,6 +84,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
       .from('groups')
       .select('id, name')
       .eq('user_auth_id', userId)
+      .is('archived_at', null)
       .order('created_at', { ascending: true })
       .limit(1)
       .then(({ data }) => {

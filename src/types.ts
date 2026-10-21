@@ -52,6 +52,7 @@ export interface Group {
   premium_branding?: boolean;
   weekend_mode_until?: string | null;
   group_type?: string;
+  archived_at?: string | null;
 }
 
 export type PlanType = 'express' | 'player' | 'team' | 'premium';
