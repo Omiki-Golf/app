@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { Crown, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { userService } from '../services/userService';
 import type { GroupMember, UserProfile } from '../types';
@@ -25,14 +25,21 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const [guestHandicap18, setGuestHandicap18] = useState('');
+  const [invitationStatuses, setInvitationStatuses] = useState<Record<string, 'pending' | 'accepted' | 'rejected'>>({});
+  const [invitedProfiles, setInvitedProfiles] = useState<Array<{ profile: UserProfile; status: 'pending' | 'accepted' | 'rejected' }>>([]);
 
   useEffect(() => {
     if (!userId) return;
     let active = true;
     const load = async () => {
       try {
-        const members = await userService.getGroupMembers(groupId);
-        if (active) { setState({ identity, members }); setLoadError(''); }
+        const [members, invitations] = await Promise.all([userService.getGroupMembers(groupId), userService.getGroupInvitationStatuses(groupId)]);
+        if (active) {
+          setState({ identity, members });
+          setInvitationStatuses(Object.fromEntries(invitations.map(invitation => [invitation.userId, invitation.status])));
+          setInvitedProfiles(invitations.filter(invitation => invitation.profile).map(invitation => ({ profile: invitation.profile!, status: invitation.status })));
+          setLoadError('');
+        }
       } catch { if (active) setLoadError('No se pudieron cargar los jugadores. Pulsa Actualizar para reintentarlo.'); }
     };
     void load();
@@ -83,7 +90,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
   const inviteRegistered = async (profile: UserProfile) => {
     if (!userId || readOnly || archived || busyRef.current) return;
     busyRef.current = true; setBusy(true); setError('');
-    try { await userService.sendInvitation(groupId, profile.user_id, userId, 'Te han invitado al grupo'); setSearchName(''); setSearchResults([]); setError(`Invitación enviada a ${profile.nick}. Aparecerá cuando la acepte.`); }
+    try { await userService.sendInvitation(groupId, profile.user_id, userId, 'Te han invitado al grupo'); setInvitationStatuses(current => ({ ...current, [profile.user_id]: current[profile.user_id] ?? 'pending' })); setInvitedProfiles(current => current.some(item => item.profile.user_id === profile.user_id) ? current : [...current, { profile, status: 'pending' }]); setError(`Invitación enviada a ${profile.nick}.`); }
     catch (err) { setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se pudo enviar la invitación'); }
     finally { busyRef.current = false; setBusy(false); }
   };
@@ -106,14 +113,15 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
     </div>
     {showAdd && canManage && <div className="border border-line rounded-xl p-3 space-y-3">
       <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-4" /><input value={searchName} onChange={event => setSearchName(event.target.value)} placeholder="Nick o nombre del jugador..." className="w-full pl-9 pr-3 py-2 border border-line rounded-lg bg-card" /></div>
-      {searchResults.map(profile => <button key={profile.user_id} disabled={busy || members?.some(member => member.user_id === profile.user_id)} onClick={() => void inviteRegistered(profile)} className="w-full flex items-center gap-2 p-2 rounded-lg bg-card-2 disabled:opacity-50 text-left"><img src={normalizeAvatarUrl(profile.avatar_url)} alt="" className="w-8 h-8 rounded-full" /><span className="flex-1"><span className="block font-medium">{profile.nick}</span><span className="block text-xs text-ink-3">HCP 18: {(profile.exact_handicap ?? 0).toFixed(1)}</span></span><UserPlus size={17} /></button>)}
+      {invitedProfiles.filter(item => !members?.some(member => member.user_id === item.profile.user_id)).map(item => <div key={`invited:${item.profile.user_id}`} className="w-full flex items-center gap-2 p-2 rounded-lg border border-line bg-card"><img src={normalizeAvatarUrl(item.profile.avatar_url)} alt="" className="w-8 h-8 rounded-full" /><span className="min-w-0 flex-1 font-medium truncate">{item.profile.nick}</span><span className={`shrink-0 text-xs font-semibold ${item.status === 'rejected' ? 'text-red-500' : 'text-amber-600'}`}>{item.status === 'pending' ? 'Invitación pendiente' : item.status === 'rejected' ? 'Invitación rechazada' : 'Invitación aceptada'}</span></div>)}
+      {searchResults.map(profile => { const invitationStatus = invitationStatuses[profile.user_id]; const alreadyMember = members?.some(member => member.user_id === profile.user_id); return <button key={profile.user_id} disabled={busy || alreadyMember || Boolean(invitationStatus)} onClick={() => void inviteRegistered(profile)} className="w-full flex items-center gap-2 p-2 rounded-lg bg-card-2 disabled:opacity-70 text-left"><img src={normalizeAvatarUrl(profile.avatar_url)} alt="" className="w-8 h-8 rounded-full" /><span className="min-w-0 flex-1"><span className="block font-medium truncate">{profile.nick}</span><span className="block text-xs text-ink-3">HCP 18: {(profile.exact_handicap ?? 0).toFixed(1)}</span></span><span className="shrink-0 text-xs font-medium">{alreadyMember ? 'Miembro' : invitationStatus === 'pending' ? 'Invitación pendiente' : invitationStatus === 'accepted' ? 'Invitación aceptada' : invitationStatus === 'rejected' ? 'Invitación rechazada' : <UserPlus size={17} />}</span></button>; })}
       {searchName.trim().length >= 2 && !searching && !searchResults.some(profile => profile.nick.toLocaleLowerCase() === searchName.trim().toLocaleLowerCase()) && <div className="bg-card-2 rounded-lg p-3"><p className="text-sm mb-2">Añadir “{searchName.trim()}” sin cuenta</p><div className="flex gap-2"><input type="number" min="0" max="54" step="0.1" value={guestHandicap18} onChange={event => setGuestHandicap18(event.target.value)} placeholder="HCP 18 hoyos" className="min-w-0 flex-1 px-3 py-2 border border-line rounded-lg bg-card" /><WriteButton disabled={busy} onClick={() => void addGuest()} className="bg-accent text-on-accent rounded-lg px-3">Añadir</WriteButton></div><p className="text-xs text-ink-3 mt-2">Para 9 hoyos se divide entre dos y se redondea.</p></div>}
     </div>}
     <p className="text-xs text-ink-3">Las invitaciones pendientes aparecen cuando se aceptan.</p>
     {loadError && <p role="alert" className="text-red-600">{loadError}</p>}{!edit && error && <p role="status" className="text-sm text-ink-3">{error}</p>}{!members && !loadError && <p role="status">Cargando jugadores…</p>}
     {members?.map(member => <article key={member.id} className="bg-card border border-line rounded-xl px-3 py-2">
-      <div className="flex items-center gap-2"><img src={normalizeAvatarUrl(member.profile?.avatar_url)} alt="" className="w-9 h-9 rounded-full object-cover" /><div className="min-w-0 flex-1"><p className="font-semibold break-words">{member.profile?.nick || 'Registro pendiente'}</p><p className="text-xs text-ink-3">{member.user_id === ownerId ? 'Creador' : member.role === 'admin' ? 'Administrador' : member.is_guest ? 'Invitado' : 'Miembro'} · {member.handicap_18 === null ? 'Hándicap pendiente' : `HCP 18: ${member.handicap_18} · HCP 9: ${member.handicap_18 / 2}`}</p></div>
-        {!archived && isOwner && member.user_id && member.user_id !== ownerId && <label className={`flex items-center gap-1 text-xs ${member.role !== 'admin' && delegatedAdminExists ? 'opacity-50' : ''}`} title={member.role !== 'admin' && delegatedAdminExists ? 'Ya hay otro administrador' : 'Administrador'}><span>Admin</span><button type="button" role="switch" aria-checked={member.role === 'admin'} disabled={busy || (member.role !== 'admin' && delegatedAdminExists)} onClick={() => void toggleRole(member)} className={`relative h-6 w-10 rounded-full transition-colors ${member.role === 'admin' ? 'bg-accent' : 'bg-line-2'}`}><span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${member.role === 'admin' ? 'translate-x-4' : ''}`} /></button></label>}
+      <div className="flex items-center gap-2">{member.user_id ? <img src={normalizeAvatarUrl(member.profile?.avatar_url)} alt="" className="w-9 h-9 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="w-9 h-9 shrink-0 rounded-full bg-accent text-on-accent flex items-center justify-center font-bold uppercase">{(member.profile?.nick || '?').trim().charAt(0)}</div>}<div className="min-w-0 flex-1"><p className="font-semibold truncate whitespace-nowrap">{member.profile?.nick || 'Registro pendiente'}</p><p className="text-xs text-ink-3 whitespace-nowrap">{member.user_id === ownerId ? 'Creador' : member.role === 'admin' ? 'Administrador' : 'Miembro'} · {member.handicap_18 === null ? 'Hándicap pendiente' : `HCP 18: ${member.handicap_18} · HCP 9: ${member.handicap_18 / 2}`}</p></div>
+        {!archived && isOwner && member.user_id && member.user_id !== ownerId && <button type="button" aria-label={member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'} disabled={busy || (member.role !== 'admin' && delegatedAdminExists)} onClick={() => void toggleRole(member)} title={member.role !== 'admin' && delegatedAdminExists ? 'Ya hay otro administrador' : member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'} className={`shrink-0 p-1.5 rounded-full disabled:opacity-40 ${member.role === 'admin' ? 'text-amber-500 bg-amber-500/15' : 'text-ink-4 bg-card-2'}`}><Crown size={19} fill={member.role === 'admin' ? 'currentColor' : 'none'} /></button>}
         {!archived && member.can_manage && member.can_remove && <WriteButton title="Eliminar del grupo" aria-label={`Eliminar a ${member.profile?.nick || 'jugador'} del grupo`} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg" onClick={() => start(member, 'remove')}><Trash2 size={18} /></WriteButton>}
       </div>{!archived && member.can_manage && <button className="ml-11 mt-1 text-xs text-accent-ink underline" onClick={() => start(member, 'handicap')}>Editar HCP</button>}
     </article>)}

@@ -77,7 +77,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [playersInActiveRounds, setPlayersInActiveRounds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [creatingUnlinked, setCreatingUnlinked] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [handicap, setHandicap] = useState('');
@@ -233,7 +232,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const handleSelectPlayer = (player: Player) => {
     setCreatingUnlinked(false);
     setSelectedPlayer(player);
-    setIsGuest(!!player.is_guest);
     setSearchTerm(player.name);
     const baseHandicap = player.exact_handicap_18 ?? player.exact_handicap;
     const displayHandicap = numHoles === 18 ? baseHandicap * 2 : baseHandicap;
@@ -242,7 +240,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   };
 
   const handleSearchChange = (value: string) => {
-    setIsGuest(false);
     setCreatingUnlinked(false);
     setSearchTerm(value);
     setSelectedPlayer(null);
@@ -277,7 +274,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       let newPlayer: RoundPlayer;
       if (currentGroup) {
-        newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, isGuest, selectedPlayer?.id);
+        newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, false, selectedPlayer?.id);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         const playersArray: Player[] = localPlayers ? JSON.parse(localPlayers) : [];
@@ -308,7 +305,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       setSearchTerm('');
       setCreatingUnlinked(false);
-      setIsGuest(false);
       setHandicap('');
       setSelectedPlayer(null);
       setShowDropdown(false);
@@ -548,7 +544,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             className="flex-1 px-4 py-3 text-left"
                           >
                             <p className="font-semibold text-ink">{player.name}</p>
-                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
+                            <p className="text-xs text-ink-3">{player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
                             </p>
@@ -604,26 +600,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                 </div>
               )}
             </div>
-
-            {currentGroup && !selectedPlayer?.auth_user_id && (
-              <div className="rounded-lg border border-line p-3">
-                <label className="flex items-center gap-2 text-sm font-semibold text-ink-2">
-                  <input type="checkbox" checked={isGuest}
-                    disabled={adding || loading || !canAddMorePlayers || !!selectedPlayer}
-                    onChange={event => setIsGuest(event.target.checked)} />
-                  Invitado: solo juega esta partida
-                </label>
-                <p className="text-xs text-ink-3 mt-2">
-                  {isGuest || !selectedPlayer ? 'No contará en las estadísticas ni en los ajustes automáticos del grupo si marcas Invitado.' : 'Cuenta como miembro del grupo en estadísticas, cervezas y ajustes de hándicap.'}
-                </p>
-                {selectedPlayer?.is_guest && canManage && <div className="mt-2">
-                  <WriteButton type="button" disabled={adding} onClick={() => setIsGuest(!isGuest)} className="text-sm text-accent-ink underline">
-                    {isGuest ? 'Incorporar al grupo' : 'Mantener como invitado'}
-                  </WriteButton>
-                  {!isGuest && <p className="text-xs text-ink-3 mt-1">Se incorporará al añadirlo. Las partidas anteriores conservan su condición de invitado.</p>}
-                </div>}
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-semibold text-ink-2 mb-2">
@@ -756,7 +732,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-ink">{player.name}</p>
-                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
+                            <p className="text-xs text-ink-3">{player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
                         {teamIdx >= 0 && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${teamIdx === 0 ? 'bg-blue-200 text-blue-800' : 'bg-orange-200 text-orange-800'}`}>
                             P{teamIdx + 1}

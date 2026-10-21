@@ -129,7 +129,7 @@ export const userService = {
   },
 
   async manageGroupMember(member: GroupMember, action: 'handicap' | 'remove', handicap18?: number): Promise<void> {
-    if (member.is_guest) {
+    if (!member.user_id) {
       const { error } = await supabase.rpc('manage_group_guest_player', {
         p_group: member.group_id,
         p_player: member.player_id,
@@ -204,17 +204,29 @@ export const userService = {
     })) as GroupInvitation[];
   },
 
-  async sendInvitation(groupId: string, invitedUserId: string, invitedBy: string, message?: string): Promise<void> {
-    const { error } = await supabase
-      .from('group_invitations')
-      .insert({
-        group_id: groupId,
-        invited_user_id: invitedUserId,
-        invited_by: invitedBy,
-        status: 'pending',
-        message,
-      });
+  async sendInvitation(groupId: string, invitedUserId: string, _invitedBy: string, message?: string): Promise<void> {
+    const { error } = await supabase.rpc('invite_group_user_once', {
+      p_group: groupId,
+      p_user: invitedUserId,
+      p_message: message ?? null,
+    });
     if (error) throw error;
+  },
+
+  async getGroupInvitationStatuses(groupId: string): Promise<Array<{ userId: string; status: 'pending' | 'accepted' | 'rejected'; profile?: UserProfile }>> {
+    const { data, error } = await supabase
+      .from('group_invitations')
+      .select('invited_user_id, status')
+      .eq('group_id', groupId);
+    if (error) throw error;
+    const ids = (data || []).map(row => row.invited_user_id);
+    const { data: profiles, error: profileError } = ids.length ? await supabase.from('user_profiles').select('*').in('user_id', ids) : { data: [], error: null };
+    if (profileError) throw profileError;
+    return (data || []).map(row => ({
+      userId: row.invited_user_id,
+      status: row.status as 'pending' | 'accepted' | 'rejected',
+      profile: (profiles || []).find(profile => profile.user_id === row.invited_user_id) as UserProfile | undefined,
+    }));
   },
 
   async addGroupGuest(groupId: string, name: string, handicap18: number): Promise<void> {
