@@ -206,6 +206,15 @@ export const userService = {
     if (error) throw error;
   },
 
+  async addGroupGuest(groupId: string, name: string, handicap18: number): Promise<void> {
+    const { error } = await supabase.rpc('add_group_guest_player', {
+      p_group: groupId,
+      p_name: name,
+      p_handicap_18: handicap18,
+    });
+    if (error) throw error;
+  },
+
   async respondToInvitation(invitationId: string, status: 'accepted' | 'rejected'): Promise<void> {
     const { error } = await supabase.rpc('respond_to_group_invitation', {
       p_invitation: invitationId,

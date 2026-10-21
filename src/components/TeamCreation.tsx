@@ -16,6 +16,14 @@ interface TooltipProps {
   text: string;
 }
 
+interface PendingPlayer {
+  key: string;
+  name: string;
+  handicap18: number;
+  avatarUrl?: string;
+  registeredUserId?: string;
+}
+
 const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   const [show, setShow] = useState(false);
   return (
@@ -48,7 +56,9 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [searchNick, setSearchNick] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
-  const [selectedPlayers, setSelectedPlayers] = useState<UserProfile[]>([]);
+  const [selectedPlayers, setSelectedPlayers] = useState<PendingPlayer[]>([]);
+  const [guestHandicap18, setGuestHandicap18] = useState('');
+  const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null);
@@ -57,15 +67,19 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   useEffect(() => {
     if (searchNick.length < 2) {
       setSearchResults([]);
+      setSearching(false);
       return;
     }
     if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(async () => {
+      setSearching(true);
       try {
         const results = await userService.searchByNick(searchNick);
         setSearchResults(results.filter(r => r.user_id !== userId));
       } catch {
         setSearchResults([]);
+      } finally {
+        setSearching(false);
       }
     }, 400);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
@@ -128,7 +142,11 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
 
       if (addPlayersNow && selectedPlayers.length > 0) {
         for (const player of selectedPlayers) {
-          await userService.sendInvitation(groupData.id, player.user_id, userId, `Te han invitado al grupo ${groupName}`);
+          if (player.registeredUserId) {
+            await userService.sendInvitation(groupData.id, player.registeredUserId, userId, `Te han invitado al grupo ${groupName}`);
+          } else {
+            await userService.addGroupGuest(groupData.id, player.name, player.handicap18);
+          }
         }
       }
 
@@ -141,15 +159,45 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   };
 
   const addPlayer = (player: UserProfile) => {
-    if (!selectedPlayers.find(p => p.user_id === player.user_id)) {
-      setSelectedPlayers([...selectedPlayers, player]);
+    if (!selectedPlayers.find(p => p.registeredUserId === player.user_id)) {
+      setSelectedPlayers([...selectedPlayers, {
+        key: `user:${player.user_id}`,
+        name: player.nick,
+        handicap18: player.exact_handicap ?? 0,
+        avatarUrl: player.avatar_url,
+        registeredUserId: player.user_id,
+      }]);
     }
     setSearchNick('');
     setSearchResults([]);
+    setGuestHandicap18('');
   };
 
-  const removePlayer = (playerId: string) => {
-    setSelectedPlayers(selectedPlayers.filter(p => p.user_id !== playerId));
+  const addGuest = () => {
+    const name = searchNick.trim();
+    const handicap18 = guestHandicap18.trim() === '' ? Number.NaN : Number(guestHandicap18);
+    if (name.length < 2) { setError('Escribe el nombre del jugador'); return; }
+    if (!Number.isFinite(handicap18) || handicap18 < 0 || handicap18 > 54) {
+      setError('Indica un hándicap de 18 hoyos entre 0 y 54');
+      return;
+    }
+    if (selectedPlayers.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setError('Ese jugador ya está en la lista');
+      return;
+    }
+    setSelectedPlayers([...selectedPlayers, {
+      key: `guest:${crypto.randomUUID()}`,
+      name,
+      handicap18,
+    }]);
+    setSearchNick('');
+    setSearchResults([]);
+    setGuestHandicap18('');
+    setError('');
+  };
+
+  const removePlayer = (playerKey: string) => {
+    setSelectedPlayers(selectedPlayers.filter(p => p.key !== playerKey));
   };
 
   return (
@@ -251,14 +299,14 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 2: 3 questions */}
         {step === 2 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-5">Configuracion del Team</h2>
+            <h2 className="text-xl font-bold text-ink mb-5">Configuración del Team</h2>
 
             <div className="space-y-4 mb-6">
               {/* Q1: Add players now */}
               <div className="border border-line rounded-xl p-4">
                 <div className="flex items-start gap-2 mb-3">
                   <p className="text-sm font-medium text-ink flex-1">
-                    Quieres anadir ahora algunos jugadores al grupo o prefieres hacerlo mas tarde?
+                    ¿Quieres añadir ahora algunos jugadores al grupo o prefieres hacerlo más tarde?
                   </p>
                   <Tooltip text="Puedes invitar jugadores a tu grupo ahora o en cualquier momento despues desde la gestion del grupo." />
                 </div>
@@ -273,7 +321,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                     onClick={() => setAddPlayersNow(false)}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${!addPlayersNow ? 'bg-accent text-on-accent' : 'bg-card-2 text-ink-3'}`}
                   >
-                    Mas tarde
+                    Más tarde
                   </button>
                 </div>
               </div>
@@ -315,7 +363,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                 disabled={loading}
                 className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                {addPlayersNow ? 'Buscar jugadores' : loading ? 'Creando...' : 'Crear grupo'}
+                {addPlayersNow ? 'Añadir jugadores' : loading ? 'Creando...' : 'Crear grupo'}
               </WriteButton>
             </div>
           </div>
@@ -324,8 +372,8 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 3: Search and invite players */}
         {step === 3 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-1">Invitar jugadores</h2>
-            <p className="text-sm text-ink-3 mb-5">Busca por Nick y envia invitaciones</p>
+            <h2 className="text-xl font-bold text-ink mb-1">Añadir jugadores</h2>
+            <p className="text-sm text-ink-3 mb-5">Busca una cuenta por nick o escribe el nombre de un jugador no registrado.</p>
 
             <div className="relative mb-4">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-4" />
@@ -333,7 +381,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                 type="text"
                 value={searchNick}
                 onChange={(e) => setSearchNick(e.target.value)}
-                placeholder="Buscar por Nick..."
+                placeholder="Nick o nombre del jugador..."
                 className="w-full pl-10 pr-4 py-2.5 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
               />
             </div>
@@ -355,11 +403,32 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                     )}
                     <div className="flex-1 text-left">
                       <p className="font-medium text-ink text-sm">{p.nick}</p>
-                      {p.display_name && <p className="text-xs text-ink-3">{p.display_name}</p>}
+                      <p className="text-xs text-ink-3">HCP 18: {(p.exact_handicap ?? 0).toFixed(1)} · Cuenta registrada</p>
                     </div>
                     <UserPlus size={16} className="text-accent-ink" />
                   </button>
                 ))}
+              </div>
+            )}
+
+            {searchNick.trim().length >= 2 && !searching && !searchResults.some(p => p.nick.toLocaleLowerCase() === searchNick.trim().toLocaleLowerCase()) && (
+              <div className="border border-line rounded-xl p-4 mb-4 bg-card-2">
+                <p className="text-sm font-medium text-ink mb-1">Añadir “{searchNick.trim()}” sin cuenta</p>
+                <p className="text-xs text-ink-3 mb-3">Indica su hándicap de 18 hoyos. En partidas de 9 se dividirá entre dos y se redondeará.</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="54"
+                    step="0.1"
+                    value={guestHandicap18}
+                    onChange={(e) => setGuestHandicap18(e.target.value)}
+                    placeholder="HCP 18 hoyos"
+                    aria-label="Hándicap de 18 hoyos"
+                    className="min-w-0 flex-1 px-3 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
+                  />
+                  <WriteButton onClick={addGuest} className="px-4 py-2 bg-accent text-on-accent font-semibold rounded-lg">Añadir</WriteButton>
+                </div>
               </div>
             )}
 
@@ -368,14 +437,17 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                 <p className="text-sm font-medium text-ink-2 mb-2">Jugadores seleccionados:</p>
                 <div className="space-y-2">
                   {selectedPlayers.map(p => (
-                    <div key={p.user_id} className="flex items-center gap-3 bg-accent-soft rounded-lg px-3 py-2">
-                      {p.avatar_url ? (
-                        <img src={p.avatar_url} alt="" className="w-7 h-7 rounded-full" />
+                    <div key={p.key} className="flex items-center gap-3 bg-accent-soft rounded-lg px-3 py-2">
+                      {p.avatarUrl ? (
+                        <img src={p.avatarUrl} alt="" className="w-7 h-7 rounded-full" />
                       ) : (
                         <div className="w-7 h-7 bg-emerald-200 rounded-full" />
                       )}
-                      <span className="flex-1 text-sm font-medium text-ink">{p.nick}</span>
-                      <button onClick={() => removePlayer(p.user_id)} className="text-red-500 hover:text-red-700">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-ink">{p.name}</p>
+                        <p className="text-xs text-ink-3">HCP 18: {p.handicap18.toFixed(1)} · {p.registeredUserId ? 'Registrado (no editable)' : 'Sin cuenta'}</p>
+                      </div>
+                      <button onClick={() => removePlayer(p.key)} className="text-red-500 hover:text-red-700" aria-label={`Quitar a ${p.name}`}>
                         <X size={16} />
                       </button>
                     </div>
@@ -390,7 +462,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                 disabled={loading}
                 className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
               >
-                {loading ? 'Creando...' : `Crear grupo${selectedPlayers.length > 0 ? ` (${selectedPlayers.length} invitaciones)` : ''}`}
+                {loading ? 'Creando...' : `Crear grupo${selectedPlayers.length > 0 ? ` (${selectedPlayers.length} jugadores)` : ''}`}
               </WriteButton>
             </div>
           </div>
@@ -406,8 +478,8 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
             <p className="text-ink-3 mb-2">{groupName}</p>
             <p className="text-sm text-ink-4 mb-6">
               {selectedPlayers.length > 0
-                ? `Se han enviado ${selectedPlayers.length} invitaciones`
-                : 'Podras invitar jugadores mas tarde'}
+                ? 'Las cuentas registradas han recibido una invitación y los jugadores sin cuenta ya están añadidos.'
+                : 'Podrás añadir jugadores más tarde'}
             </p>
             <div className="bg-card-2 rounded-xl px-4 py-3 mb-6">
               <p className="text-xs text-ink-3 mb-1">Codigo de acceso</p>
