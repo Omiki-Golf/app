@@ -322,9 +322,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        {((!currentGroup && onBack) || messagesButton) && (
+        {(((!currentGroup || isArchivedGroup) && onBack) || messagesButton) && (
           <div className="grid grid-cols-3 items-center">
-            <div>{!currentGroup && onBack && <NavigationButton destination="home" onClick={onBack} />}</div>
+            <div>{(!currentGroup || isArchivedGroup) && onBack && <NavigationButton destination={isArchivedGroup ? "back" : "home"} onClick={onBack} />}</div>
             <div className="flex justify-center">{messagesButton}</div>
             <div />
           </div>

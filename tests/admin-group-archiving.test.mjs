@@ -6,6 +6,7 @@ const migration = await readFile(new URL('../supabase/migrations/20261021130000_
 const groups = await readFile(new URL('../src/components/MyGroups.tsx', import.meta.url), 'utf8');
 const setup = await readFile(new URL('../src/components/RoundSetup.tsx', import.meta.url), 'utf8');
 const team = await readFile(new URL('../src/components/TeamCreation.tsx', import.meta.url), 'utf8');
+const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 
 test('archiving frees the active Team slot and blocks new group rounds server-side', () => {
   assert.match(migration, /ADD COLUMN IF NOT EXISTS archived_at timestamptz/);
@@ -21,6 +22,9 @@ test('an archived group remains selectable in read-only history mode', () => {
   assert.match(setup, /clasificación, jugadores y estadísticas/);
   assert.match(setup, /isGroupCreator && !hasLimitedAccess && !isArchivedGroup/);
   assert.match(setup, /!isArchivedGroup && <div[\s\S]{0,180}onViewActiveRounds/);
+  assert.match(setup, /isArchivedGroup \? ["']back["'] : ["']home["']/);
+  assert.match(app, /currentGroup\.archived_at \? \(\) => \{[\s\S]{0,250}setCurrentView\(['"]my-groups['"]\)/);
+  assert.match(groups, /!group\.archived_at && \([\s\S]{0,700}Jugadores y administradores/);
 });
 
 test('only an archived group owner can permanently delete the complete group', () => {

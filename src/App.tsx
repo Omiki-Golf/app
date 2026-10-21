@@ -1304,6 +1304,13 @@ function App() {
             setAccessCodeError('');
           }}
           onLeaveGroup={handleLeaveGroup}
+          onBack={currentGroup.archived_at ? () => {
+            void golfService.leaveGroup();
+            setCurrentGroup(null);
+            setIsGroupCreator(false);
+            setHasLimitedAccess(false);
+            setCurrentView('my-groups');
+          } : undefined}
           currentGroup={currentGroup}
           isGroupCreator={isGroupCreator}
           hasLimitedAccess={hasLimitedAccess}

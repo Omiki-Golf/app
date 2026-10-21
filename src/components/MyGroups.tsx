@@ -291,18 +291,20 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     {t('groups.select')}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setOpenMembers(openMembers === group.id ? null : group.id)}
-                    aria-expanded={openMembers === group.id}
-                    className="mt-2 w-full flex items-center justify-center gap-2 border border-line bg-card text-ink-2 px-4 py-2 rounded-lg hover:bg-neutral-hover transition-colors font-medium"
-                  >
-                    <Users size={18} aria-hidden="true" />
-                    Jugadores y administradores
-                    {openMembers === group.id ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
-                  </button>
+                  {!group.archived_at && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenMembers(openMembers === group.id ? null : group.id)}
+                      aria-expanded={openMembers === group.id}
+                      className="mt-2 w-full flex items-center justify-center gap-2 border border-line bg-card text-ink-2 px-4 py-2 rounded-lg hover:bg-neutral-hover transition-colors font-medium"
+                    >
+                      <Users size={18} aria-hidden="true" />
+                      Jugadores y administradores
+                      {openMembers === group.id ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+                    </button>
+                  )}
 
-                  {openMembers === group.id && (
+                  {!group.archived_at && openMembers === group.id && (
                     <div className="mt-4">
                       <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} archived={Boolean(group.archived_at)} />
                     </div>
