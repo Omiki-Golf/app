@@ -18,7 +18,8 @@ test('owner and delegated admin can archive and delete, but only owner manages t
   assert.match(rules, /Solo el creador puede cambiar administradores/);
   assert.match(rules, /solo puede tener un administrador además del creador/);
   assert.match(members, /delegatedAdminExists/);
-  assert.match(members, /Quitar administrador/);
+  assert.match(members, /role="switch"/);
+  assert.match(members, /aria-checked=\{member\.role === 'admin'\}/);
 });
 
 test('archived groups sort last and hide their access code', () => {

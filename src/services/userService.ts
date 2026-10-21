@@ -129,6 +129,17 @@ export const userService = {
   },
 
   async manageGroupMember(member: GroupMember, action: 'handicap' | 'remove', handicap18?: number): Promise<void> {
+    if (member.is_guest) {
+      const { error } = await supabase.rpc('manage_group_guest_player', {
+        p_group: member.group_id,
+        p_player: member.player_id,
+        p_player_revision: member.player_revision,
+        p_action: action,
+        p_handicap_18: handicap18 ?? null,
+      });
+      if (error) throw error;
+      return;
+    }
     const { error } = await supabase.rpc('manage_group_member', {
       p_group: member.group_id, p_user: member.user_id,
       p_member_revision: member.member_revision, p_player_revision: member.player_revision,

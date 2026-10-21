@@ -76,8 +76,9 @@ export interface UserProfile {
 export interface GroupMember {
   id: string;
   group_id: string;
-  user_id: string;
+  user_id: string | null;
   role: 'admin' | 'member';
+  is_guest?: boolean;
   invited_by?: string;
   joined_at: string;
   profile?: Pick<UserProfile, 'nick' | 'display_name' | 'avatar_url'>;

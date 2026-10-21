@@ -25,7 +25,7 @@ test('an archived group remains selectable in read-only history mode', () => {
   assert.match(setup, /!isArchivedGroup && <div[\s\S]{0,180}onViewActiveRounds/);
   assert.match(setup, /isArchivedGroup \? ["']back["'] : ["']home["']/);
   assert.match(app, /currentGroup\.archived_at \? \(\) => \{[\s\S]{0,250}setCurrentView\(['"]my-groups['"]\)/);
-  assert.match(groups, /!group\.archived_at && \([\s\S]{0,700}Jugadores y administradores/);
+  assert.match(groups, /!group\.archived_at && \([\s\S]{0,700}Jugadores/);
 });
 
 test('an archived group owner or admin can permanently delete the complete group', () => {

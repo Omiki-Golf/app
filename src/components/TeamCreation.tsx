@@ -329,7 +329,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
               {/* Administradores: se nombran cuando los invitados ya son miembros. */}
               <div className="flex items-start gap-2 rounded-xl bg-card-2 p-4 text-sm text-ink-3">
                 <Info size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-                <p>Podrás nombrar administradores que te ayuden a crear partidas desde <span className="font-semibold text-ink-2">Mis grupos → Jugadores y administradores</span>, cuando los invitados hayan aceptado.</p>
+                <p>Podrás nombrar administradores que te ayuden a crear partidas desde <span className="font-semibold text-ink-2">Mis grupos → Jugadores</span>, cuando los invitados hayan aceptado.</p>
               </div>
 
               {/* Q3: Hoyo 19 */}
