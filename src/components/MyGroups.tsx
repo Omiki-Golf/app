@@ -98,7 +98,10 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member' }));
       }
 
-      setGroups([...ownedGroups, ...joinedGroups]);
+      setGroups([...ownedGroups, ...joinedGroups].sort((a, b) => {
+        const archiveOrder = Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at));
+        return archiveOrder || b.created_at.localeCompare(a.created_at);
+      }));
     } catch (err: any) {
       setError(err.message || t('groups.loadError'));
     } finally {
@@ -247,7 +250,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                       <p className="text-xs font-medium text-ink-3">{accessLabel[group.access]}</p>
                       {group.archived_at && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Archivado</span>}
                     </div>
-                    {group.access === 'owner' && (
+                    {(group.access === 'owner' || group.access === 'admin') && (
                       <WriteButton
                         onClick={() => group.archived_at ? handleDeleteGroup(group.id) : setGroupToArchive(group.id)}
                         className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -258,7 +261,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     )}
                   </div>
 
-                  <div className="flex items-center gap-3 mb-3">
+                  {!group.archived_at && <div className="flex items-center gap-3 mb-3">
                     <div className="min-w-0 flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
                       <p className="text-xs text-ink-3 mb-1">{t('groups.accessCode')}</p>
                       <p className="truncate text-xl font-mono font-bold text-accent-ink tracking-wider">
@@ -282,7 +285,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                         </>
                       )}
                     </button>
-                  </div>
+                  </div>}
 
                   <button
                     onClick={() => handleSelectGroup(group)}

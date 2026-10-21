@@ -71,6 +71,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
   const validHandicap = handicap.trim() !== '' && Number.isFinite(Number(handicap.replace(',', '.'))) && Number(handicap.replace(',', '.')) >= 0 && Number(handicap.replace(',', '.')) <= 54;
   if (!userId) return null;
   const members = state?.identity === identity ? state.members : null;
+  const delegatedAdminExists = members?.some(member => member.user_id !== ownerId && member.role === 'admin') ?? false;
   return <section className="space-y-3 mb-6 text-ink">
     <div className="flex flex-wrap items-center justify-between gap-3 bg-accent-soft p-4 rounded-lg">
       <h2 className="flex items-center gap-2 text-xl font-semibold text-title"><Users size={24} />Miembros del grupo{members && ` (${members.length})`}</h2>
@@ -84,16 +85,14 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
       <div className="flex items-center gap-3">
         <img src={normalizeAvatarUrl(member.profile?.avatar_url)} alt="" className="w-12 h-12 rounded-full object-cover" />
         <div className="min-w-0">
-          <p className="font-semibold break-words">{member.profile?.nick || member.profile?.display_name || 'Registro pendiente de completar'}</p>
-          {member.profile?.display_name && <p className="text-sm break-words">{member.profile.display_name}</p>}
+          <p className="font-semibold break-words">{member.profile?.nick || 'Registro pendiente de completar'}</p>
           <p className="text-sm text-ink-3">{member.user_id === ownerId ? 'Creador del grupo' : member.role === 'admin' ? 'Administrador del Grupo' : 'Miembro'}</p>
-          <p className="text-sm">{member.handicap_18 === null ? 'Hándicap pendiente' : `Hándicap del grupo (18 hoyos): ${member.handicap_18}`}</p>
+          <p className="text-sm">{member.handicap_18 === null ? 'Hándicap pendiente' : `HCP 18: ${member.handicap_18} · HCP 9: ${member.handicap_18 / 2}`}</p>
         </div>
       </div>
-      <details className="text-xs text-ink-3 mt-3"><summary>Detalles</summary><p className="break-all">UUID de cuenta: {member.user_id}</p><p className="break-all">Ficha: {member.player_id}</p></details>
       {!archived && (member.can_manage || (isOwner && member.user_id !== ownerId)) && <div className="flex flex-wrap gap-2 mt-3">
         {member.can_manage && <WriteButton className="border border-line rounded-xl px-3 py-2" onClick={() => start(member, 'handicap')}>Editar hándicap</WriteButton>}
-        {isOwner && member.user_id !== ownerId && <WriteButton disabled={busy} className="border border-accent text-accent-ink rounded-xl px-3 py-2 disabled:opacity-50" onClick={() => void toggleRole(member)}>{member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'}</WriteButton>}
+        {isOwner && member.user_id !== ownerId && <WriteButton disabled={busy || (member.role !== 'admin' && delegatedAdminExists)} className="border border-accent text-accent-ink rounded-xl px-3 py-2 disabled:opacity-50" onClick={() => void toggleRole(member)}>{member.role === 'admin' ? 'Quitar administrador' : delegatedAdminExists ? 'Ya hay administrador' : 'Hacer administrador'}</WriteButton>}
         {member.can_manage && member.can_remove && <WriteButton className="border border-red-400 text-red-500 rounded-xl px-3 py-2" onClick={() => start(member, 'remove')}>Eliminar del grupo</WriteButton>}
       </div>}
       {isOwner && member.user_id !== ownerId && member.role === 'admin' && <p className="text-xs text-ink-3 mt-2">Puede crear partidas y gestionar el grupo contigo.</p>}
@@ -102,8 +101,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
     {edit?.identity === identity && <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
       <div role="dialog" aria-modal="true" aria-labelledby="member-edit-title" className="bg-card border border-line rounded-2xl p-5 max-w-lg w-full space-y-4">
         <h3 id="member-edit-title" className="font-semibold text-lg">{edit.action === 'handicap' ? 'Editar hándicap del grupo' : 'Eliminar del grupo'}</h3>
-        <p>{edit.member.profile?.nick || edit.member.profile?.display_name || 'Cuenta pendiente'}{edit.member.profile?.display_name && ` · ${edit.member.profile.display_name}`}</p>
-        <p className="text-xs break-all text-ink-3">{edit.member.user_id}</p>
+        <p>{edit.member.profile?.nick || 'Cuenta pendiente'}</p>
         {edit.action === 'handicap' ? <>
           <label className="block">Hándicap para 18 hoyos
             <input type="number" min="0" max="54" step="any" value={handicap} disabled={confirm || busy} onChange={event => setHandicap(event.target.value)} className="block w-full bg-card border border-line rounded-xl p-3 mt-2" />

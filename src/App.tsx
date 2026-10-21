@@ -859,9 +859,18 @@ function App() {
           setAccessCodeError('Código de acceso incorrecto');
         }
       } else {
-        const round = await golfService.getRoundByAccessCode(code, currentGroup?.id);
+        const round = await golfService.getRoundByAccessCode(code, currentGroup?.id, !currentGroup);
 
         if (round) {
+          if (!currentGroup && round.group_id) {
+            const { data: group } = await supabase.from('groups').select('*').eq('id', round.group_id).maybeSingle();
+            if (group) {
+              storageUtils.saveCurrentGroup(group.id, group.group_code, false, true);
+              setCurrentGroup(group);
+              setIsGroupCreator(false);
+              setHasLimitedAccess(true);
+            }
+          }
           accessCodeStorage.saveAccessCode(round.id, code);
           setShowAccessCodeModal(false);
           await handleJoinRound(round.id);
