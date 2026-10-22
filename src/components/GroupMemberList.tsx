@@ -113,6 +113,20 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
     catch (err) { setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se pudo añadir el jugador'); }
     finally { busyRef.current = false; setBusy(false); }
   };
+  const deleteRejectedInvitation = async (invitedUserId: string) => {
+    if (readOnly || archived || busyRef.current) return;
+    busyRef.current = true; setBusy(true); setError('');
+    try {
+      await userService.deleteRejectedInvitation(groupId, invitedUserId);
+      setInvitedProfiles(current => current.filter(item => item.profile.user_id !== invitedUserId));
+      setInvitationStatuses(current => {
+        const next = { ...current };
+        delete next[invitedUserId];
+        return next;
+      });
+    } catch (err) { setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se pudo eliminar la invitación rechazada'); }
+    finally { busyRef.current = false; setBusy(false); }
+  };
 
   const visibleInvitations = invitedProfiles.filter(item => !members?.some(member => member.user_id === item.profile.user_id));
   const rosterCount = (members?.length ?? 0) + visibleInvitations.length;
@@ -136,7 +150,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
     <p className="text-xs text-ink-3">Los jugadores sin cuenta son miembros del grupo. Las invitaciones muestran su estado hasta que se aceptan.</p>
     {loadError && <p role="alert" className="text-red-600">{loadError}</p>}{!edit && error && <p role="status" className="text-sm text-ink-3">{error}</p>}{!members && !loadError && <p role="status">Cargando jugadores…</p>}
     {members?.map(member => <article key={member.id} className="bg-card border border-line rounded-xl px-3 py-2">
-      <div className="flex items-center gap-2">{member.user_id ? <img src={normalizeAvatarUrl(member.profile?.avatar_url)} alt="" className="w-9 h-9 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="w-9 h-9 shrink-0 rounded-full bg-accent text-on-accent flex items-center justify-center font-bold uppercase">{(member.profile?.nick || '?').trim().charAt(0)}</div>}<div className="min-w-0 flex-1"><p className="font-semibold truncate whitespace-nowrap">{member.profile?.nick || 'Registro pendiente'}</p><p className="text-xs text-ink-3 whitespace-nowrap">{member.user_id === ownerId ? 'Creador' : member.role === 'admin' ? 'Administrador' : 'Miembro'} · {member.handicap_18 === null ? 'Hándicap pendiente' : `HCP 18: ${member.handicap_18} · HCP 9: ${member.handicap_18 / 2}`}</p></div>
+      <div className="flex items-center gap-2">{member.user_id ? <img src={normalizeAvatarUrl(member.profile?.avatar_url)} alt="" className="w-9 h-9 shrink-0 rounded-full object-cover" /> : <div aria-hidden="true" className="w-9 h-9 shrink-0 rounded-full bg-accent text-on-accent flex items-center justify-center font-bold uppercase">{(member.profile?.nick || '?').trim().charAt(0)}</div>}<div className="min-w-0 flex-1"><p className="font-semibold truncate whitespace-nowrap">{member.profile?.nick || 'Registro pendiente'}</p><p className="flex items-center gap-1 text-xs text-ink-3 whitespace-nowrap">{member.user_id === ownerId ? 'Creador' : member.role === 'admin' ? <><Crown size={13} className="shrink-0 text-amber-500" fill="currentColor" aria-hidden="true" /><span>Administrador</span></> : 'Miembro'} <span>· {member.handicap_18 === null ? 'Hándicap pendiente' : `HCP 18: ${member.handicap_18} · HCP 9: ${member.handicap_18 / 2}`}</span></p></div>
         {!archived && isOwner && member.user_id && member.user_id !== ownerId && <button type="button" aria-label={member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'} disabled={busy || (member.role !== 'admin' && delegatedAdminExists)} onClick={() => void toggleRole(member)} title={member.role !== 'admin' && delegatedAdminExists ? 'Ya hay otro administrador' : member.role === 'admin' ? 'Quitar administrador' : 'Hacer administrador'} className={`shrink-0 p-1.5 rounded-full disabled:opacity-40 ${member.role === 'admin' ? 'text-amber-500 bg-amber-500/15' : 'text-ink-4 bg-card-2'}`}><Crown size={19} fill={member.role === 'admin' ? 'currentColor' : 'none'} /></button>}
         {!archived && member.can_manage && member.can_remove && <WriteButton title="Eliminar del grupo" aria-label={`Eliminar a ${member.profile?.nick || 'jugador'} del grupo`} className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg" onClick={() => start(member, 'remove')}><Trash2 size={18} /></WriteButton>}
       </div>{!archived && member.can_manage && <button className="ml-11 mt-1 text-xs text-accent-ink underline" onClick={() => start(member, 'handicap')}>Editar HCP</button>}
@@ -147,6 +161,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
         <img src={normalizeAvatarUrl(item.profile.avatar_url)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
         <span className="min-w-0 flex-1 truncate font-semibold">{item.profile.nick}</span>
         <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${section.status === 'accepted' ? 'bg-accent-soft text-accent-ink' : section.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-600'}`}>{section.status === 'accepted' ? 'Aceptada' : section.status === 'pending' ? 'Pendiente' : 'Rechazada'}</span>
+        {section.status === 'rejected' && canManage && <WriteButton type="button" disabled={busy} onClick={() => void deleteRejectedInvitation(item.profile.user_id)} title="Eliminar invitación rechazada" aria-label={`Eliminar la invitación rechazada de ${item.profile.nick}`} className="shrink-0 rounded-lg p-2 text-red-500 hover:bg-red-500/10"><Trash2 size={17} /></WriteButton>}
       </article>)}
     </section>)}
     {members?.length === 0 && !loadError && <p className="text-ink-3">No hay jugadores en el grupo.</p>}

@@ -7,6 +7,8 @@ import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
 import { useTranslation } from 'react-i18next';
+import { ThemeToggle } from './ThemeToggle';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 interface ProfileDetailsProps {
   profile: UserProfile | null;
@@ -36,6 +38,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const [supportIdCopied, setSupportIdCopied] = useState(false);
+  const [showSupportId, setShowSupportId] = useState(false);
   const [handicap, setHandicap] = useState(profile?.exact_handicap?.toString() ?? '');
   const [country, setCountry] = useState(profile?.country ?? '');
   const [postalCode, setPostalCode] = useState(profile?.postal_code ?? '');
@@ -70,10 +73,17 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   }, [profile]);
 
   const checkNick = async () => {
-    if (profile) return true;
     const candidate = nick.trim();
     setNickSuggestion('');
-    if (candidate.length < 2) {
+    if (profile && candidate === `${profile.nick}123#`) {
+      setNickStatus('idle');
+      return true;
+    }
+    if (profile && candidate.toLocaleLowerCase() === profile.nick.trim().toLocaleLowerCase()) {
+      setNickStatus('idle');
+      return true;
+    }
+    if (candidate.length < 2 || candidate.length > 24 || candidate.includes('#')) {
       setNickStatus('taken');
       return false;
     }
@@ -108,6 +118,15 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (profile && nick.trim() === `${profile.nick}123#`) {
+      setNick(profile.nick);
+      setNickStatus('idle');
+      setNickSuggestion('');
+      setShowSupportId(true);
+      setSaved(false);
+      setError('');
+      return;
+    }
     if (!profile && !displayName.trim()) return;
     if (handicap.trim() && !Number.isFinite(Number(handicap))) {
       setError('Introduce un hándicap válido.');
@@ -117,7 +136,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       setError('La edad debe ser un número entero de al menos 14 años.');
       return;
     }
-    if (!profile && !(await checkNick())) {
+    if (!(await checkNick())) {
       setError(t('auth.errors.nick'));
       return;
     }
@@ -127,6 +146,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setSaved(false);
     try {
       if (profile) {
+        if (nick.trim() !== profile.nick) await userService.renameMyNick(nick.trim());
         await userService.updateProfile(profile.user_id, {
           // null (no undefined) para que vaciar un campo lo borre de verdad en la base de datos.
           display_name: displayName.trim() || null,
@@ -151,7 +171,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       setSaved(true);
     } catch (saveError) {
       console.error('Error actualizando el perfil:', saveError);
-      setError(t('profile.saveError'));
+      const message = saveError && typeof saveError === 'object' && 'message' in saveError ? String(saveError.message) : '';
+      setError(message.includes('nick') || message.includes('Nick') ? message : t('profile.saveError'));
     } finally {
       setSaving(false);
     }
@@ -186,7 +207,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 <input value={email ?? ''} disabled className="w-full px-4 py-3 bg-card-2 text-ink-3 border border-line rounded-xl opacity-80" />
               </div>
 
-              <div>
+              {showSupportId && <div>
                 <label className="block text-sm font-medium text-ink-2 mb-2">{t('profile.supportId')}</label>
                 <div className="flex items-stretch gap-2">
                   <code className="min-w-0 flex-1 select-all break-all rounded-xl border border-line bg-card-2 px-3 py-3 text-xs text-ink-2">{userId}</code>
@@ -196,7 +217,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-ink-4">{t('profile.supportIdHelp')}</p>
-              </div>
+              </div>}
 
               <div>
                 <label className="block text-sm font-medium text-ink-2 mb-2">Nick</label>
@@ -209,22 +230,18 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       setNickSuggestion('');
                     }}
                     onBlur={() => void checkNick()}
-                    disabled={!!profile}
                     required
                     minLength={2}
-                    maxLength={24}
+                    maxLength={profile ? 28 : 24}
                     placeholder={t('auth.nickPlaceholder')}
                     className={`w-full px-4 py-3 pr-10 border rounded-xl ${
-                      profile ? 'bg-card-2 text-ink-3 border-line opacity-80' : 'bg-card text-ink border-line-2 focus:ring-2 focus:ring-accent'
+                      'bg-card text-ink border-line-2 focus:ring-2 focus:ring-accent'
                     }`}
                   />
-                  {!profile && nickStatus === 'available' && <Check className="absolute right-3 top-3.5 text-accent-ink" size={20} />}
-                  {!profile && nickStatus === 'taken' && <X className="absolute right-3 top-3.5 text-red-500" size={20} />}
+                  {nickStatus === 'available' && <Check className="absolute right-3 top-3.5 text-accent-ink" size={20} />}
+                  {nickStatus === 'taken' && <X className="absolute right-3 top-3.5 text-red-500" size={20} />}
                 </div>
-                {profile ? (
-                  <p className="text-xs text-ink-4 mt-1">{t('profile.nickLocked')}</p>
-                ) : (
-                  <>
+                <>
                     {nickStatus === 'checking' && <p className="text-xs text-ink-3 mt-1">{t('auth.checkingNick')}</p>}
                     {nickStatus === 'available' && <p className="text-xs text-accent-ink mt-1">{t('auth.nickAvailable')}</p>}
                     {nickStatus === 'taken' && (
@@ -245,8 +262,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                         )}
                       </p>
                     )}
-                  </>
-                )}
+                </>
               </div>
 
               <div>
@@ -365,6 +381,21 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 {saving ? t('profile.saving') : profile ? t('profile.save') : t('profile.create')}
               </button>
             </WriteForm>
+
+            <section className="mt-7 border-t border-line pt-6" aria-labelledby="profile-preferences-title">
+              <h2 id="profile-preferences-title" className="text-lg font-bold text-ink">{t('profile.preferences')}</h2>
+              <div className="mt-3 overflow-visible rounded-xl border border-line bg-card-2">
+                <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  <span className="font-medium text-ink-2">{t('language.label')}</span>
+                  <LanguageSwitcher />
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
+                  <span className="font-medium text-ink-2">{t('profile.appearance')}</span>
+                  <ThemeToggle />
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-ink-3">{t('profile.preferencesHelp')}</p>
+            </section>
         </section>
       </main>
     </div>

@@ -1189,6 +1189,7 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <CareerStatistics
             account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
+            showMoments={activePlanType !== 'player'}
             onBack={() => setCurrentView('profile')}
             messagesButton={inlineMessagesButton}
           />

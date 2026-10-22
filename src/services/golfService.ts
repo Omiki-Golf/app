@@ -1113,6 +1113,21 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       return data || [];
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase.rpc('list_my_quick_player_suggestions');
+      if (error) throw error;
+      return (data || []).map((suggestion: any) => ({
+        id: suggestion.id,
+        name: suggestion.name,
+        exact_handicap: Number(suggestion.handicap_18) / 2,
+        exact_handicap_18: Number(suggestion.handicap_18) / 2,
+        created_at: suggestion.created_at,
+        updated_at: suggestion.updated_at,
+        quick_suggestion: true,
+      }));
+    }
+
     let query = supabase
       .from('players')
       .select('*')
@@ -1206,8 +1221,33 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     if (error) throw error;
   },
 
+  async saveQuickPlayerSuggestion(name: string, handicap18: number): Promise<Player> {
+    const { data, error } = await supabase.rpc('save_my_quick_player_suggestion', { p_name: name, p_handicap_18: handicap18 });
+    if (error) throw error;
+    return { id: data.id, name: data.name, exact_handicap: Number(data.handicap_18) / 2, exact_handicap_18: Number(data.handicap_18) / 2, created_at: data.created_at, updated_at: data.updated_at, quick_suggestion: true };
+  },
+
+  async hideQuickPlayerSuggestion(id: string): Promise<void> {
+    const { error } = await supabase.rpc('hide_my_quick_player_suggestion', { p_suggestion: id });
+    if (error) throw error;
+  },
+
+  async getPlayerNamesInActiveRounds(excludeRoundId?: string, groupOverride?: string): Promise<string[]> {
+    const groupId = groupOverride ?? storageUtils.getCurrentGroupId();
+    if (!groupId && (await supabase.auth.getUser()).data.user) return [];
+    let query = supabase.from('round_players').select('name, golf_rounds!inner(status)').eq('golf_rounds.status', 'active');
+    query = groupId ? query.eq('golf_rounds.group_id', groupId) : query.is('golf_rounds.group_id', null);
+    if (excludeRoundId) query = query.neq('round_id', excludeRoundId);
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []).map((item: any) => item.name).filter(Boolean);
+  },
+
   async getOrCreatePlayer(name: string, exactHandicap: number): Promise<Player> {
     const groupId = storageUtils.getCurrentGroupId();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!groupId && user) return this.saveQuickPlayerSuggestion(name, exactHandicap * 2);
 
     let query = supabase
       .from('players')

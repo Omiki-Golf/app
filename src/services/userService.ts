@@ -71,6 +71,12 @@ export const userService = {
     return data as UserProfile;
   },
 
+  async renameMyNick(nick: string): Promise<UserProfile> {
+    const { data, error } = await supabase.rpc('rename_my_nick', { p_nick: nick });
+    if (error) throw error;
+    return data as UserProfile;
+  },
+
   async searchByNick(nick: string): Promise<UserProfile[]> {
     const { data, error } = await supabase.rpc('search_user_profiles', {
       search_term: nick,
@@ -212,6 +218,14 @@ export const userService = {
     });
     if (error) throw error;
     return data as 'pending' | 'accepted' | 'rejected';
+  },
+
+  async deleteRejectedInvitation(groupId: string, invitedUserId: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_rejected_group_invitation', {
+      p_group: groupId,
+      p_user: invitedUserId,
+    });
+    if (error) throw error;
   },
 
   async getGroupInvitationStatuses(groupId: string): Promise<Array<{ userId: string; status: 'pending' | 'accepted' | 'rejected'; profile?: UserProfile }>> {

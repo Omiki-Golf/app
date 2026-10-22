@@ -44,7 +44,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState('');
+  const [userNick, setUserNick] = useState('');
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [groupToArchive, setGroupToArchive] = useState<string | null>(null);
   const [openMembers, setOpenMembers] = useState<string | null>(null);
@@ -72,14 +72,15 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         return;
       }
 
-      setUserEmail(user.email || '');
-
-      const [owned, memberships] = await Promise.all([
+      const [owned, memberships, profile] = await Promise.all([
         supabase.from('groups').select(GROUP_COLUMNS).eq('user_auth_id', user.id).order('created_at', { ascending: false }),
         supabase.from('group_members').select('role, group_id').eq('user_id', user.id),
+        supabase.from('user_profiles').select('nick').eq('user_id', user.id).maybeSingle(),
       ]);
       if (owned.error) throw owned.error;
       if (memberships.error) throw memberships.error;
+      if (profile.error) throw profile.error;
+      setUserNick(profile.data?.nick || '');
 
       const ownedGroups: MyGroup[] = (owned.data || []).map(group => ({ ...group, access: 'owner' }));
       const ownedIds = new Set(ownedGroups.map(group => group.id));
@@ -224,7 +225,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
               <Users className="w-8 h-8 text-accent-ink" />
             </div>
             <h1 className="text-2xl font-bold text-ink mb-1">{t('groups.title')}</h1>
-            <p className="text-sm text-ink-3">{userEmail}</p>
+            {userNick && <p className="text-sm text-ink-3">{userNick}</p>}
           </div>
 
           {error && (

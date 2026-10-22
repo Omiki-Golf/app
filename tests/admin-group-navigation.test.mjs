@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const profile = await readFile(new URL('../src/components/ProfileScreen.tsx', import.meta.url), 'utf8');
+const profileDetails = await readFile(new URL('../src/components/ProfileDetails.tsx', import.meta.url), 'utf8');
 const groups = await readFile(new URL('../src/components/MyGroups.tsx', import.meta.url), 'utf8');
 
 test('a Player member can open My groups without being redirected home', () => {
@@ -22,4 +23,16 @@ test('accepting an invitation refreshes group membership access', () => {
 test('My groups loads both owned and joined groups', () => {
   assert.match(groups, /from\(['"]group_members['"]\)[\s\S]{0,150}eq\(['"]user_id['"],\s*user\.id\)/);
   assert.match(groups, /\.in\(['"]id['"],\s*\[\.\.\.roles\.keys\(\)\]\)/);
+  assert.match(groups, /user_profiles['"]\)\.select\(['"]nick['"]\)/);
+  assert.doesNotMatch(groups, /setUserEmail/);
+});
+
+test('profile keeps the nick on one line and explains both handicap values', () => {
+  assert.match(profile, /whitespace-nowrap/);
+  assert.match(profile, /HCP 18:/);
+  assert.match(profile, /Math\.round\(handicap18 \/ 2\)/);
+  assert.match(profile, /omikiHandicapInfo/);
+  assert.match(profileDetails, /profile\.preferences/);
+  assert.match(profileDetails, /<LanguageSwitcher/);
+  assert.match(profileDetails, /<ThemeToggle/);
 });

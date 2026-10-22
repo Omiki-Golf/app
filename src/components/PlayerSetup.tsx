@@ -75,6 +75,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const playerLoadVersion = useRef(0);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [playersInActiveRounds, setPlayersInActiveRounds] = useState<string[]>([]);
+  const [playerNamesInActiveRounds, setPlayerNamesInActiveRounds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [creatingUnlinked, setCreatingUnlinked] = useState(false);
   const [canManage, setCanManage] = useState(false);
@@ -144,8 +145,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     try {
       let allPlayersData: Player[] = [];
 
-      if (currentGroup) {
-        allPlayersData = await golfService.getAllPlayers(currentGroup.id);
+      if (currentGroup || user) {
+        allPlayersData = await golfService.getAllPlayers(currentGroup?.id);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         if (localPlayers) {
@@ -153,11 +154,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         }
       }
 
-      const playersInRounds = await golfService.getPlayersInActiveRounds(roundId);
+      const [playersInRounds, namesInRounds] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, currentGroup?.id)]);
       if (request !== playerLoadVersion.current) return;
       setAllPlayers(allPlayersData);
       setCanManage(allPlayersData.some(player => player.can_manage));
       setPlayersInActiveRounds(playersInRounds);
+      setPlayerNamesInActiveRounds(namesInRounds);
     } catch (err) {
       console.error('Error loading players:', err);
     }
@@ -222,12 +224,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
   const playersInThisRound = players.map(p => p.player_id).filter(Boolean);
 
-  const filteredPlayers = allPlayers.filter((player) => {
-    const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const isInThisRound = playersInThisRound.includes(player.id);
-    const isInOtherRound = playersInActiveRounds.includes(player.id);
-    return matchesSearch && !isInThisRound && !isInOtherRound;
-  });
+  const filteredPlayers = allPlayers.filter((player) => normalizeName(player.name).includes(normalizeName(searchTerm)));
+  const playerAvailability = (player: Player) => {
+    if (playersInThisRound.includes(player.id) || players.some(item => normalizeName(item.name) === normalizeName(player.name))) return 'Ya está en esta partida';
+    if (playersInActiveRounds.includes(player.id) || playerNamesInActiveRounds.some(name => normalizeName(name) === normalizeName(player.name))) return 'Está en otra partida activa';
+    return '';
+  };
 
   const handleSelectPlayer = (player: Player) => {
     setCreatingUnlinked(false);
@@ -271,10 +273,14 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       const handicapFor9Holes = numHoles === 18 ? handicapNum / 2 : handicapNum;
       const playerName = searchTerm.trim();
+      const linkedUserId = isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
 
       let newPlayer: RoundPlayer;
       if (currentGroup) {
         newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, false, selectedPlayer?.id);
+      } else if (user) {
+        const suggestion = await golfService.saveQuickPlayerSuggestion(playerName, handicapNum * (numHoles === 9 ? 2 : 1));
+        newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, suggestion.exact_handicap, useSlope, undefined, linkedUserId);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         const playersArray: Player[] = localPlayers ? JSON.parse(localPlayers) : [];
@@ -295,7 +301,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         }
 
         localStorage.setItem('quickPlayPlayers', JSON.stringify(playersArray));
-        const linkedUserId = isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
         newPlayer = await golfService.addPlayerToRound(roundId, playerName, handicapFor9Holes, useSlope, undefined, linkedUserId);
       }
 
@@ -331,6 +336,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     try {
       if (currentGroup) {
         await golfService.deletePlayer(playerId);
+      } else if (user) {
+        await golfService.hideQuickPlayerSuggestion(playerId);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         if (localPlayers) {
@@ -448,7 +455,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       : `Jugador ${nextPlayerNumber}`;
 
   const isNewPlayer = searchTerm && !allPlayers.find(
-    (p) => !p.auth_user_id && p.name.toLowerCase() === searchTerm.toLowerCase()
+    (p) => !p.auth_user_id && normalizeName(p.name) === normalizeName(searchTerm)
   );
 
   return (
@@ -532,7 +539,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                       <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
                         JUGADORES EXISTENTES
                       </div>
-                      {filteredPlayers.map((player) => (
+                      {filteredPlayers.map((player) => {
+                        const unavailable = playerAvailability(player);
+                        return (
                         <div
                           key={player.id}
                           className="flex items-center hover:bg-accent-soft border-b border-line transition-colors"
@@ -540,16 +549,17 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                           <button
                             type="button"
                             onClick={() => handleSelectPlayer(player)}
-                            disabled={player.handicap_pending}
-                            className="flex-1 px-4 py-3 text-left"
+                            disabled={player.handicap_pending || Boolean(unavailable)}
+                            className="flex-1 px-4 py-3 text-left disabled:opacity-60"
                           >
                             <p className="font-semibold text-ink">{player.name}</p>
                             <p className="text-xs text-ink-3">{player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
+                            {unavailable && <p className="text-xs font-medium text-amber-600">{unavailable}</p>}
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
                             </p>
                           </button>
-                          <WriteButton
+                          {!player.quick_suggestion && <WriteButton
                             type="button"
                             disabled={!!player.auth_user_id}
                             onClick={(e) => handleEditPlayerClick(player, e)}
@@ -557,7 +567,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             title="Editar nombre"
                           >
                             <Edit2 size={18} />
-                          </WriteButton>
+                          </WriteButton>}
                           {!currentGroup && (
                             <button
                               type="button"
@@ -570,7 +580,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             </button>
                           )}
                         </div>
-                      ))}
+                      )})}
                     </div>
                   ) : searchTerm ? (
                     <div className="px-4 py-3 text-center text-ink-3">

@@ -1,8 +1,6 @@
 import { NavigationButton } from './NavigationButton';
-import { ThemeToggle } from './ThemeToggle';
-import { LanguageSwitcher } from './LanguageSwitcher';
-import React from 'react';
-import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard, Gem, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard, Gem, Info, LogOut, X } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
 
@@ -37,7 +35,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   messagesButton,
 }) => {
   const { t } = useTranslation();
+  const [showHandicapInfo, setShowHandicapInfo] = useState(false);
   const isTeam = (planType === 'team' || planType === 'premium');
+  const nick = profile?.nick || t('profile.player');
+  const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
+  const handicap18 = profile?.exact_handicap;
+  const handicap9 = handicap18 === undefined ? undefined : Math.round(handicap18 / 2);
   const avatarPlanClasses: Record<PlanType, string> = {
     express: 'border-blue-500 bg-blue-500',
     player: 'border-emerald-500 bg-emerald-500',
@@ -59,6 +62,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       { icon: Gem, label: t('profile.plans'), onClick: onShowPlans, show: true },
     ],
   ].map((section) => section.filter((item) => item.show)).filter((section) => section.length > 0);
+
+  useEffect(() => {
+    if (!showHandicapInfo) return;
+    window.history.pushState({ ...(window.history.state || {}), omikiHandicapInfo: true }, '', window.location.href);
+    const closeOnKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') window.history.back();
+    };
+    const closeOnBack = () => setShowHandicapInfo(false);
+    window.addEventListener('keydown', closeOnKey);
+    window.addEventListener('popstate', closeOnBack);
+    return () => {
+      window.removeEventListener('keydown', closeOnKey);
+      window.removeEventListener('popstate', closeOnBack);
+    };
+  }, [showHandicapInfo]);
+
+  const closeHandicapInfo = () => {
+    if (window.history.state?.omikiHandicapInfo) window.history.back();
+    else setShowHandicapInfo(false);
+  };
 
   return (
     <div className="min-h-screen bg-app transition-colors">
@@ -82,21 +105,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="break-words text-xl font-bold text-ink">{profile?.nick || t('profile.player')}</h2>
+              <h2 className={`whitespace-nowrap font-bold leading-tight text-ink ${nickSize}`}>{nick}</h2>
               <p className="break-words text-sm text-ink-3">{profile?.display_name || ''}</p>
               <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full uppercase ${isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full uppercase ${isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'}`}>
+                  {isTeam && <Crown size={13} fill="currentColor" aria-hidden="true" />}
                   {planType}
                 </span>
-                {profile?.exact_handicap !== undefined && (
-                  <span className="text-xs text-ink-3">HCP {profile.exact_handicap}</span>
+                {handicap18 !== undefined && (
+                  <span className="inline-flex items-center gap-1 text-xs text-ink-3">
+                    HCP 18: {handicap18}
+                    <button type="button" onClick={() => setShowHandicapInfo(true)} className="inline-flex h-5 w-5 items-center justify-center rounded-full text-accent-ink hover:bg-accent-soft" aria-label={t('profile.handicapInfo')}>
+                      <Info size={15} aria-hidden="true" />
+                    </button>
+                  </span>
                 )}
-                {isTeam && <Crown className="text-amber-500" size={16} aria-hidden="true" />}
               </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <ThemeToggle className="!h-11 !w-11" />
-              <LanguageSwitcher />
             </div>
           </div>
         </div>
@@ -133,6 +157,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           {t('common.logout')}
         </button>
       </div>
+      {showHandicapInfo && handicap18 !== undefined && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/55 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) closeHandicapInfo(); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="handicap-info-title" className="w-full max-w-sm rounded-2xl border border-line bg-card p-5 text-ink shadow-card">
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="handicap-info-title" className="text-lg font-bold">{t('profile.handicapTitle')}</h2>
+              <button type="button" onClick={closeHandicapInfo} className="rounded-full p-2 text-ink-3 hover:bg-card-2" aria-label={t('common.close')}><X size={20} /></button>
+            </div>
+            <dl className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap18')}</dt><dd className="mt-1 text-xl font-bold">{handicap18}</dd></div>
+              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap9')}</dt><dd className="mt-1 text-xl font-bold">{handicap9}</dd></div>
+            </dl>
+            <p className="mt-3 text-sm text-ink-3">{t('profile.handicapHelp')}</p>
+          </section>
+        </div>
+      )}
     </div>
   );
 };

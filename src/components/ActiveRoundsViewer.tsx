@@ -307,8 +307,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       setNewPlayerIsGuest(false);
       const roundPlayers = await golfService.getRoundPlayers(roundId);
       const roundPlayerIds = roundPlayers.map(p => p.player_id).filter(Boolean);
-      const busy = await golfService.getPlayersInActiveRounds(roundId);
-      const available = players.filter(p => !roundPlayerIds.includes(p.id) && !busy.includes(p.id));
+      const [busy, busyNames] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, target?.round.group_id || undefined)]);
+      const normalized = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+      const available = players.map(player => ({
+        ...player,
+        unavailable_reason: roundPlayerIds.includes(player.id) || roundPlayers.some(item => normalized(item.name) === normalized(player.name))
+          ? 'Ya está en esta partida'
+          : busy.includes(player.id) || busyNames.some(name => normalized(name) === normalized(player.name)) ? 'Está en otra partida activa' : '',
+      }));
       setAvailablePlayers(available);
       setShowAddPlayerModal(roundId);
       setSelectedPlayerId('');
@@ -345,13 +351,13 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           await golfService.addGroupRoundPlayer(round.round.group_id, roundId, newPlayerName.trim(), baseHandicap, newPlayerIsGuest);
         } else {
           const player = await golfService.getOrCreatePlayer(newPlayerName.trim(), baseHandicap);
-          await golfService.addPlayerToRound(roundId, player.name, player.exact_handicap, round.round.use_slope, player.id);
+          await golfService.addPlayerToRound(roundId, player.name, player.exact_handicap, round.round.use_slope, player.quick_suggestion ? undefined : player.id);
         }
       } else if (selectedPlayerId) {
         const player = availablePlayers.find(p => p.id === selectedPlayerId);
         if (!player) return;
         if (round.round.group_id) await golfService.addGroupRoundPlayer(round.round.group_id, roundId, player.name, player.exact_handicap, player.is_guest ? newPlayerIsGuest : false, player.id);
-        else await golfService.addPlayerToRound(roundId, player.name, player.exact_handicap, round.round.use_slope, player.id);
+        else await golfService.addPlayerToRound(roundId, player.name, player.exact_handicap, round.round.use_slope, player.quick_suggestion ? undefined : player.id);
       } else {
         setError('Por favor selecciona o crea un jugador');
         return;
@@ -1035,8 +1041,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
               >
                 <option value="">-- Selecciona --</option>
                 {availablePlayers.map((player) => (
-                  <option key={player.id} value={player.id} disabled={player.handicap_pending}>
-                    {player.name}{player.is_guest ? ' · Invitado' : ''} (HCP {(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap}){player.handicap_pending ? ' · Pendiente' : ''}
+                  <option key={player.id} value={player.id} disabled={player.handicap_pending || Boolean(player.unavailable_reason)}>
+                    {player.name}{player.is_guest ? ' · Invitado' : ''} (HCP {(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap}){player.handicap_pending ? ' · Pendiente' : player.unavailable_reason ? ` · ${player.unavailable_reason}` : ''}
                   </option>
                 ))}
                 <option value="new">+ Crear nuevo jugador</option>

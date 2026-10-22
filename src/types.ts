@@ -117,6 +117,7 @@ export interface ProShopPurchase {
 }
 
 export interface Player {
+  quick_suggestion?: boolean;
   is_guest?: boolean;
   can_manage?: boolean;
   auth_user_id?: string | null;
