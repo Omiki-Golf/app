@@ -229,18 +229,20 @@ export const userService = {
   },
 
   async getGroupInvitationStatuses(groupId: string): Promise<Array<{ userId: string; status: 'pending' | 'accepted' | 'rejected'; profile?: UserProfile }>> {
-    const { data, error } = await supabase
-      .from('group_invitations')
-      .select('invited_user_id, status')
-      .eq('group_id', groupId);
+    // user_profiles solo deja leer el perfil propio: el nick y el avatar de los invitados
+    // llegan por la función, que solo responde a quien gestiona el grupo.
+    const { data, error } = await supabase.rpc('list_group_invitations', { p_group: groupId });
     if (error) throw error;
-    const ids = (data || []).map(row => row.invited_user_id);
-    const { data: profiles, error: profileError } = ids.length ? await supabase.from('user_profiles').select('*').in('user_id', ids) : { data: [], error: null };
-    if (profileError) throw profileError;
-    return (data || []).map(row => ({
+    return ((data || []) as Array<{ invited_user_id: string; status: string; nick: string | null; display_name: string | null; avatar_url: string | null; exact_handicap: number | null }>).map(row => ({
       userId: row.invited_user_id,
       status: row.status as 'pending' | 'accepted' | 'rejected',
-      profile: (profiles || []).find(profile => profile.user_id === row.invited_user_id) as UserProfile | undefined,
+      profile: row.nick ? {
+        user_id: row.invited_user_id,
+        nick: row.nick,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url ?? undefined,
+        exact_handicap: Number(row.exact_handicap ?? 0),
+      } as UserProfile : undefined,
     }));
   },
 

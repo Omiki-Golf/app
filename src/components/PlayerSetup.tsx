@@ -1,10 +1,11 @@
 import { WriteButton, WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
-import { RoundPlayer, Player, GameMode } from '../types';
+import { RoundPlayer, Player, GameMode, UserProfile } from '../types';
 import { calculatePlayingHandicap } from '../utils/calculations';
 import { useAuth } from '../context/AuthContext';
 import { golfService } from '../services/golfService';
+import { userService } from '../services/userService';
 import { Trash2, Plus, Settings, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
@@ -80,6 +81,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [creatingUnlinked, setCreatingUnlinked] = useState(false);
   const [canManage, setCanManage] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  // Partida rápida con sesión: compañeros registrados encontrados por nick y el elegido.
+  const [registeredResults, setRegisteredResults] = useState<UserProfile[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<UserProfile | null>(null);
   const [handicap, setHandicap] = useState('');
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
@@ -139,6 +143,30 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!user || currentGroup || term.length < 2 || selectedAccount) { setRegisteredResults([]); return; }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await userService.searchByNick(term);
+        if (active) setRegisteredResults(results.filter(result => result.user_id !== account?.userId));
+      } catch { if (active) setRegisteredResults([]); }
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [searchTerm, user?.id, currentGroup?.id, selectedAccount, account?.userId]);
+
+  const handleSelectAccount = (profile: UserProfile) => {
+    setCreatingUnlinked(false);
+    setSelectedPlayer(null);
+    setSelectedAccount(profile);
+    setSearchTerm(profile.nick);
+    // El hándicap del perfil es el exacto de 18 hoyos; el campo pide el de los hoyos de la partida.
+    const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
+    setHandicap(String(Math.round(forHoles * 10) / 10));
+    setShowDropdown(false);
+  };
 
   const loadPlayers = async () => {
     const request = ++playerLoadVersion.current;
@@ -243,6 +271,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
   const handleSearchChange = (value: string) => {
     setCreatingUnlinked(false);
+    setSelectedAccount(null);
     setSearchTerm(value);
     setSelectedPlayer(null);
     setShowDropdown(true);
@@ -273,11 +302,19 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       const handicapFor9Holes = numHoles === 18 ? handicapNum / 2 : handicapNum;
       const playerName = searchTerm.trim();
-      const linkedUserId = isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
+      const pickedAccount = selectedAccount && normalizeName(selectedAccount.nick) === normalizeName(playerName) ? selectedAccount : null;
+      if (pickedAccount && players.some(player => player.user_id === pickedAccount.user_id)) {
+        setError(`${pickedAccount.nick} ya está en esta partida`);
+        return;
+      }
+      const linkedUserId = pickedAccount ? pickedAccount.user_id : isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
 
       let newPlayer: RoundPlayer;
       if (currentGroup) {
         newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, false, selectedPlayer?.id);
+      } else if (user && pickedAccount) {
+        // Compañero registrado: queda vinculado a su cuenta y la partida cuenta en sus estadísticas.
+        newPlayer = await golfService.addPlayerToRound(roundId, pickedAccount.nick, handicapFor9Holes, useSlope, undefined, pickedAccount.user_id);
       } else if (user) {
         const suggestion = await golfService.saveQuickPlayerSuggestion(playerName, handicapNum * (numHoles === 9 ? 2 : 1));
         newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, suggestion.exact_handicap, useSlope, undefined, linkedUserId);
@@ -312,6 +349,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       setCreatingUnlinked(false);
       setHandicap('');
       setSelectedPlayer(null);
+      setSelectedAccount(null);
       setShowDropdown(false);
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Error añadiendo jugador');
@@ -582,13 +620,40 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                         </div>
                       )})}
                     </div>
-                  ) : searchTerm ? (
+                  ) : searchTerm && registeredResults.length === 0 ? (
                     <div className="px-4 py-3 text-center text-ink-3">
                       No se encontraron jugadores
                     </div>
                   ) : null}
 
-                  {isNewPlayer && searchTerm && !selectedPlayer && (
+                  {registeredResults.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                        JUGADORES REGISTRADOS
+                      </div>
+                      {registeredResults.map((profile) => {
+                        const inRound = players.some(player => player.user_id === profile.user_id);
+                        return (
+                          <button
+                            key={profile.user_id}
+                            type="button"
+                            onClick={() => handleSelectAccount(profile)}
+                            disabled={inRound}
+                            className="w-full px-4 py-3 text-left border-b border-line hover:bg-accent-soft transition-colors disabled:opacity-60"
+                          >
+                            <p className="font-semibold text-ink">{profile.nick}</p>
+                            <p className="text-xs text-ink-3">Cuenta registrada · la partida contará en sus estadísticas</p>
+                            {inRound && <p className="text-xs font-medium text-amber-600">Ya está en esta partida</p>}
+                            <p className="text-sm text-ink-3">
+                              Hándicap ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {isNewPlayer && searchTerm && !selectedPlayer && !selectedAccount && (
                     <button
                       type="button"
                       onClick={() => { setCreatingUnlinked(true); setSelectedPlayer(null); setShowDropdown(false); }}
