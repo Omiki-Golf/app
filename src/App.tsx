@@ -1,7 +1,7 @@
 import { supabase } from './services/supabaseClient';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { useReadOnly } from './context/ReadOnlyContext';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType } from './types';
 import { golfService } from './services/golfService';
@@ -75,7 +75,30 @@ function App() {
   const [hasGroupMembership, setHasGroupMembership] = useState(false);
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [currentView, setCurrentViewState] = useState<ViewType>('main');
+  const currentViewRef = useRef<ViewType>('main');
+  const historyIndexRef = useRef(1);
+  const historyViewsRef = useRef(new Map<number, ViewType>([[0, 'main'], [1, 'main']]));
+  const historyInitializedRef = useRef(false);
+  const exitBackAtRef = useRef(0);
+  const [showExitHint, setShowExitHint] = useState(false);
+
+  const setCurrentView = useCallback((view: ViewType) => {
+    if (view === currentViewRef.current) return;
+    exitBackAtRef.current = 0;
+    setShowExitHint(false);
+    const previousIndex = historyIndexRef.current - 1;
+    if (previousIndex >= 1 && historyViewsRef.current.get(previousIndex) === view) {
+      window.history.back();
+      return;
+    }
+    const nextIndex = historyIndexRef.current + 1;
+    historyIndexRef.current = nextIndex;
+    historyViewsRef.current.set(nextIndex, view);
+    currentViewRef.current = view;
+    window.history.pushState({ omikiApp: true, view, index: nextIndex }, '', window.location.href);
+    setCurrentViewState(view);
+  }, []);
   const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
   const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
   const [plansContext, setPlansContext] = useState<'default' | 'express-limit' | 'express-modes'>('default');
@@ -136,6 +159,8 @@ function App() {
   const [returnToProfile, setReturnToProfile] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [messagesOpen, setMessagesOpen] = useState(false);
+  const messagesOpenRef = useRef(false);
+  useEffect(() => { messagesOpenRef.current = messagesOpen; }, [messagesOpen]);
   // Paid access comes from the server-confirmed database subscription.
   const activePlanType = planType;
 
@@ -169,9 +194,45 @@ function App() {
   }, [profileSaved]);
 
   useEffect(() => {
-    const closeMessagesOnBack = () => setMessagesOpen(false);
-    window.addEventListener('popstate', closeMessagesOnBack);
-    return () => window.removeEventListener('popstate', closeMessagesOnBack);
+    if (!historyInitializedRef.current) {
+      historyInitializedRef.current = true;
+      const initialView = currentViewRef.current;
+      historyIndexRef.current = 1;
+      historyViewsRef.current = new Map([[0, initialView], [1, initialView]]);
+      const initialState = { ...(window.history.state || {}), omikiApp: true, view: initialView, index: 0 };
+      window.history.replaceState(initialState, document.title, window.location.href);
+      window.history.pushState({ ...initialState, index: 1 }, document.title, window.location.href);
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (messagesOpenRef.current) {
+        setMessagesOpen(false);
+        return;
+      }
+      const state = event.state as { omikiApp?: boolean; view?: ViewType; index?: number } | null;
+      if (!state?.omikiApp || typeof state.index !== 'number') return;
+      if (state.index === 0) {
+        const now = Date.now();
+        if (now - exitBackAtRef.current <= 2000) {
+          window.history.back();
+          return;
+        }
+        exitBackAtRef.current = now;
+        setShowExitHint(true);
+        window.history.pushState({ omikiApp: true, view: 'main', index: 1 }, '', window.location.href);
+        historyIndexRef.current = 1;
+        currentViewRef.current = 'main';
+        setCurrentViewState('main');
+        window.setTimeout(() => setShowExitHint(false), 2000);
+        return;
+      }
+      const restoredView = state.view && historyViewsRef.current.get(state.index) === state.view ? state.view : 'main';
+      historyIndexRef.current = state.index;
+      currentViewRef.current = restoredView;
+      setCurrentViewState(restoredView);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   const openMessages = () => {
@@ -242,13 +303,13 @@ function App() {
     if (!emailConfirmed) return;
     const url = new URL(window.location.href);
     url.searchParams.delete('email-confirmed');
-    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, [emailConfirmed]);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has('stripe_checkout')) return;
     url.searchParams.delete('stripe_checkout');
-    window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, []);
   useEffect(() => {
     const checkIncognito = () => {
@@ -970,6 +1031,11 @@ function App() {
     || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
+    {showExitHint && (
+      <div role="status" className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg">
+        Pulsa atrás otra vez para salir
+      </div>
+    )}
     {!usesInlineMessages && <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} belowWarning={isIncognito} />}
     {messagesOpen && <NotificationsBell
       key={`${user?.id || 'express'}-${activityScope.groupId || activityScope.roundId || 'general'}`}

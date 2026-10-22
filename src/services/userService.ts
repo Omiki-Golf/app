@@ -204,13 +204,14 @@ export const userService = {
     })) as GroupInvitation[];
   },
 
-  async sendInvitation(groupId: string, invitedUserId: string, _invitedBy: string, message?: string): Promise<void> {
-    const { error } = await supabase.rpc('invite_group_user_once', {
+  async sendInvitation(groupId: string, invitedUserId: string, _invitedBy: string, message?: string): Promise<'pending' | 'accepted' | 'rejected'> {
+    const { data, error } = await supabase.rpc('invite_group_user_once', {
       p_group: groupId,
       p_user: invitedUserId,
       p_message: message ?? null,
     });
     if (error) throw error;
+    return data as 'pending' | 'accepted' | 'rejected';
   },
 
   async getGroupInvitationStatuses(groupId: string): Promise<Array<{ userId: string; status: 'pending' | 'accepted' | 'rejected'; profile?: UserProfile }>> {

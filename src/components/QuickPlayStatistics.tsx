@@ -2,7 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
-  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
+  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2, ChevronDown, Check
 } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
@@ -91,9 +91,27 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState('');
   const [shareAsset, setShareAsset] = useState<{ file: File; url: string; date: string } | null>(null);
+  const [roundMenuOpen, setRoundMenuOpen] = useState(false);
 
   const statsContainerRef = useRef<HTMLDivElement>(null);
   const desktopExportRef = useRef<HTMLDivElement>(null);
+  const roundMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!roundMenuOpen) return;
+    const closeFromOutside = (event: PointerEvent) => {
+      if (!roundMenuRef.current?.contains(event.target as Node)) setRoundMenuOpen(false);
+    };
+    const closeFromKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setRoundMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeFromOutside);
+    document.addEventListener('keydown', closeFromKeyboard);
+    return () => {
+      document.removeEventListener('pointerdown', closeFromOutside);
+      document.removeEventListener('keydown', closeFromKeyboard);
+    };
+  }, [roundMenuOpen]);
 
   useEffect(() => () => {
     if (shareAsset) URL.revokeObjectURL(shareAsset.url);
@@ -140,11 +158,21 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   }, [sharedRoundData]);
 
   const handleSelectRound = async (roundId: string) => {
+    setRoundMenuOpen(false);
     setShareAsset(null);
     setShareError('');
     setSelectedRoundId(roundId);
     await loadRoundData(roundId);
   };
+
+  const formatRoundLabel = (round: AvailableRound) => `${new Date(round.created_at).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })} - ${new Date(round.created_at).toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })} · ${getModeLabel(round.game_mode)}`;
 
   const loadRoundData = async (roundId: string) => {
     try {
@@ -993,27 +1021,42 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
 
             {availableRounds.length > 0 && (
-              <div className="relative mt-2 w-full max-w-md rounded-2xl border border-line bg-card p-1 shadow-card">
-                <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-ink pointer-events-none z-10" />
-                <select
-                  value={selectedRoundId || ''}
-                  onChange={(e) => handleSelectRound(e.target.value)}
+              <div ref={roundMenuRef} className="relative mt-2 w-full max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setRoundMenuOpen(open => !open)}
+                  aria-haspopup="listbox"
+                  aria-expanded={roundMenuOpen}
                   aria-label="Partida a mostrar"
-                  className="w-full appearance-none cursor-pointer rounded-xl bg-card py-3 pl-10 pr-10 text-sm font-semibold text-ink outline-none transition focus:bg-accent-soft focus:ring-2 focus:ring-accent"
+                  className={`flex min-h-12 w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left shadow-card transition focus:outline-none focus:ring-2 focus:ring-accent ${roundMenuOpen ? 'border-accent' : 'border-line'}`}
                 >
-                  {availableRounds.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {new Date(r.created_at).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      })} - {new Date(r.created_at).toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })} · {getModeLabel(r.game_mode)}
-                    </option>
-                  ))}
-                </select>
+                  <Calendar size={19} className="shrink-0 text-accent-ink" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+                    {formatRoundLabel(availableRounds.find(round => round.id === selectedRoundId) || availableRounds[0])}
+                  </span>
+                  <ChevronDown size={19} className={`shrink-0 text-accent-ink transition-transform ${roundMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {roundMenuOpen && (
+                  <div role="listbox" aria-label="Partidas disponibles" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl">
+                    {availableRounds.map((round) => {
+                      const selected = round.id === selectedRoundId;
+                      return (
+                        <button
+                          key={round.id}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          onClick={() => void handleSelectRound(round.id)}
+                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${selected ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-card-2 active:bg-accent-soft'}`}
+                        >
+                          <Calendar size={17} className="shrink-0 opacity-80" />
+                          <span className="min-w-0 flex-1 font-semibold leading-5">{formatRoundLabel(round)}</span>
+                          {selected && <Check size={18} className="shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

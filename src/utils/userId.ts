@@ -7,10 +7,10 @@ let authenticatedUserId: string | null = null;
 export const setAuthenticatedUserId = (userId: string | null): void => {
   authenticatedUserId = userId;
   try {
-    if (userId) window.sessionStorage.setItem(AUTHENTICATED_USER_KEY, userId);
-    else window.sessionStorage.removeItem(AUTHENTICATED_USER_KEY);
+    if (userId) window.localStorage.setItem(AUTHENTICATED_USER_KEY, userId);
+    else window.localStorage.removeItem(AUTHENTICATED_USER_KEY);
   } catch {
-    // Some private browsing modes disable sessionStorage. The anonymous
+    // Some private browsing modes disable localStorage. The anonymous
     // identifier remains a safe fallback until the next auth event.
   }
 };
@@ -24,10 +24,10 @@ export const getDeviceUserId = (): string | null => {
 export const getUserId = (): string => {
   if (authenticatedUserId) return authenticatedUserId;
   try {
-    const authenticatedUserId = window.sessionStorage.getItem(AUTHENTICATED_USER_KEY);
+    const authenticatedUserId = window.localStorage.getItem(AUTHENTICATED_USER_KEY);
     if (authenticatedUserId) return authenticatedUserId;
   } catch {
-    // Fall back to the device identifier when sessionStorage is unavailable.
+    // Fall back to the device identifier when localStorage is unavailable.
   }
 
   // 1. Intentar obtener un ID previo guardado en el navegador

@@ -2,7 +2,7 @@ import { effectivePlan } from '../utils/effectivePlan';
 // src/context/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '../services/supabaseClient';
+import { clearStoredAuthSession, supabase } from '../services/supabaseClient';
 import { getDeviceUserId, setAuthenticatedUserId } from '../utils/userId';
 
 export interface UserSubscription {
@@ -123,6 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await supabase.auth.signOut({ scope: 'local' });
+    await clearStoredAuthSession();
     currentUserId.current = null;
     setAuthenticatedUserId(null);
     setUser(null);

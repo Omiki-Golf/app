@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { tabAuthStorage, authStorageKey, clearTabAuthSession } from './tabAuthStorage';
+import { persistentAuthStorage, authStorageKey, clearPersistentAuthSession } from './tabAuthStorage';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -17,7 +17,7 @@ let supabaseClient;
 try {
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
     auth: {
-      storage: tabAuthStorage,
+      storage: persistentAuthStorage,
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
@@ -28,7 +28,7 @@ try {
   console.error('Error creating Supabase client:', error);
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
     auth: {
-      storage: tabAuthStorage,
+      storage: persistentAuthStorage,
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
@@ -39,4 +39,4 @@ try {
 
 export const supabase = supabaseClient;
 
-export const clearStoredAuthSession = clearTabAuthSession;
+export const clearStoredAuthSession = clearPersistentAuthSession;
