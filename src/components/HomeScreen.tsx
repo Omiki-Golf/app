@@ -153,7 +153,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-28 object-contain" />
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <div className="hidden mt-6 flex-wrap items-center justify-center gap-3" aria-hidden="true">
           <WriteButton
             type="button"
             onClick={onToggleSimulator}
@@ -183,7 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {simulatorEnabled && (
-          <p className="text-center text-xs text-ink-4 mt-2">
+          <p className="hidden text-center text-xs text-ink-4 mt-2" aria-hidden="true">
             {t('home.preview', { user: profile?.nick || t('common.user'), plan: planType })}
           </p>
         )}

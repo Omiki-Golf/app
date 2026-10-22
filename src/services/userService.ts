@@ -183,13 +183,13 @@ export const userService = {
       .from('group_invitations')
       .select(`
         *,
-        group:groups!group_id(*)
+        group:groups!inner(*)
       `)
       .eq('invited_user_id', userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    const invitations = (data || []) as unknown as GroupInvitation[];
+    const invitations = ((data || []) as unknown as GroupInvitation[]).filter(invitation => !invitation.group?.archived_at);
     if (!invitations.length) return invitations;
     // invited_by references Auth, not user_profiles. Fetch optional display
     // details separately so a missing/inaccessible profile cannot hide an invite.

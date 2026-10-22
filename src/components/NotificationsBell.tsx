@@ -3,7 +3,7 @@ import { GroupMessages } from './messages/GroupMessages';
 import { messageService } from '../services/messageService';
 import { WriteButton } from '../context/ReadOnlyContext';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Check, X, Users, Clock, Trophy, Flag, Hand } from 'lucide-react';
+import { Bell, Check, X, Trophy, Flag, Hand } from 'lucide-react';
 import { userService } from '../services/userService';
 import { GroupInvitation } from '../types';
 import type { ActivityEvent, ActivityScope } from '../services/messageService';
@@ -13,10 +13,11 @@ interface NotificationsBellProps {
   userId: string | null;
   onBack: () => void;
   onInvitationResolved: () => void;
+  onInvitationAccepted: () => void;
   activityScope: ActivityScope;
 }
 
-export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, activityScope }) => {
+export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, onInvitationAccepted, activityScope }) => {
   const { t } = useTranslation();
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +94,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
       setLoading(false);
       setInvitations(current => current.filter(i => i.id !== invitationId));
       onInvitationResolved();
+      if (status === 'accepted') onInvitationAccepted();
     } catch {
       setResponseError('No se pudo guardar la respuesta. Actualiza las invitaciones y vuelve a intentarlo.');
     } finally {
@@ -127,7 +129,6 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
         {showGroupMessages && userId ? <GroupMessages onBack={() => setShowGroupMessages(false)} /> : <>
         {managesGroups && <button className="w-full bg-card border border-line rounded-xl p-3 text-ink mb-5" onClick={() => setShowGroupMessages(true)}>Mensajes de mis grupos</button>}
         <MessageInbox key={userId || 'express'} userId={userId} onRead={onInvitationResolved} />
-        {userId && <h2 className="font-bold text-lg text-ink mb-3">Invitaciones a grupos</h2>}
         {userId && <button disabled={responding !== null} className="border border-line rounded-xl p-2 text-ink mb-3" onClick={() => { void load(); onInvitationResolved(); }}>Actualizar invitaciones</button>}
         {invitationError && <p role="alert" className="text-red-600 mb-3">{invitationError}</p>}
         {responseError && <p role="alert" className="text-red-600 mb-3">{responseError}</p>}
@@ -145,23 +146,9 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
           <div className="space-y-3">
             {invitations.map(inv => (
               <div key={inv.id} className="bg-card rounded-2xl shadow-card p-5">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
-                    <Users size={18} className="text-amber-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-ink text-sm">
-                      {inv.inviter_profile?.nick || 'Alguien'} te ha invitado
-                    </p>
-                    <p className="text-sm text-ink-3 mt-0.5">
-                      Quieres meterte en el grupo <strong>{inv.group?.name}</strong> donde te han invitado?
-                    </p>
-                    <p className="text-xs text-ink-4 mt-1 flex items-center gap-1">
-                      <Clock size={12} />
-                      {new Date(inv.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
+                <p className="mb-4 text-base font-semibold text-ink">
+                  ¿Quieres aceptar la invitación de {inv.inviter_profile?.nick || 'alguien'} al grupo <strong>{inv.group?.name}</strong>?
+                </p>
 
                 <div className="flex gap-2">
                   <WriteButton

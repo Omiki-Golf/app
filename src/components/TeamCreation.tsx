@@ -37,7 +37,7 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
         <Info size={14} />
       </button>
       {show && (
-        <div className="absolute z-50 left-1/2 -translate-x-1/2 top-6 w-56 bg-ink text-card text-xs p-2.5 rounded-lg shadow-card">
+        <div role="tooltip" className="fixed z-[200] left-4 right-4 top-1/2 -translate-y-1/2 bg-ink text-card text-sm p-4 rounded-xl shadow-card sm:absolute sm:left-auto sm:right-0 sm:top-6 sm:w-64 sm:translate-y-0 sm:text-xs sm:p-2.5">
           {text}
         </div>
       )}

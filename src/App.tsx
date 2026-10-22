@@ -977,6 +977,11 @@ function App() {
       activityScope={activityScope}
       onBack={closeMessages}
       onInvitationResolved={handleNotificationsRefresh}
+      onInvitationAccepted={() => {
+        closeMessages();
+        setCurrentGroup(null);
+        setCurrentView('my-groups');
+      }}
     />}
     {content}
   </>;

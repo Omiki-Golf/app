@@ -993,15 +993,16 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
 
             {availableRounds.length > 0 && (
-              <div className="relative flex items-center mt-1">
-                <Calendar size={18} className="absolute left-3 text-emerald-300 pointer-events-none z-10" />
+              <div className="relative mt-2 w-full max-w-md rounded-2xl border border-line bg-card p-1 shadow-card">
+                <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-accent-ink pointer-events-none z-10" />
                 <select
                   value={selectedRoundId || ''}
                   onChange={(e) => handleSelectRound(e.target.value)}
-                  className="bg-card text-ink font-semibold pl-9 pr-8 py-2 rounded-lg border border-line-2 focus:outline-none focus:ring-2 focus:ring-accent appearance-none cursor-pointer text-sm shadow-card"
+                  aria-label="Partida a mostrar"
+                  className="w-full appearance-none cursor-pointer rounded-xl bg-card py-3 pl-10 pr-10 text-sm font-semibold text-ink outline-none transition focus:bg-accent-soft focus:ring-2 focus:ring-accent"
                 >
                   {availableRounds.map((r) => (
-                    <option key={r.id} value={r.id} className="bg-slate-900 text-white">
+                    <option key={r.id} value={r.id}>
                       {new Date(r.created_at).toLocaleDateString('es-ES', {
                         day: '2-digit',
                         month: 'short',
