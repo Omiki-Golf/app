@@ -37,6 +37,10 @@ interface MyGroup extends GroupWithCode {
 }
 
 const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at';
+const sortGroups = (items: MyGroup[]) => [...items].sort((a, b) => {
+  const archiveOrder = Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at));
+  return archiveOrder || b.created_at.localeCompare(a.created_at);
+});
 
 export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, messagesButton }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
@@ -99,10 +103,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member' }));
       }
 
-      setGroups([...ownedGroups, ...joinedGroups].sort((a, b) => {
-        const archiveOrder = Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at));
-        return archiveOrder || b.created_at.localeCompare(a.created_at);
-      }));
+      setGroups(sortGroups([...ownedGroups, ...joinedGroups]));
     } catch (err: any) {
       setError(err.message || t('groups.loadError'));
     } finally {
@@ -125,7 +126,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
     try {
       const { data, error: archiveError } = await supabase.rpc('archive_owned_group', { p_group: groupToArchive });
       if (archiveError) throw archiveError;
-      setGroups(current => current.map(group => group.id === groupToArchive ? { ...group, archived_at: data } : group));
+      setGroups(current => sortGroups(current.map(group => group.id === groupToArchive ? { ...group, archived_at: data } : group)));
+      setOpenMembers(current => current === groupToArchive ? null : current);
       onGroupArchived?.(groupToArchive, data);
       setGroupToArchive(null);
     } catch (err: any) {
