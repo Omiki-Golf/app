@@ -23,7 +23,7 @@ const styles = {
   player: { ink: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500', button: 'bg-emerald-400 hover:bg-emerald-300 text-slate-950', icon: User },
   team: { ink: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500', button: 'bg-amber-400 hover:bg-amber-300 text-slate-950', icon: Users },
   premium: { ink: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500', button: 'bg-purple-600 hover:bg-purple-500 text-white', icon: Gem },
-  weekend: { ink: 'text-orange-700 dark:text-orange-400', border: 'border-orange-500', button: 'bg-orange-500 hover:bg-orange-400 text-white', icon: Plane },
+  weekend: { ink: 'text-orange-700 dark:text-orange-400', border: 'border-orange-500', button: 'bg-orange-700 hover:bg-orange-800 text-white', icon: Plane },
 };
 const money = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
 const longDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });

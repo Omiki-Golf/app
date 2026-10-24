@@ -1,8 +1,9 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
+import { SelectMenu } from './SelectMenu';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
-  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2, ChevronDown, Check
+  Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
@@ -91,27 +92,10 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState('');
   const [shareAsset, setShareAsset] = useState<{ file: File; url: string; date: string } | null>(null);
-  const [roundMenuOpen, setRoundMenuOpen] = useState(false);
 
   const statsContainerRef = useRef<HTMLDivElement>(null);
   const desktopExportRef = useRef<HTMLDivElement>(null);
-  const roundMenuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!roundMenuOpen) return;
-    const closeFromOutside = (event: PointerEvent) => {
-      if (!roundMenuRef.current?.contains(event.target as Node)) setRoundMenuOpen(false);
-    };
-    const closeFromKeyboard = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setRoundMenuOpen(false);
-    };
-    document.addEventListener('pointerdown', closeFromOutside);
-    document.addEventListener('keydown', closeFromKeyboard);
-    return () => {
-      document.removeEventListener('pointerdown', closeFromOutside);
-      document.removeEventListener('keydown', closeFromKeyboard);
-    };
-  }, [roundMenuOpen]);
 
   useEffect(() => () => {
     if (shareAsset) URL.revokeObjectURL(shareAsset.url);
@@ -158,7 +142,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   }, [sharedRoundData]);
 
   const handleSelectRound = async (roundId: string) => {
-    setRoundMenuOpen(false);
     setShareAsset(null);
     setShareError('');
     setSelectedRoundId(roundId);
@@ -1021,43 +1004,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
 
             {availableRounds.length > 0 && (
-              <div ref={roundMenuRef} className="relative mt-2 w-full max-w-md">
-                <button
-                  type="button"
-                  onClick={() => setRoundMenuOpen(open => !open)}
-                  aria-haspopup="listbox"
-                  aria-expanded={roundMenuOpen}
-                  aria-label="Partida a mostrar"
-                  className={`flex min-h-12 w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left shadow-card transition focus:outline-none focus:ring-2 focus:ring-accent ${roundMenuOpen ? 'border-accent' : 'border-line'}`}
-                >
-                  <Calendar size={19} className="shrink-0 text-accent-ink" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-                    {formatRoundLabel(availableRounds.find(round => round.id === selectedRoundId) || availableRounds[0])}
-                  </span>
-                  <ChevronDown size={19} className={`shrink-0 text-accent-ink transition-transform ${roundMenuOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {roundMenuOpen && (
-                  <div role="listbox" aria-label="Partidas disponibles" className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl">
-                    {availableRounds.map((round) => {
-                      const selected = round.id === selectedRoundId;
-                      return (
-                        <button
-                          key={round.id}
-                          type="button"
-                          role="option"
-                          aria-selected={selected}
-                          onClick={() => void handleSelectRound(round.id)}
-                          className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition ${selected ? 'bg-accent-soft text-accent-ink' : 'text-ink hover:bg-card-2 active:bg-accent-soft'}`}
-                        >
-                          <Calendar size={17} className="shrink-0 opacity-80" />
-                          <span className="min-w-0 flex-1 font-semibold leading-5">{formatRoundLabel(round)}</span>
-                          {selected && <Check size={18} className="shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <SelectMenu
+                className="mt-2 max-w-md"
+                value={selectedRoundId || availableRounds[0].id}
+                onChange={(roundId) => void handleSelectRound(roundId)}
+                ariaLabel="Partida a mostrar"
+                icon={<Calendar size={19} />}
+                options={availableRounds.map((round) => ({ value: round.id, label: formatRoundLabel(round) }))}
+              />
             )}
 
             <p className="text-accent-ink font-semibold text-xs md:text-sm mt-1">

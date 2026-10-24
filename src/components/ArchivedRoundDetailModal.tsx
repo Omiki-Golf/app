@@ -269,7 +269,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               className={`text-center py-2 px-2 font-semibold border-b border-l ${index === 0 ? 'bg-amber-200 text-ink' : 'text-ink-2'}`}
                             >
                               <div className="flex items-center justify-center gap-1">
-                                {index === 0 && <Trophy size={16} className="text-amber-600" />}
+                                {index === 0 && <Trophy size={16} className="text-amber-700" />}
                                 {gameMode === 'parejas' && roundData.final_ranking.length === 4 && (
                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${index < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                                     {index < 2 ? 'P1' : 'P2'}
@@ -373,9 +373,9 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                             <tr key={index} className={`border-b hover:bg-card-2 ${isWinner ? 'bg-amber-100' : ''}`}>
                               <td className="py-3 px-4 font-semibold text-ink">
                                 <div className="flex items-center gap-2">
-                                  {isWinner && <Trophy size={18} className="text-amber-600" />}
+                                  {isWinner && <Trophy size={18} className="text-amber-700" />}
                                   {playerStat.player_name}{playerStat.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
-                                  {isWinner && <span className="text-xs text-amber-600 font-bold">(Ganador/a)</span>}
+                                  {isWinner && <span className="text-xs text-amber-700 font-bold">(Ganador/a)</span>}
                                 </div>
                               </td>
                               <td className="text-center py-3 px-4 text-ink-2">{stats.eagles}</td>

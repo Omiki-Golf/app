@@ -160,7 +160,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
       {section.items.map(item => <article key={`invited:${item.profile.user_id}`} className="flex w-full items-center gap-2 rounded-xl border border-line bg-card px-3 py-2">
         <img src={normalizeAvatarUrl(item.profile.avatar_url)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
         <span className="min-w-0 flex-1 truncate font-semibold">{item.profile.nick}</span>
-        <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${section.status === 'accepted' ? 'bg-accent-soft text-accent-ink' : section.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-600'}`}>{section.status === 'accepted' ? 'Aceptada' : section.status === 'pending' ? 'Pendiente' : 'Rechazada'}</span>
+        <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${section.status === 'accepted' ? 'bg-accent-soft text-accent-ink' : section.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-700'}`}>{section.status === 'accepted' ? 'Aceptada' : section.status === 'pending' ? 'Pendiente' : 'Rechazada'}</span>
         {section.status === 'rejected' && canManage && <WriteButton type="button" disabled={busy} onClick={() => void deleteRejectedInvitation(item.profile.user_id)} title="Eliminar invitación rechazada" aria-label={`Eliminar la invitación rechazada de ${item.profile.nick}`} className="shrink-0 rounded-lg p-2 text-red-500 hover:bg-red-500/10"><Trash2 size={17} /></WriteButton>}
       </article>)}
     </section>)}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { SelectMenu } from "../SelectMenu";
 import {
   adminService,
   type ManagedRound,
@@ -102,56 +103,52 @@ export function AdminRounds() {
         </label>
         <label>
           Estado
-          <select
-            className={input}
+          <SelectMenu
+            ariaLabel="Estado"
             value={state}
-            onChange={(e) => {
-              setState(e.target.value);
+            onChange={(value) => {
+              setState(value);
               setPage(0);
             }}
-          >
-            <option value="">Todos</option>
-            {Object.entries(labels).map(([v, l]) => (
-              <option value={v} key={v}>
-                {l}
-              </option>
-            ))}
-          </select>
+            options={[{ value: "", label: "Todos" }, ...Object.entries(labels).map(([v, l]) => ({ value: v, label: l }))]}
+          />
         </label>
         <label>
           Tipo
-          <select
-            className={input}
+          <SelectMenu
+            ariaLabel="Tipo de partida"
             value={kind}
-            onChange={(e) => {
-              setKind(e.target.value);
+            onChange={(value) => {
+              setKind(value);
               setMode("");
               setGroup("");
               setPage(0);
             }}
-          >
-            <option value="">Todas</option>
-            <option value="quick">Rápidas</option>
-            <option value="group">De grupo (consulta)</option>
-          </select>
+            options={[
+              { value: "", label: "Todas" },
+              { value: "quick", label: "Rápidas" },
+              { value: "group", label: "De grupo (consulta)" },
+            ]}
+          />
         </label>
         {kind === "quick" && (
           <label>
             Modalidad
-            <select
-              className={input}
+            <SelectMenu
+              ariaLabel="Modalidad"
               value={mode}
-              onChange={(e) => {
-                setMode(e.target.value);
+              onChange={(value) => {
+                setMode(value);
                 setPage(0);
               }}
-            >
-              <option value="">Todas las modalidades</option>
-              <option value="stableford">Stableford</option>
-              <option value="match">Match</option>
-              <option value="sindicato">Sindicato</option>
-              <option value="parejas">Parejas</option>
-            </select>
+              options={[
+                { value: "", label: "Todas las modalidades" },
+                { value: "stableford", label: "Stableford" },
+                { value: "match", label: "Match" },
+                { value: "sindicato", label: "Sindicato" },
+                { value: "parejas", label: "Parejas" },
+              ]}
+            />
           </label>
         )}
         {kind === "group" && (

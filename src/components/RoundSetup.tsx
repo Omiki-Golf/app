@@ -541,7 +541,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                   <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100">
                     {currentGroup ? t('roundSetup.active') : t('roundSetup.myRound')}
                   </h2>
-                  <div className="bg-amber-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
+                  <div className="bg-amber-600 text-amber-950 font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
                     {activeRoundsCount}
                   </div>
                 </div>
@@ -551,7 +551,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     : t('roundSetup.myRoundDescription')}
                 </p>
               </div>
-              <button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
+              <button className="w-full bg-amber-600 hover:bg-amber-700 text-amber-950 font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
                 {t('roundSetup.viewRound')}
                 <ChevronRight size={20} />
               </button>
@@ -599,7 +599,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
             {!currentGroup && isExpress && quickPlayRoundsCount !== null && (
               <div className="bg-amber-100 dark:bg-amber-950 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-amber-950 dark:text-amber-100 flex items-center gap-3 shadow-card">
-                <Info className="text-amber-600 dark:text-amber-300 flex-shrink-0" size={24} />
+                <Info className="text-amber-700 dark:text-amber-300 flex-shrink-0" size={24} />
                 <div className="text-sm">
                   <p className="font-semibold">{t('roundSetup.express')}</p>
                   <p className="text-amber-800 dark:text-amber-200">

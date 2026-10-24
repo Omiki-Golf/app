@@ -655,7 +655,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           <div className="bg-card rounded-xl shadow-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-amber-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-amber-600" />
+                <Calendar className="w-6 h-6 text-amber-700" />
               </div>
               <h2 className="text-xl font-bold text-ink">Partidas</h2>
             </div>

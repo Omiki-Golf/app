@@ -121,7 +121,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
             <button
               onClick={handleGenerateInvoice}
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {loading ? 'Generando factura...' : 'Pagar con Lightning'}
             </button>
@@ -153,7 +153,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
                 </p>
                 <button
                   onClick={handleCopy}
-                  className="text-xs text-amber-600 hover:underline font-medium flex items-center gap-1"
+                  className="text-xs text-amber-700 hover:underline font-medium flex items-center gap-1"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                   {copied ? '¡Copiado!' : 'Copiar texto de la factura'}

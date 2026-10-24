@@ -140,7 +140,7 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, sho
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block font-semibold text-ink">{round.points} pts</span>
-                      {round.won && <span className="text-xs font-semibold text-yellow-600">Ganada</span>}
+                      {round.won && <span className="text-xs font-semibold text-yellow-800">Ganada</span>}
                     </span>
                   </li>
                 ))}

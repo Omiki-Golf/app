@@ -254,7 +254,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       <div className="text-right">
                         <p
                           className={`text-3xl font-bold ${
-                            index === 0 ? 'text-yellow-600' : 'text-accent-ink'
+                            index === 0 ? 'text-yellow-800' : 'text-accent-ink'
                           }`}
                         >
                           {entry.totalPoints}
@@ -401,7 +401,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                 </div>
                                 <p
                                   className={`text-2xl font-bold ${
-                                    index === 0 ? 'text-yellow-600' : 'text-accent-ink'
+                                    index === 0 ? 'text-yellow-800' : 'text-accent-ink'
                                   }`}
                                 >
                                   {item.stats.totalPoints}

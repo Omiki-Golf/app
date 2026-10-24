@@ -232,7 +232,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             <div className="flex justify-end">
               <button
                 onClick={onShowLeaderboard}
-                className="bg-yellow-600 hover:bg-yellow-700 text-white px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
                 aria-label="Clasificación"
               >
                 <Trophy size={20} />
@@ -311,7 +311,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
           {!hasEditAccess && (
             <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
-                <Lock className="text-amber-600" size={20} />
+                <Lock className="text-amber-700" size={20} />
                 <span className="text-sm font-medium text-amber-900">
                   Solo lectura - No tienes permiso para editar esta partida
                 </span>
@@ -846,7 +846,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               type="button"
               onClick={() => setShowPendingScoresModal(false)}
               autoFocus
-              className="mt-6 w-full rounded-lg bg-amber-600 px-4 py-3 font-bold text-white transition-colors hover:bg-amber-700"
+              className="mt-6 w-full rounded-lg bg-amber-600 px-4 py-3 font-bold text-amber-950 transition-colors hover:bg-amber-700"
             >
               Entendido
             </button>

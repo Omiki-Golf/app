@@ -80,7 +80,7 @@ export default function ComingSoonModal({ onClose }: ComingSoonModalProps) {
 
                 <div className="flex gap-4">
                   <div className="flex-shrink-0 w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <Lock className="w-5 h-5 text-yellow-600" />
+                    <Lock className="w-5 h-5 text-yellow-800" />
                   </div>
                   <div>
                     <h4 className="font-semibold text-ink">Todo guardado en la nube</h4>

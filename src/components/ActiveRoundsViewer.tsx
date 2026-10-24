@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, Group } from '../types';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
+import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { RoundStatistics } from './RoundStatistics';
 import { adminPinUtils } from '../utils/adminPin';
@@ -513,7 +514,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                       <p
                         className={`text-3xl font-bold ${
                           index === 0
-                            ? 'text-yellow-600'
+                            ? 'text-yellow-800'
                             : index === 1
                             ? 'text-ink-3'
                             : index === 2
@@ -545,7 +546,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                     <>
                       <button
                         onClick={() => setShowGlobalLeaderboard(true)}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold h-11 px-4 rounded-lg flex items-center gap-2 transition-colors"
+                        className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 font-bold h-11 px-4 rounded-lg flex items-center gap-2 transition-colors"
                         aria-label="Clasificación"
                       >
                         <Trophy size={20} />
@@ -755,7 +756,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 </div>
                                 <p
                                   className={`text-2xl font-bold ${
-                                    index === 0 ? 'text-yellow-600' : 'text-accent-ink'
+                                    index === 0 ? 'text-yellow-800' : 'text-accent-ink'
                                   }`}
                                 >
                                   {item.stats.totalPoints}
@@ -857,7 +858,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 </div>
                                 <p
                                   className={`text-2xl font-bold ${
-                                    index === 0 ? 'text-yellow-600' : 'text-accent-ink'
+                                    index === 0 ? 'text-yellow-800' : 'text-accent-ink'
                                   }`}
                                 >
                                   {item.stats.totalPoints}
@@ -1034,19 +1035,21 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
               <label className="block text-sm font-medium text-ink-2 mb-2">
                 Selecciona un jugador
               </label>
-              <select
+              <SelectMenu
                 value={selectedPlayerId}
-                onChange={(e) => { setSelectedPlayerId(e.target.value); setNewPlayerIsGuest(!!availablePlayers.find(player => player.id === e.target.value)?.is_guest); }}
-                className="w-full px-3 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">-- Selecciona --</option>
-                {availablePlayers.map((player) => (
-                  <option key={player.id} value={player.id} disabled={player.handicap_pending || Boolean(player.unavailable_reason)}>
-                    {player.name}{player.is_guest ? ' · Invitado' : ''} (HCP {(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap}){player.handicap_pending ? ' · Pendiente' : player.unavailable_reason ? ` · ${player.unavailable_reason}` : ''}
-                  </option>
-                ))}
-                <option value="new">+ Crear nuevo jugador</option>
-              </select>
+                onChange={(value) => { setSelectedPlayerId(value); setNewPlayerIsGuest(!!availablePlayers.find(player => player.id === value)?.is_guest); }}
+                ariaLabel="Selecciona un jugador"
+                placeholder="Selecciona un jugador"
+                icon={<UserPlus size={19} />}
+                options={[
+                  ...availablePlayers.map((player) => ({
+                    value: player.id,
+                    disabled: player.handicap_pending || Boolean(player.unavailable_reason),
+                    label: `${player.name}${player.is_guest ? ' · Invitado' : ''} (HCP ${(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap})${player.handicap_pending ? ' · Pendiente' : player.unavailable_reason ? ` · ${player.unavailable_reason}` : ''}`,
+                  })),
+                  { value: 'new', label: '+ Crear nuevo jugador' },
+                ]}
+              />
             </div>
 
             {availablePlayers.find(player => player.id === selectedPlayerId)?.is_guest && canManagePlayers && <div className="mb-4">

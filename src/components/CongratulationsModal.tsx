@@ -16,7 +16,7 @@ export const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
         <div className="text-center">
           <div className="flex justify-center gap-2 mb-4">
             <Star className="text-yellow-500 animate-bounce" size={40} style={{ animationDelay: '0ms' }} />
-            <Trophy className="text-yellow-600" size={48} />
+            <Trophy className="text-yellow-800" size={48} />
             <Star className="text-yellow-500 animate-bounce" size={40} style={{ animationDelay: '200ms' }} />
           </div>
 
@@ -28,7 +28,7 @@ export const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
             <strong className="text-yellow-700">{playerName}</strong>
           </p>
 
-          <p className="text-2xl font-bold text-yellow-600 mb-4">
+          <p className="text-2xl font-bold text-yellow-800 mb-4">
             ¡Ha conseguido un HOYO EN UNO!
           </p>
 
@@ -41,7 +41,7 @@ export const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
 
           <button
             onClick={onClose}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-8 rounded-lg transition-colors shadow-card text-lg"
+            className="bg-yellow-500 hover:bg-yellow-600 text-amber-950 font-bold py-3 px-8 rounded-lg transition-colors shadow-card text-lg"
           >
             ¡Gracias!
           </button>

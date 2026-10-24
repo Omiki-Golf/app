@@ -22,9 +22,10 @@ interface HoleCardProps {
 }
 
 const markerColors = [
-  'bg-blue-500 border-blue-700',
-  'bg-orange-500 border-orange-700',
-  'bg-violet-500 border-violet-700',
+  // Tonos con contraste suficiente para las iniciales en blanco (≥ 5:1).
+  'bg-blue-600 border-blue-800',
+  'bg-orange-700 border-orange-900',
+  'bg-violet-600 border-violet-800',
 ] as const;
 
 const playerInitials = (name: string) => name
@@ -346,8 +347,27 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
             ? 'border-blue-400 ring-1 ring-blue-100'
             : 'border-orange-400 ring-1 ring-orange-100';
 
+          // En Parejas los puntos son de la pareja: se muestran una sola vez, en la cabecera de cada pareja.
+          const startsTeam = isParejas && (playerIndex === 0 || (teamAssignments[players[playerIndex - 1].id] ?? (playerIndex - 1 < 2 ? 0 : 1)) !== team);
+          const teamMembers = isParejas ? players.filter((member, memberIndex) => (teamAssignments[member.id] ?? (memberIndex < 2 ? 0 : 1)) === team) : [];
+          const teamHolePoints = scores[teamMembers[0]?.id]?.mode_points ?? 0;
+
           return (
-            <div key={player.id} className={`border-2 rounded-lg overflow-hidden ${isParejas ? teamClasses : 'border-line'}`}>
+            <React.Fragment key={player.id}>
+            {startsTeam && (
+              <div className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${playerIndex > 0 ? 'mt-2' : ''} ${team === 0 ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100' : 'bg-orange-50 text-orange-900 dark:bg-orange-950/40 dark:text-orange-100'}`}>
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                  <ColorMarker colorIndex={team} />
+                  <span className="truncate">Pareja {team + 1} · {teamMembers.map((member) => member.name).join(' / ')}</span>
+                </span>
+                {allPlayersEntered && (
+                  <span className="shrink-0 rounded-lg border-2 border-accent-ring bg-card px-3 py-1 text-base font-bold text-accent-ink" title="Puntos de la pareja en el hoyo">
+                    {teamHolePoints.toLocaleString('es-ES')} pts
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={`border-2 rounded-lg overflow-hidden ${isParejas ? teamClasses : 'border-line'}`}>
               <button
                 onClick={() => handleToggleExpanded(player.id, isExpanded)}
                 disabled={readonly}
@@ -386,12 +406,12 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                       : getPointsText(score.stableford_points, isRaya);
                     return (
                       <div className="flex items-center gap-2">
-                        {isModeScoring && allPlayersEntered && (
+                        {isModeScoring && !isParejas && allPlayersEntered && (
                           <div
                             className="px-3 py-2 rounded-lg border-2 border-accent-ring bg-accent-soft text-accent-ink font-bold text-lg flex items-center justify-center min-w-[64px]"
                             title="Puntos asignados en el hoyo"
                           >
-                            {score.mode_points ?? 0} pts
+                            {(score.mode_points ?? 0).toLocaleString('es-ES')} pts
                           </div>
                         )}
                         <div
@@ -453,7 +473,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                             onClick={() => handleNumberClick(player.id, num, player)}
                             className={`h-11 rounded-lg font-bold text-lg transition-colors shadow-soft active:scale-95 ${
                               firstDigit === 1 && pendingPlayerId === player.id
-                                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                ? 'bg-yellow-500 hover:bg-yellow-600 text-amber-950'
                                 : 'bg-accent hover:bg-accent-hover text-on-accent'
                             }`}
                           >
@@ -622,6 +642,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                 );
               })()}
             </div>
+            </React.Fragment>
           );
         })}
       </div>

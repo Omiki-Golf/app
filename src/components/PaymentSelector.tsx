@@ -154,7 +154,7 @@ export const PaymentSelector: React.FC<PaymentSelectorProps> = ({
             </p>
             <button
               onClick={handleCopy}
-              className="text-xs text-amber-600 hover:underline font-medium flex items-center gap-1"
+              className="text-xs text-amber-700 hover:underline font-medium flex items-center gap-1"
             >
               {copied ? <Check size={14} /> : <ArrowLeft size={14} />}
               {copied ? 'Copiado' : 'Copiar factura'}

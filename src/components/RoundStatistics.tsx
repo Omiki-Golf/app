@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Trophy, Target, Zap, Award, BarChart3 } from 'lucide-react';
+import { Trophy, Target, Zap, Award, BarChart3, Calendar } from 'lucide-react';
+import { SelectMenu } from './SelectMenu';
 import { RoundPlayer, RoundScore, GolfHole } from '../types';
 import { golfService } from '../services/golfService';
 
@@ -176,14 +177,14 @@ useEffect(() => {
       <div className="bg-card rounded-lg shadow-card p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="bg-yellow-100 p-3 rounded-full">
-            <Trophy className="w-6 h-6 text-yellow-600" />
+            <Trophy className="w-6 h-6 text-yellow-800" />
           </div>
           <h3 className="text-2xl font-bold text-ink">Estadísticas de la partida</h3>
         </div>
 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-line">
   <div className="flex items-center gap-3">
     <div className="bg-yellow-100 p-3 rounded-full">
-      <Trophy className="w-6 h-6 text-yellow-600" />
+      <Trophy className="w-6 h-6 text-yellow-800" />
     </div>
     <h3 className="text-2xl font-bold text-ink">Estadísticas de la partida</h3>
   </div>
@@ -194,25 +195,17 @@ useEffect(() => {
       <label className="text-sm font-medium text-ink-3 whitespace-nowrap">
         Partida:
       </label>
-      <select
+      <SelectMenu
         value={selectedRoundId}
-        onChange={(e) => setSelectedRoundId(e.target.value)}
-        className="w-full md:w-auto bg-card-2 text-ink font-semibold px-3 py-2 rounded-lg border border-line-2 focus:outline-none focus:ring-2 focus:ring-accent text-sm shadow-soft"
-      >
-        {availableRounds.map((r, index) => {
-          const dateStr = new Date(r.created_at).toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
-          const statusTag = r.status === 'completed' ? ' (Última)' : ' (Archivada)';
-          return (
-            <option key={r.id} value={r.id}>
-              {dateStr} {statusTag}
-            </option>
-          );
-        })}
-      </select>
+        onChange={setSelectedRoundId}
+        ariaLabel="Partida a mostrar"
+        icon={<Calendar size={19} />}
+        className="md:w-72"
+        options={availableRounds.map((r) => ({
+          value: r.id,
+          label: `${new Date(r.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} ${r.status === 'completed' ? '(Última)' : '(Archivada)'}`,
+        }))}
+      />
     </div>
   )}
 </div>
@@ -226,7 +219,7 @@ useEffect(() => {
               </p>
             </div>
             <div className="text-right">
-              <p className="text-5xl font-bold text-yellow-600">{winner.totalPoints}</p>
+              <p className="text-5xl font-bold text-yellow-800">{winner.totalPoints}</p>
               <p className="text-sm text-yellow-700">puntos</p>
             </div>
           </div>
@@ -309,7 +302,7 @@ useEffect(() => {
                 <p
                   className={`text-3xl font-bold ${
                     index === 0
-                      ? 'text-yellow-600'
+                      ? 'text-yellow-800'
                       : index === 1
                       ? 'text-ink-3'
                       : index === 2

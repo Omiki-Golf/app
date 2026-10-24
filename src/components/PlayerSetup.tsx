@@ -1,5 +1,6 @@
 import { WriteButton, WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
 import React, { useState, useEffect, useRef } from 'react';
 import { RoundPlayer, Player, GameMode, UserProfile } from '../types';
 import { calculatePlayingHandicap } from '../utils/calculations';
@@ -26,6 +27,8 @@ interface PlayerSetupProps {
   onStartRound: () => void;
   /** En grupos: guardar la partida y volver al inicio del grupo para preparar otra salida. */
   onSaveAndReturn?: () => void;
+  /** Campana de avisos en la cabecera (no flotante), como en el resto de pantallas. */
+  messagesButton?: React.ReactNode;
   onOpenHoleConfig: () => void;
   onHolesChanged?: (numHoles: 9 | 18, holes: any[]) => void;
   onBack?: () => void;
@@ -51,6 +54,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   onPlayersUpdated,
   onStartRound,
   onSaveAndReturn,
+  messagesButton,
   onOpenHoleConfig,
   onHolesChanged,
   onBack, backDestination = 'back',
@@ -500,15 +504,16 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
-            {onBack && (
+          <TopBar
+            className="mb-6"
+            left={onBack && (
               <NavigationButton destination={backDestination}
                 onClick={onBack}
                 className="text-accent-ink hover:text-title font-semibold flex items-center gap-2 transition-colors"
               />
             )}
-            <div className="flex-1"></div>
-          </div>
+            center={messagesButton}
+          />
           <h1 className="text-3xl md:text-4xl font-bold text-title mb-2 text-center">
             Configuración de Partida
           </h1>
@@ -561,7 +566,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                   onFocus={() => setShowDropdown(true)}
                   placeholder="Buscar o crear jugador..."
                   disabled={adding || loading || !canAddMorePlayers}
-                  className="w-full px-4 py-3 pr-10 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent transition-colors disabled:bg-gray-100"
+                  className="min-h-12 w-full rounded-2xl border border-line bg-card px-4 py-3 pr-10 text-sm font-semibold text-ink shadow-card transition focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50"
                   autoComplete="off"
                 />
                 <ChevronDown
@@ -571,10 +576,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               </div>
 
               {showDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-card border-2 border-line-2 rounded-lg shadow-card max-h-60 overflow-y-auto">
+                <div className="absolute z-50 mt-2 w-full max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl">
                   {filteredPlayers.length > 0 ? (
                     <div>
-                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
                         JUGADORES EXISTENTES
                       </div>
                       {filteredPlayers.map((player) => {
@@ -582,7 +587,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                         return (
                         <div
                           key={player.id}
-                          className="flex items-center hover:bg-accent-soft border-b border-line transition-colors"
+                          className="flex items-center rounded-xl transition hover:bg-card-2 active:bg-accent-soft"
                         >
                           <button
                             type="button"
@@ -592,7 +597,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                           >
                             <p className="font-semibold text-ink">{player.name}</p>
                             <p className="text-xs text-ink-3">{player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
-                            {unavailable && <p className="text-xs font-medium text-amber-600">{unavailable}</p>}
+                            {unavailable && <p className="text-xs font-medium text-amber-700">{unavailable}</p>}
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
                             </p>
@@ -628,7 +633,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
                   {registeredResults.length > 0 && (
                     <div>
-                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
                         JUGADORES REGISTRADOS
                       </div>
                       {registeredResults.map((profile) => {
@@ -639,11 +644,11 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             type="button"
                             onClick={() => handleSelectAccount(profile)}
                             disabled={inRound}
-                            className="w-full px-4 py-3 text-left border-b border-line hover:bg-accent-soft transition-colors disabled:opacity-60"
+                            className="w-full rounded-xl px-3 py-3 text-left transition hover:bg-card-2 active:bg-accent-soft disabled:opacity-60"
                           >
                             <p className="font-semibold text-ink">{profile.nick}</p>
                             <p className="text-xs text-ink-3">Cuenta registrada · la partida contará en sus estadísticas</p>
-                            {inRound && <p className="text-xs font-medium text-amber-600">Ya está en esta partida</p>}
+                            {inRound && <p className="text-xs font-medium text-amber-700">Ya está en esta partida</p>}
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
                             </p>
@@ -659,10 +664,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                       onClick={() => { setCreatingUnlinked(true); setSelectedPlayer(null); setShowDropdown(false); }}
                       className="w-full"
                     >
-                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
                         CREAR FICHA SIN CUENTA VINCULADA
                       </div>
-                      <div className="px-4 py-3 bg-accent-soft hover:bg-accent-soft transition-colors">
+                      <div className="rounded-xl bg-accent-soft px-3 py-3 text-left transition hover:brightness-95">
                         <p className="font-semibold text-accent-ink">
                           Crear: {searchTerm}
                         </p>
@@ -699,7 +704,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                       <div className="flex-1">
                         <p className="text-xs font-semibold text-ink-2">
                           Slope: {currentSlope}
-                          {isManualSlope && <span className="text-amber-600 ml-1">(Manual)</span>}
+                          {isManualSlope && <span className="text-amber-700 ml-1">(Manual)</span>}
                           {!isManualSlope && teeName && <span className="text-ink-3 ml-1">({teeName})</span>}
                         </p>
                         <p className="text-xs text-ink-3 mt-0.5">

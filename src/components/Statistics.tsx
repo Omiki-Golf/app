@@ -1,6 +1,7 @@
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useState, useEffect } from 'react';
+import { SelectMenu } from './SelectMenu';
 import { golfService } from '../services/golfService';
 import { User, Users, MapPin, TrendingUp, Trophy, Award, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine } from 'lucide-react';
 import { Group } from '../types';
@@ -591,24 +592,20 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                   <label className="block text-sm font-medium text-ink-2 mb-2">
                     Selecciona un jugador
                   </label>
-                  <select
+                  <SelectMenu
                     value={selectedPlayer}
-                    onChange={(e) => handlePlayerChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  >
-                    {uniquePlayers.map((player) => (
-                      <option key={player} value={player}>
-                        {player}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handlePlayerChange}
+                    ariaLabel="Selecciona un jugador"
+                    icon={<User size={19} />}
+                    options={uniquePlayers.map((player) => ({ value: player, label: player }))}
+                  />
                 </div>
 
                 {playerStats && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <StatCard
-                        icon={<Trophy className="text-yellow-600" />}
+                        icon={<Trophy className="text-yellow-800" />}
                         label="Partidas"
                         value={playerStats.totalRounds}
                       />
@@ -865,7 +862,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" menos veces</p>
                               <p className="text-2xl font-bold text-yellow-800">{divendStats.driverOro.name}</p>
-                              <p className="text-lg text-yellow-600">{divendStats.driverOro.value} veces</p>
+                              <p className="text-lg text-yellow-800">{divendStats.driverOro.value} veces</p>
                               {divendStats.driverOro.rounds_played !== undefined && (
                                 <p className="text-xs text-ink-3 mt-1">en {divendStats.driverOro.rounds_played} partidas</p>
                               )}
@@ -888,7 +885,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Mejor vuelta histórica</p>
                               <p className="text-2xl font-bold text-yellow-800">{phase2Stats.killer.player_name}</p>
-                              <p className="text-lg text-yellow-600">{phase2Stats.killer.best_score} puntos</p>
+                              <p className="text-lg text-yellow-800">{phase2Stats.killer.best_score} puntos</p>
                               <p className="text-xs text-ink-3 mt-1">{phase2Stats.killer.course_name}</p>
                               <p className="text-xs text-ink-3">{new Date(phase2Stats.killer.played_at).toLocaleDateString('es-ES')}</p>
                             </div>
@@ -1013,7 +1010,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más bogeys</p>
                               <p className="text-2xl font-bold text-amber-800">{phase2Stats.amigoDelMasUno.player_name}</p>
-                              <p className="text-lg text-amber-600">{phase2Stats.amigoDelMasUno.total_bogeys} bogeys totales</p>
+                              <p className="text-lg text-amber-700">{phase2Stats.amigoDelMasUno.total_bogeys} bogeys totales</p>
                               <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.amigoDelMasUno.best_single_day} bogeys</p>
                             </div>
                           )}
@@ -1103,7 +1100,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                                 </p>
                                 {isDivend && (
                                   <div className="flex items-center gap-1 justify-end mt-1">
-                                    <Beer size={16} className="text-amber-600" />
+                                    <Beer size={16} className="text-amber-700" />
                                     <p
                                       className={`text-sm font-semibold ${
                                         player.beerBalance >= 0 ? 'text-accent-ink' : 'text-red-600'
@@ -1131,17 +1128,13 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                   <label className="block text-sm font-medium text-ink-2 mb-2">
                     Selecciona un campo
                   </label>
-                  <select
+                  <SelectMenu
                     value={selectedCourse}
-                    onChange={(e) => handleCourseChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  >
-                    {uniqueCourses.map((course) => (
-                      <option key={course} value={course}>
-                        {course}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleCourseChange}
+                    ariaLabel="Selecciona un campo"
+                    icon={<MapPin size={19} />}
+                    options={uniqueCourses.map((course) => ({ value: course, label: course }))}
+                  />
                 </div>
 
                 {courseStats && courseStats.totalRounds > 0 && (

@@ -34,7 +34,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="bg-amber-100 p-3 rounded-full">
-              <Shield className="text-amber-600" size={24} />
+              <Shield className="text-amber-700" size={24} />
             </div>
             <h2 className="text-xl font-bold text-ink">
               Verificación Adicional
@@ -89,7 +89,7 @@ export const AdminPinModal: React.FC<AdminPinModalProps> = ({
             <button
               type="submit"
               disabled={pin.length !== 4}
-              className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors"
+              className="flex-1 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed text-amber-950 font-semibold py-3 rounded-lg transition-colors"
             >
               Verificar
             </button>

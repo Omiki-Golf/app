@@ -79,7 +79,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                           : index === 1
                           ? 'bg-ink-4 text-white'
                           : index === 2
-                          ? 'bg-amber-500 text-white'
+                          ? 'bg-amber-500 text-amber-950'
                           : 'bg-neutral-hover text-ink-2'
                       }`}
                     >

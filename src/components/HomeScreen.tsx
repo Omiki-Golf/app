@@ -143,7 +143,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {isTeam && (
             <WriteButton
               onClick={onCreateTeam}
-              className="w-full flex items-center justify-center gap-3 bg-amber-500 text-white px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-3 bg-amber-500 text-amber-950 px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
             >
               {teamName ? <Users className="w-6 h-6" aria-hidden="true" /> : <Plus className="w-6 h-6" aria-hidden="true" />}
               <span className="truncate">{teamName || t('home.createTeam')}</span>

@@ -1027,7 +1027,7 @@ function App() {
     </>
   );
 
-  const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
+  const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
     || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
@@ -1432,6 +1432,7 @@ function App() {
             />
           )}
           <PlayerSetup backDestination={currentGroup ? 'home' : 'back'}
+            messagesButton={inlineMessagesButton}
             roundId={roundState.round.id}
             players={roundState.players}
             useSlope={roundState.round.use_slope}
