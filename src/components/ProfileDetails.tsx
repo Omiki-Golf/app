@@ -9,6 +9,7 @@ import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { DeleteAccountSection } from './DeleteAccountSection';
 
 interface ProfileDetailsProps {
   profile: UserProfile | null;
@@ -16,6 +17,9 @@ interface ProfileDetailsProps {
   email?: string;
   onBack: () => void;
   onSaved: () => Promise<void> | void;
+  /** Tras darse de baja: cerrar la sesión y volver al inicio. */
+  onAccountDeleted?: () => void;
+  onOpenGroups?: () => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -25,6 +29,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   email,
   onBack,
   onSaved,
+  onAccountDeleted,
+  onOpenGroups,
   messagesButton,
 }) => {
   const { t } = useTranslation();
@@ -396,6 +402,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               </div>
               <p className="mt-2 text-xs text-ink-3">{t('profile.preferencesHelp')}</p>
             </section>
+
+            {profile && onAccountDeleted && <DeleteAccountSection onDeleted={onAccountDeleted} onOpenGroups={onOpenGroups} />}
         </section>
       </main>
     </div>

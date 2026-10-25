@@ -18,11 +18,13 @@ interface SelectMenuProps {
   icon?: React.ReactNode;
   disabled?: boolean;
   className?: string;
+  /** La lista ocupa su sitio en vez de flotar: para ventanas con desplazamiento propio, donde se cortaría. */
+  inline?: boolean;
 }
 
 // Desplegable de la app, con el mismo aspecto que el selector de partidas de las estadísticas:
 // botón redondeado y lista flotante con la opción elegida resaltada y marcada.
-export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 'Selecciona…', icon, disabled = false, className = '' }: SelectMenuProps) {
+export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 'Selecciona…', icon, disabled = false, className = '', inline = false }: SelectMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -42,7 +44,9 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
     // Al abrir, el foco va a la opción elegida (o a la primera) para poder usar el teclado.
     const target = listRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]:not(:disabled)')
       ?? listRef.current?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)');
-    target?.focus({ preventScroll: false });
+    target?.focus({ preventScroll: true });
+    // La lista entera queda a la vista: dentro de una ventana con desplazamiento, esta baja lo necesario.
+    listRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     return () => {
       document.removeEventListener('pointerdown', closeFromOutside);
       document.removeEventListener('keydown', closeFromKeyboard);
@@ -89,7 +93,7 @@ export function SelectMenu({ value, options, onChange, ariaLabel, placeholder = 
           role="listbox"
           aria-label={ariaLabel}
           onKeyDown={moveFocus}
-          className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl"
+          className={`${inline ? 'relative' : 'absolute left-0 right-0 top-full z-50'} mt-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl`}
         >
           {options.length === 0 && <p className="px-3 py-3 text-sm text-ink-3">Sin opciones</p>}
           {options.map((option) => {

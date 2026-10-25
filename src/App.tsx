@@ -1208,6 +1208,13 @@ function App() {
             userId={user.id}
             email={user.email}
             onBack={() => setCurrentView('profile')}
+            onAccountDeleted={async () => {
+              // La cuenta ya no existe: se cierra la sesión local y se vuelve al inicio.
+              try { await logout(); } catch { /* la sesión ya no es válida */ }
+              setCurrentGroup(null);
+              setCurrentView('main');
+            }}
+            onOpenGroups={() => openFromProfile('my-groups')}
             onSaved={async () => {
               await refreshSubscription();
               setProfileSaved(true);
@@ -1245,7 +1252,8 @@ function App() {
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
           <ProShop
-            groupId={currentGroup?.id ?? null}
+            groupId={currentGroup?.id ?? ownedTeam?.id ?? null}
+            groupName={currentGroup?.name ?? ownedTeam?.name}
             userId={user.id}
             onBack={() => setCurrentView('profile')}
             onPurchaseComplete={() => setCurrentView('profile')}
