@@ -1,6 +1,6 @@
 import { NavigationButton } from './NavigationButton';
 import React, { useEffect, useState } from 'react';
-import { Settings, BarChart3, Gamepad2, Crown, ChevronRight, CreditCard, Gem, Info, LogOut, X } from 'lucide-react';
+import { Settings, BarChart3, LandPlot, Crown, ChevronRight, CreditCard, Gem, Info, LogOut, X } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
 
@@ -52,7 +52,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   // Primer bloque: lo personal del jugador. Segundo bloque, tras el separador: tienda y planes.
   const menuSections = [
     [
-      { icon: Gamepad2, label: t('profile.rounds'), onClick: onShowRoundStats, show: true, comingSoon: false },
+      { icon: LandPlot, label: t('profile.rounds'), onClick: onShowRoundStats, show: true, comingSoon: false },
       { icon: BarChart3, label: t('profile.stats'), onClick: onShowCareerStats, show: true, comingSoon: false },
       { icon: Crown, label: t('profile.groups'), onClick: onShowGroups, show: isTeam || hasGroups },
       { icon: Settings, label: t('profile.details'), onClick: onShowSettings, show: true },

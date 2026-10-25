@@ -28,7 +28,9 @@ test('archived groups sort last and hide their access code', () => {
 });
 
 test('member cards show only nick, role and both handicaps without technical details', () => {
-  assert.match(members, /HCP 18:[\s\S]{0,80}HCP 9:/);
+  assert.match(members, /HCP <strong[\s\S]{0,80}member\.handicap_18[\s\S]{0,160}handicap9\(member\.handicap_18\)/);
+  // El HCP de 9 hoyos no muestra decimales: se redondea y se marca con *.
+  assert.match(members, /Number\.isInteger\(half\) \? String\(half\) : `\$\{Math\.round\(half\)\}\*`/);
   assert.doesNotMatch(members, /<details/);
   assert.doesNotMatch(members, /UUID de cuenta/);
   assert.doesNotMatch(members, /profile\?\.display_name/);

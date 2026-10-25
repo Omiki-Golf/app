@@ -22,8 +22,8 @@ test('group roster includes guests and offers the same registered-or-guest addit
 test('compact roster uses a trash icon and administrator crown', () => {
   assert.match(roster, /Trash2/);
   assert.match(roster, /<Crown/);
-  assert.match(roster, /member\.role === 'admin' \? <><Crown/);
-  assert.match(roster, /fill="currentColor"[\s\S]{0,100}<span>Administrador<\/span>/);
+  assert.match(roster, /member\.role === 'admin' \? <span[^>]*><Crown/);
+  assert.match(roster, /fill="currentColor"[\s\S]{0,100}\/>Admin<\/span>/);
   assert.doesNotMatch(roster, />Eliminar del grupo<\/WriteButton>/);
   assert.doesNotMatch(roster, />Hacer administrador<\/WriteButton>/);
   assert.match(service, /manage_group_guest_player/);
