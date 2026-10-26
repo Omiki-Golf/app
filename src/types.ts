@@ -103,6 +103,19 @@ export interface GroupInvitation {
   inviter_profile?: UserProfile;
 }
 
+export interface QuickRoundInvitation {
+  id: string;
+  round_id: string;
+  round_player_id: string;
+  invited_user_id: string;
+  invited_by: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  inviter_nick: string;
+  course_name: string;
+  played_at: string;
+}
+
 export interface ProShopPurchase {
   id: string;
   group_id: string;

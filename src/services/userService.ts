@@ -1,7 +1,7 @@
 import { effectivePlan } from '../utils/effectivePlan';
 import { getReadOnly } from './userRestriction';
 import { supabase } from './supabaseClient';
-import { UserProfile, GroupMember, GroupInvitation, PlanType } from '../types';
+import { UserProfile, GroupMember, GroupInvitation, QuickRoundInvitation, PlanType } from '../types';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
 
 export const userService = {
@@ -83,6 +83,23 @@ export const userService = {
     });
     if (error) throw error;
     return (data || []) as UserProfile[];
+  },
+
+  async getQuickRoundInvitations(): Promise<QuickRoundInvitation[]> {
+    const { data, error } = await supabase.rpc('list_my_quick_round_invitations');
+    if (error) throw error;
+    return (data || []) as QuickRoundInvitation[];
+  },
+
+  async getQuickRoundInvitationCount(): Promise<number> {
+    const { data, error } = await supabase.rpc('count_my_quick_round_invitations');
+    if (error) throw error;
+    return Number(data || 0);
+  },
+
+  async respondToQuickRoundInvitation(id: string, status: 'accepted' | 'rejected'): Promise<void> {
+    const { error } = await supabase.rpc('respond_quick_round_invitation', { p_invitation: id, p_status: status });
+    if (error) throw error;
   },
 
   async getPlanType(userId: string): Promise<PlanType> {

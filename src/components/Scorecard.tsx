@@ -373,8 +373,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 onClick={handleFinishWithConfirm}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
-                <Trophy size={20} />
-                Finalizar Partida
+                Finalizar
               </WriteButton>
             ) : isLastHole && (isRoundFinished || (allScoresComplete && !canFinishRound)) ? (
               <button

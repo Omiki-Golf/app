@@ -15,9 +15,10 @@ export function useNotificationCount(
   const version = useRef(0);
   const refresh = useCallback(async () => {
     const request = ++version.current;
-    const [messages, invitations, activity] = await Promise.allSettled([
+    const [messages, invitations, quickRounds, activity] = await Promise.allSettled([
       messageService.inbox(userId),
       userId ? userService.getInvitationCount(userId) : Promise.resolve(0),
+      userId ? userService.getQuickRoundInvitationCount() : Promise.resolve(0),
       messageService.activity(activityScope, userId),
     ]);
     if (request !== version.current) return;
@@ -30,8 +31,8 @@ export function useNotificationCount(
             ? previous.messages
             : 0,
       invitations:
-        invitations.status === "fulfilled"
-          ? invitations.value
+        invitations.status === "fulfilled" && quickRounds.status === "fulfilled"
+          ? invitations.value + quickRounds.value
           : previous.id === userId
             ? previous.invitations
             : 0,

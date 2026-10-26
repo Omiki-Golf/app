@@ -422,8 +422,7 @@ function App() {
             const currentUserId = getUserId();
 
             const isCreator = currentUserId === roundData.round.user_id;
-            const storedCode = accessCodeStorage.getAccessCode(activeRoundId);
-            const hasEditAccess = isCreator || storedCode === roundData.round.access_code;
+            const hasEditAccess = isCreator && roundData.round.status === 'active';
 
             if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator) {
               accessCodeStorage.removeAccessCode(activeRoundId);
@@ -535,7 +534,7 @@ function App() {
           setCurrentView('setup');
           return;
         }
-        const edit = data.status === 'active' && (data.user_id === getUserId() || accessCodeStorage.getAccessCode(roundId) === data.access_code);
+        const edit = data.status === 'active' && data.user_id === getUserId();
         setRoundState(prev => prev.round?.id === roundId ? {...prev, round: data, hasEditAccess: edit} : prev);
       } catch { /* Keep the existing view on a transient network failure. */ }
     };
@@ -658,7 +657,7 @@ function App() {
 
         const isCreator = currentUserId === roundData.round.user_id;
         const storedCode = accessCodeStorage.getAccessCode(roundId);
-        const hasEditAccess = isCreator || storedCode === roundData.round.access_code;
+        const hasEditAccess = isCreator && roundData.round.status === 'active';
 
         if (!roundData.round.group_id && !isCreator && storedCode === roundData.round.access_code) {
           await golfService.registerExpressRoundAccess(roundId, storedCode);
@@ -708,7 +707,7 @@ function App() {
   const handleScoreChange = async (playerId: string, holeNumber: number, score: any) => {
     console.log('=== handleScoreChange llamado ===');
 
-    if (!roundState.round) {
+    if (!roundState.round || !roundState.hasEditAccess || readOnly) {
       console.log('No hay round activo');
       return;
     }

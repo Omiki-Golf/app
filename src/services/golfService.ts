@@ -456,8 +456,15 @@ async deleteAllRounds(groupId?: string): Promise<void> {
   },
 
   async getActiveRounds(): Promise<GolfRound[]> {
-    const userId = getUserId();
     const groupId = storageUtils.getCurrentGroupId();
+
+    if (!groupId && (await supabase.auth.getSession()).data.session?.user) {
+      const { data, error } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['active', 'completed'] });
+      if (error) throw error;
+      return (data || []) as GolfRound[];
+    }
+
+    const userId = getUserId();
 
     let query = supabase
       .from('golf_rounds')
@@ -527,6 +534,12 @@ async hasCompletedQuickPlayRound(): Promise<boolean> {
 
 // 4. Obtener todas las partidas finalizadas o archivadas del usuario para el desplegable de estadísticas
 async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; created_at: string; status: string }>> {
+  if ((await supabase.auth.getSession()).data.session?.user) {
+    const { data, error } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['completed', 'archived'] });
+    if (error) { console.error('Error al obtener partidas para estadísticas:', error); return []; }
+    const rows = data || [];
+    return (limit !== undefined && limit > 0 ? rows.slice(0, limit) : rows) as Array<{ id: string; created_at: string; status: string }>;
+  }
   const userId = getUserId();
   
   let query = supabase
@@ -553,16 +566,9 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 },
   /** Partidas rápidas finalizadas de la cuenta, con jugadores, golpes y campos, para "Mis estadísticas". */
   async getCareerData(userId: string) {
-    const { data: rounds, error: roundsError } = await supabase
-      .from('golf_rounds')
-      .select('id, created_at, game_mode, num_holes, course_id, decided_result')
-      .eq('user_id', userId)
-      .in('status', ['completed', 'archived'])
-      .is('group_id', null)
-      .is('admin_withdrawn_at', null)
-      .order('created_at', { ascending: false });
+    const { data: rounds, error: roundsError } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['completed', 'archived'] });
     if (roundsError) throw roundsError;
-    const roundList = rounds ?? [];
+    const roundList = (rounds ?? []) as import('../utils/careerStats').CareerRound[];
     if (roundList.length === 0) return { rounds: [], players: [], scores: [], courseNames: {} as Record<string, string> };
 
     // Por lotes, para no superar la longitud máxima de la URL con muchas partidas.
@@ -1336,6 +1342,12 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (error) throw error;
     return data;
+  },
+
+  async addRegisteredQuickRoundPlayer(roundId: string, userId: string): Promise<RoundPlayer> {
+    const { data, error } = await supabase.rpc('add_registered_quick_round_player', { p_round: roundId, p_user: userId });
+    if (error) throw error;
+    return data as RoundPlayer;
   },
 
   async getRoundPlayers(roundId: string): Promise<RoundPlayer[]> {

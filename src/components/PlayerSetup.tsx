@@ -317,8 +317,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       if (currentGroup) {
         newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, false, selectedPlayer?.id);
       } else if (user && pickedAccount) {
-        // Compañero registrado: queda vinculado a su cuenta y la partida cuenta en sus estadísticas.
-        newPlayer = await golfService.addPlayerToRound(roundId, pickedAccount.nick, handicapFor9Holes, useSlope, undefined, pickedAccount.user_id);
+        // La cuenta invitada decide si incorpora esta partida a su historial y estadísticas.
+        newPlayer = await golfService.addRegisteredQuickRoundPlayer(roundId, pickedAccount.user_id);
       } else if (user) {
         const suggestion = await golfService.saveQuickPlayerSuggestion(playerName, handicapNum * (numHoles === 9 ? 2 : 1));
         newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, suggestion.exact_handicap, useSlope, undefined, linkedUserId);
@@ -637,7 +637,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                         JUGADORES REGISTRADOS
                       </div>
                       {registeredResults.map((profile) => {
-                        const inRound = players.some(player => player.user_id === profile.user_id);
+                        const linkedInRound = players.some(player => player.user_id === profile.user_id);
+                        const pendingInRound = players.some(player => !player.user_id && normalizeName(player.name) === normalizeName(profile.nick));
+                        const inRound = linkedInRound || pendingInRound;
                         return (
                           <button
                             key={profile.user_id}
@@ -647,8 +649,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             className="w-full rounded-xl px-3 py-3 text-left transition hover:bg-card-2 active:bg-accent-soft disabled:opacity-60"
                           >
                             <p className="font-semibold text-ink">{profile.nick}</p>
-                            <p className="text-xs text-ink-3">Cuenta registrada · la partida contará en sus estadísticas</p>
-                            {inRound && <p className="text-xs font-medium text-amber-700">Ya está en esta partida</p>}
+                            <p className="text-xs text-ink-3">Cuenta registrada · recibirá una invitación para guardar los resultados</p>
+                            {inRound && <p className="text-xs font-medium text-amber-700">{pendingInRound ? 'Invitación pendiente' : 'Ya está en esta partida'}</p>}
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
                             </p>
