@@ -17,9 +17,11 @@ REVOKE ALL ON public.quick_round_participation_invitations FROM PUBLIC,anon,auth
 
 -- Existing UUID-linked participations predate consent. Keep their history visible.
 INSERT INTO public.quick_round_participation_invitations(round_id,round_player_id,invited_user_id,invited_by,status,responded_at)
-SELECT rp.round_id,rp.id,rp.user_id,r.user_id,'accepted',coalesce(r.completed_at,r.updated_at,r.created_at)
+SELECT rp.round_id,rp.id,rp.user_id,r.user_id::uuid,'accepted',coalesce(r.completed_at,r.updated_at,r.created_at)
 FROM public.round_players rp JOIN public.golf_rounds r ON r.id=rp.round_id
-WHERE r.group_id IS NULL AND rp.user_id IS NOT NULL AND rp.user_id<>r.user_id
+WHERE r.group_id IS NULL AND rp.user_id IS NOT NULL
+  AND r.user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  AND rp.user_id::text<>r.user_id
 ON CONFLICT DO NOTHING;
 
 CREATE FUNCTION public.add_registered_quick_round_player(p_round uuid,p_user uuid) RETURNS jsonb
@@ -28,7 +30,7 @@ DECLARE r public.golf_rounds; p public.user_profiles; rp public.round_players; v
 BEGIN
  IF auth.uid() IS NULL OR public.is_app_user_read_only() THEN RAISE EXCEPTION 'No tienes permiso para añadir jugadores' USING ERRCODE='42501'; END IF;
  SELECT * INTO r FROM public.golf_rounds WHERE id=p_round FOR UPDATE;
- IF r.id IS NULL OR r.group_id IS NOT NULL OR r.user_id<>auth.uid() OR r.status<>'active' THEN RAISE EXCEPTION 'Solo el creador puede añadir jugadores a una partida rápida activa' USING ERRCODE='42501'; END IF;
+ IF r.id IS NULL OR r.group_id IS NOT NULL OR r.user_id IS DISTINCT FROM auth.uid()::text OR r.status<>'active' THEN RAISE EXCEPTION 'Solo el creador puede añadir jugadores a una partida rápida activa' USING ERRCODE='42501'; END IF;
  IF p_user=auth.uid() THEN RAISE EXCEPTION 'Usa Añadirme a la partida'; END IF;
  SELECT * INTO p FROM public.user_profiles WHERE user_id=p_user;
  IF p.id IS NULL THEN RAISE EXCEPTION 'La cuenta ya no está disponible'; END IF;
@@ -84,7 +86,7 @@ CREATE FUNCTION public.list_my_quick_rounds(p_statuses text[]) RETURNS SETOF pub
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $$
  SELECT r.* FROM public.golf_rounds r
  WHERE r.group_id IS NULL AND r.admin_withdrawn_at IS NULL AND r.status=ANY(p_statuses)
- AND (r.user_id=auth.uid() OR EXISTS(SELECT 1 FROM public.round_players rp WHERE rp.round_id=r.id AND rp.user_id=auth.uid()))
+ AND (r.user_id=auth.uid()::text OR EXISTS(SELECT 1 FROM public.round_players rp WHERE rp.round_id=r.id AND rp.user_id=auth.uid()))
  ORDER BY r.created_at DESC
 $$;
 

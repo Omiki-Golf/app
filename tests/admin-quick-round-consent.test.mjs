@@ -22,7 +22,7 @@ test('registered quick-round players require consent and accepted participation 
       CREATE TABLE user_profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid UNIQUE,nick text,display_name text,exact_handicap numeric);
       CREATE TABLE golf_courses(id uuid PRIMARY KEY,name text);
       CREATE TABLE tees(id uuid PRIMARY KEY,slope_18 numeric,slope_9_i numeric,slope_9_ii numeric);
-      CREATE TABLE golf_rounds(id uuid PRIMARY KEY,group_id uuid,user_id uuid,status text,admin_withdrawn_at timestamptz,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),completed_at timestamptz,num_holes int,use_slope boolean,manual_slope numeric,holes_range text,tee_id uuid,course_id uuid);
+      CREATE TABLE golf_rounds(id uuid PRIMARY KEY,group_id uuid,user_id text,status text,admin_withdrawn_at timestamptz,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),completed_at timestamptz,num_holes int,use_slope boolean,manual_slope numeric,holes_range text,tee_id uuid,course_id uuid);
       CREATE TABLE round_players(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),round_id uuid REFERENCES golf_rounds(id) ON DELETE CASCADE,player_id uuid,user_id uuid,name text,exact_handicap numeric,exact_handicap_18 numeric,playing_handicap numeric,created_at timestamptz DEFAULT now());
     `);
     await db.exec(migration);
