@@ -128,7 +128,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="w-full flex items-center justify-center gap-3 bg-accent text-on-accent px-6 py-4 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
           >
             <Zap className="w-6 h-6" />
-            {isExpress ? t('home.createExpress') : t('home.createGame')}
+            {t('home.createGame')}
           </WriteButton>
 
           <WriteButton
