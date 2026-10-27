@@ -2,7 +2,7 @@ import { MessageInbox } from './MessageInbox';
 import { GroupMessages } from './messages/GroupMessages';
 import { messageService } from '../services/messageService';
 import { WriteButton } from '../context/ReadOnlyContext';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Check, X, Trophy, Flag, Hand } from 'lucide-react';
 import { userService } from '../services/userService';
 import { GroupInvitation, QuickRoundInvitation } from '../types';
@@ -31,6 +31,14 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   const [activityError, setActivityError] = useState('');
   const invitationRequest = useRef(0);
   const responseRunning = useRef(false);
+  const invalidateInvitationRequests = useCallback(() => {
+    invitationRequest.current++;
+  }, []);
+  const stableActivityScope = useMemo(() => ({
+    roundId: activityScope.roundId,
+    groupId: activityScope.groupId,
+    accessCode: activityScope.accessCode,
+  }), [activityScope.roundId, activityScope.groupId, activityScope.accessCode]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
@@ -42,14 +50,14 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
     let live = true;
     const loadActivity = async () => {
       try {
-        const data = await messageService.activity(activityScope, userId, true);
+        const data = await messageService.activity(stableActivityScope, userId, true);
         if (live) { setActivity(data.events); setActivityError(''); onInvitationResolved(); }
       } catch { if (live) setActivityError(t('activity.loadError')); }
     };
     void loadActivity();
     const timer = window.setInterval(() => void loadActivity(), 30000);
     return () => { live = false; window.clearInterval(timer); };
-  }, [activityScope.roundId, activityScope.groupId, activityScope.accessCode, userId, onInvitationResolved, t]);
+  }, [stableActivityScope, userId, onInvitationResolved, t]);
 
   useEffect(() => {
     if (!userId) return;
@@ -77,14 +85,12 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   }, [userId]);
 
   useEffect(() => {
-    void load(); const tick = () => void load(); const timer = window.setInterval(tick, 30000); window.addEventListener('focus', tick);
+    void load(); const tick = () => void load(); const timer = window.setInterval(tick, 30000);     window.addEventListener('focus', tick);
     return () => {
-      // A request generation counter, not a DOM ref.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      invitationRequest.current++;
+      invalidateInvitationRequests();
       window.clearInterval(timer); window.removeEventListener('focus', tick);
     };
-  }, [load]);
+  }, [load, invalidateInvitationRequests]);
 
   const handleRespond = async (invitationId: string, status: 'accepted' | 'rejected') => {
     if (responseRunning.current) return;

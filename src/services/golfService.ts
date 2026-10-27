@@ -10,6 +10,25 @@ import {
   Group,
   Tee,
   GameMode,
+  RealtimeEvent,
+  ArchivedRound,
+  ArchivedDailyRanking,
+  DailyRanking,
+  DailyRankingStanding,
+  DailyRankingHistoryRow,
+  HandicapHistoryEntry,
+  PlayerStatisticsSummary,
+  GroupPlayerStatistics,
+  GroupStatisticsSummary,
+  CourseStatisticsSummary,
+  Season,
+  RankingRpcRow,
+  DetailedPlayerStatistics,
+  QuickPlayCompletedRound,
+  QuickPlayAwardsSummary,
+  CompletedRoundSummary,
+  HolePerformanceStatistics,
+  BestCourseRoundStatistics,
 } from '../types';
 import { calculatePlayingHandicap, calculateScore } from '../utils/calculations';
 import { getUserId } from '../utils/userId';
@@ -349,7 +368,7 @@ async deleteAllRounds(groupId?: string): Promise<void> {
 
     if (error) throw error;
 
-    let holes = (data || []).map((hole: any) => ({
+    let holes = ((data || []) as GolfHole[]).map((hole) => ({
       ...hole,
       strokeIndex: hole.stroke_index,
       holeNumber: hole.hole_number,
@@ -565,7 +584,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   return data || [];
 },
   /** Partidas rápidas finalizadas de la cuenta, con jugadores, golpes y campos, para "Mis estadísticas". */
-  async getCareerData(userId: string) {
+  async getCareerData() {
     const { data: rounds, error: roundsError } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['completed', 'archived'] });
     if (roundsError) throw roundsError;
     const roundList = (rounds ?? []) as import('../utils/careerStats').CareerRound[];
@@ -647,7 +666,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       }
 
       // If it's a "no rows" error (PGRN116), the round genuinely doesn't exist
-      const code = (roundData.error as any)?.code;
+      const code = roundData.error?.code;
       if (code === 'PGRN116' || code === '22P02') return null;
 
       // Network/transient error — retry after a short delay
@@ -660,8 +679,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return null;
   },
 
-  async updateRoundStatus(roundId: string, status: string): Promise<void> {
-    const updates: any = {
+  async updateRoundStatus(roundId: string, status: GolfRound['status']): Promise<void> {
+    const updates: { status: GolfRound['status']; updated_at: string; completed_at?: string } = {
       status,
       updated_at: new Date().toISOString()
     };
@@ -795,7 +814,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
           }
 
           // Calculate playing handicap
-          let newPlayingHandicap = roundInfo.use_slope
+          const newPlayingHandicap = roundInfo.use_slope
             ? calculatePlayingHandicap(newExactHandicap, slope)
             : Math.round(newExactHandicap);
 
@@ -901,7 +920,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         }
 
         // Calculate playing handicap based on the base handicap and target holes
-        let playingHandicap = round.use_slope
+        const playingHandicap = round.use_slope
           ? calculatePlayingHandicap(newExactHandicap, slope)
           : Math.round(newExactHandicap);
 
@@ -1045,25 +1064,29 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data;
   },
 
-  async getExpressRoundStatisticsByCode(accessCode: string): Promise<any | null> {
+  async getExpressRoundStatisticsByCode(accessCode: string): Promise<QuickPlayCompletedRound | null> {
     const { data, error } = await supabase.rpc('get_express_round_statistics_by_code', {
       p_access_code: accessCode.toUpperCase(),
     });
     if (error) throw error;
     if (!data) return null;
 
-    const holes = data.holes || [];
-    if (holes.length === 9 && data.round?.num_holes === 18 && !data.round?.holes_range) {
-      data.holes = [
+    const statistics = data as QuickPlayCompletedRound;
+    const holes = statistics.holes || [];
+    if (holes.length === 9 && statistics.round?.num_holes === 18 && !statistics.round?.holes_range) {
+      return {
+        ...statistics,
+        holes: [
         ...holes,
-        ...holes.map((hole: any) => ({
+        ...holes.map((hole) => ({
           ...hole,
           id: `${hole.id}_back`,
           hole_number: hole.hole_number + 9,
         })),
-      ];
+        ],
+      };
     }
-    return data;
+    return statistics;
   },
 
   async registerExpressRoundAccess(roundId: string, accessCode: string): Promise<void> {
@@ -1108,7 +1131,14 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     if (user) {
       const { data, error } = await supabase.rpc('list_my_quick_player_suggestions');
       if (error) throw error;
-      return (data || []).map((suggestion: any) => ({
+      const suggestions = (data || []) as Array<{
+        id: string;
+        name: string;
+        handicap_18: number;
+        created_at: string;
+        updated_at: string;
+      }>;
+      return suggestions.map((suggestion) => ({
         id: suggestion.id,
         name: suggestion.name,
         exact_handicap: Number(suggestion.handicap_18) / 2,
@@ -1159,7 +1189,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (error) throw error;
 
-    return (data || []).map((item: any) => item.player_id).filter(Boolean);
+    const playerRows = (data || []) as Array<{ player_id: string | null }>;
+    return playerRows.map((item) => item.player_id).filter((id): id is string => !!id);
   },
 
   async createPlayer(name: string, exactHandicap: number): Promise<Player> {
@@ -1231,7 +1262,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     if (excludeRoundId) query = query.neq('round_id', excludeRoundId);
     const { data, error } = await query;
     if (error) throw error;
-    return (data || []).map((item: any) => item.name).filter(Boolean);
+    const playerRows = (data || []) as Array<{ name: string }>;
+    return playerRows.map((item) => item.name).filter(Boolean);
   },
 
   async getOrCreatePlayer(name: string, exactHandicap: number): Promise<Player> {
@@ -1304,7 +1336,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     const slope = slopeInfo?.slope || 113;
 
     // Calculate playing handicap
-    let playingHandicap = useSlope
+    const playingHandicap = useSlope
       ? calculatePlayingHandicap(handicapToUse, slope)
       : Math.round(handicapToUse);
 
@@ -1419,7 +1451,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   },
 
   // Realtime subscriptions
-  subscribeToRound(roundId: string, callback: (data: any) => void) {
+  subscribeToRound(roundId: string, callback: (data: RealtimeEvent) => void) {
     return supabase
       .channel(`round:${roundId}`)
       .on(
@@ -1435,7 +1467,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .subscribe();
   },
 
-  subscribeToRounds(callback: (data: any) => void) {
+  subscribeToRounds(callback: (data: RealtimeEvent) => void) {
     return supabase
       .channel('active_rounds')
       .on(
@@ -1450,7 +1482,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .subscribe();
   },
 
-  subscribeToRoundScores(roundId: string, callback: (data: any) => void) {
+  subscribeToRoundScores(roundId: string, callback: (data: RealtimeEvent) => void) {
     return supabase
       .channel(`round_scores_${roundId}`)
       .on(
@@ -1466,7 +1498,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .subscribe();
   },
 
-  subscribeToRoundPlayers(roundId: string, callback: (data: any) => void) {
+  subscribeToRoundPlayers(roundId: string, callback: (data: RealtimeEvent) => void) {
     return supabase
       .channel(`round_players_${roundId}`)
       .on(
@@ -1505,7 +1537,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     if (error) throw error;
   },
 
-  async getDailyRankings(): Promise<any[]> {
+  async getDailyRankings(): Promise<DailyRanking[]> {
     const groupId = storageUtils.getCurrentGroupId();
 
     if (!groupId) {
@@ -1522,7 +1554,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (roundsError) throw roundsError;
 
-    const rankingsByDate: { [date: string]: any[] } = {};
+    const rankingsByDate: Record<string, DailyRankingStanding[]> = {};
 
     if (rounds && rounds.length > 0) {
       const roundsByDate: { [date: string]: string[] } = {};
@@ -1534,7 +1566,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         roundsByDate[dateKey].push(round.id);
       });
 
-      const activeRankings = await Promise.all(
+      await Promise.all(
         Object.entries(roundsByDate).map(async ([date, roundIds]) => {
           const standingsPromises = roundIds.map(async (roundId) => {
             const [playersData, scoresData] = await Promise.all([
@@ -1542,8 +1574,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
               supabase.from('round_scores').select('*').eq('round_id', roundId),
             ]);
 
-            const players = playersData.data || [];
-            const scores = scoresData.data || [];
+            const players = (playersData.data || []) as RoundPlayer[];
+            const scores = (scoresData.data || []) as RoundScore[];
 
             // Los invitados aparecen en la clasificación del día (isGuest) pero no ajustan hándicap.
             return players.map((player) => {
@@ -1590,7 +1622,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return rankings;
   },
 
-  async getHandicapHistory(groupId?: string): Promise<any[]> {
+  async getHandicapHistory(groupId?: string): Promise<HandicapHistoryEntry[]> {
     const currentGroupId = groupId || storageUtils.getCurrentGroupId();
 
     if (!currentGroupId) {
@@ -1611,7 +1643,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     archivedRounds.forEach((round) => {
       const date = round.played_at.split('T')[0];
       if (round.final_ranking && Array.isArray(round.final_ranking)) {
-        round.final_ranking.forEach((rankEntry: any) => {
+        round.final_ranking.forEach((rankEntry) => {
           const playerName = rankEntry.player_name || rankEntry.playerName;
           const exactHandicap = rankEntry.handicap !== undefined ? rankEntry.handicap : rankEntry.exactHandicap;
 
@@ -1625,13 +1657,13 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       }
     });
 
-    const dateRankings = new Map<string, any[]>();
+    const dateRankings = new Map<string, DailyRankingHistoryRow[]>();
     dailyRankingsData.forEach((ranking) => {
       const date = ranking.ranking_date;
       if (!dateRankings.has(date)) {
         dateRankings.set(date, []);
       }
-      dateRankings.get(date)!.push(ranking);
+      dateRankings.get(date)!.push(ranking as DailyRankingHistoryRow);
     });
 
     const historyByDate: { [date: string]: { [playerName: string]: { newHandicap: number; playingHandicap: number } } } = {};
@@ -1780,9 +1812,9 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     const lastRanking = rankings[0];
     // A day with only guests still has rounds to archive, without member adjustments.
-    const standings = (lastRanking.standings || []).filter((standing: any) => !standing.isGuest);
+    const standings = (lastRanking.standings || []).filter((standing) => !standing.isGuest);
 
-    const sortedPlayers = [...standings].sort((a: any, b: any) => {
+    const sortedPlayers = [...standings].sort((a, b) => {
       if (b.totalPoints !== a.totalPoints) {
         return b.totalPoints - a.totalPoints;
       }
@@ -2053,7 +2085,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     await this.deleteRound(roundId);
   },
 
-  async getArchivedRounds(groupId?: string, seasonId?: string): Promise<any[]> {
+  async getArchivedRounds(groupId?: string, seasonId?: string): Promise<ArchivedRound[]> {
     let query = supabase
       .from('archived_rounds')
       .select('*')
@@ -2073,7 +2105,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getStatisticsRounds(groupId?: string, seasonId?: string): Promise<any[]> {
+  async getStatisticsRounds(groupId?: string, seasonId?: string): Promise<ArchivedRound[]> {
     let query = supabase
       .from('group_statistics_rounds')
       .select('*')
@@ -2093,11 +2125,11 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getPlayerStatistics(playerName: string, groupId: string): Promise<any> {
+  async getPlayerStatistics(playerName: string, groupId: string): Promise<PlayerStatisticsSummary> {
     const archivedRounds = await this.getStatisticsRounds(groupId);
 
     const playerRounds = archivedRounds.filter((round) =>
-      round.final_ranking.some((r: any) => r.player_name === playerName)
+      round.final_ranking.some((r) => r.player_name === playerName)
     );
 
     if (playerRounds.length === 0) {
@@ -2120,7 +2152,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     playerRounds.forEach((round) => {
       const playerRanking = round.final_ranking.find(
-        (r: any) => r.player_name === playerName
+        (r) => r.player_name === playerName
       );
       if (playerRanking) {
         totalPoints += playerRanking.points;
@@ -2170,7 +2202,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     };
   },
 
-  async getGroupStatistics(groupId: string): Promise<any> {
+  async getGroupStatistics(groupId: string): Promise<GroupStatisticsSummary> {
     const archivedRounds = await this.getStatisticsRounds(groupId);
 
     if (archivedRounds.length === 0) {
@@ -2180,23 +2212,26 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       };
     }
 
-    const playerMap = new Map<string, any>();
+    const playerMap = new Map<string, GroupPlayerStatistics>();
 
     archivedRounds.forEach((round) => {
-      round.final_ranking.forEach((ranking: any) => {
+      round.final_ranking.forEach((ranking) => {
         if (!playerMap.has(ranking.player_name)) {
           playerMap.set(ranking.player_name, {
             name: ranking.player_name,
             totalRounds: 0,
             totalPoints: 0,
+            averagePoints: 0,
             wins: 0,
             podiums: 0,
             beersWon: 0,
             beersPaid: 0,
+            beerBalance: 0,
           });
         }
 
         const player = playerMap.get(ranking.player_name);
+        if (!player) return;
         player.totalRounds++;
         player.totalPoints += ranking.points;
 
@@ -2245,7 +2280,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     };
   },
 
-  async getCourseStatistics(courseName: string, groupId?: string): Promise<any> {
+  async getCourseStatistics(courseName: string, groupId?: string): Promise<CourseStatisticsSummary> {
     let archivedRounds = await this.getStatisticsRounds(groupId);
 
     archivedRounds = archivedRounds.filter((round) => round.course_name === courseName);
@@ -2271,7 +2306,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       totalWinningScore += winner.points;
       highestScore = Math.max(highestScore, winner.points);
 
-      round.final_ranking.forEach((ranking: any) => {
+      round.final_ranking.forEach((ranking) => {
         lowestScore = Math.min(lowestScore, ranking.points);
 
         if (!playerScores.has(ranking.player_name)) {
@@ -2305,7 +2340,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     name: string,
     startDate: string,
     endDate?: string
-  ): Promise<any> {
+  ): Promise<Season> {
     const { data, error } = await supabase
       .from('seasons')
       .insert([
@@ -2323,7 +2358,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data;
   },
 
-  async getSeasons(groupId: string): Promise<any[]> {
+  async getSeasons(groupId: string): Promise<Season[]> {
     const { data, error } = await supabase
       .from('seasons')
       .select('*')
@@ -2334,7 +2369,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getCurrentSeason(groupId: string): Promise<any | null> {
+  async getCurrentSeason(groupId: string): Promise<Season | null> {
     const today = new Date().toISOString().split('T')[0];
 
     const { data, error } = await supabase
@@ -2382,7 +2417,12 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         this.getDriverOroRanking(groupId),
       ]);
 
-      const stats: any = {
+      const stats: {
+        patrocinador?: { name: string; value: number; rounds_played: number };
+        barraLibre?: { name: string; value: number; rounds_played: number };
+        corto?: { name: string; value: number; rounds_played: number };
+        driverOro?: { name: string; value: number; rounds_played: number };
+      } = {
         patrocinador: undefined,
         barraLibre: undefined,
         corto: undefined,
@@ -2391,22 +2431,22 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
       if (patrocinadorData && patrocinadorData.length > 0) {
         const top = patrocinadorData[0];
-        stats.patrocinador = { name: top.player_name, value: top.total_beers_paid, rounds_played: top.total_rounds };
+        stats.patrocinador = { name: top.player_name, value: top.total_beers_paid ?? 0, rounds_played: top.total_rounds ?? 0 };
       }
 
       if (barraLibreData && barraLibreData.length > 0) {
         const top = barraLibreData[0];
-        stats.barraLibre = { name: top.player_name, value: top.total_beers_won, rounds_played: top.total_rounds };
+        stats.barraLibre = { name: top.player_name, value: top.total_beers_won ?? 0, rounds_played: top.total_rounds ?? 0 };
       }
 
       if (cortoData && cortoData.length > 0) {
         const top = cortoData[0];
-        stats.corto = { name: top.player_name, value: top.no_paso_rojas_count, rounds_played: top.total_rounds };
+        stats.corto = { name: top.player_name, value: top.no_paso_rojas_count ?? 0, rounds_played: top.total_rounds ?? 0 };
       }
 
       if (driverOroData && driverOroData.length > 0) {
         const top = driverOroData[0];
-        stats.driverOro = { name: top.player_name, value: top.no_paso_rojas_count, rounds_played: top.total_rounds };
+        stats.driverOro = { name: top.player_name, value: top.no_paso_rojas_count ?? 0, rounds_played: top.total_rounds ?? 0 };
       }
 
       return stats;
@@ -2421,7 +2461,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }
   },
 
-  async getPatrocinadorRanking(groupId: string): Promise<any[]> {
+  async getPatrocinadorRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_patrocinador_ranking', {
       p_group_id: groupId,
     });
@@ -2429,7 +2469,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getBarraLibreRanking(groupId: string): Promise<any[]> {
+  async getBarraLibreRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_barra_libre_ranking', {
       p_group_id: groupId,
     });
@@ -2437,7 +2477,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getCortoRanking(groupId: string): Promise<any[]> {
+  async getCortoRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_corto_ranking', {
       p_group_id: groupId,
     });
@@ -2445,7 +2485,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getDriverOroRanking(groupId: string): Promise<any[]> {
+  async getDriverOroRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_driver_oro_ranking', {
       p_group_id: groupId,
     });
@@ -2476,11 +2516,11 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     };
   },
 
-  async getDetailedPlayerStatistics(playerName: string, groupId: string): Promise<any> {
+  async getDetailedPlayerStatistics(playerName: string, groupId: string): Promise<DetailedPlayerStatistics | null> {
     const archivedRounds = await this.getStatisticsRounds(groupId);
 
     const playerRounds = archivedRounds.filter((round) =>
-      round.final_ranking?.some((r: any) => r.player_name === playerName)
+      round.final_ranking?.some((r) => r.player_name === playerName)
     );
 
     if (playerRounds.length === 0) {
@@ -2497,7 +2537,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     let bestRound: { points: number; course: string; date: string } | null = null;
 
     playerRounds.forEach((round) => {
-      const playerStat = round.player_stats?.find((ps: any) => ps.player_name === playerName);
+      const playerStat = round.player_stats?.find((ps) => ps.player_name === playerName);
       if (playerStat?.hole_results) {
         const hr = playerStat.hole_results;
         eagles += hr.eagles || 0;
@@ -2509,7 +2549,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       }
       totalHolesPlayed += playerStat?.total_holes_played || 0;
 
-      const ranking = round.final_ranking.find((r: any) => r.player_name === playerName);
+      const ranking = round.final_ranking.find((r) => r.player_name === playerName);
       if (ranking) {
         if (!bestRound || ranking.points > bestRound.points) {
           bestRound = {
@@ -2522,7 +2562,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     });
 
     let currentHandicap = 0;
-    const latestRanking = playerRounds[0].final_ranking.find((entry: any) => entry.player_name === playerName);
+    const latestRanking = playerRounds[0].final_ranking.find((entry) => entry.player_name === playerName);
     const playerId = latestRanking?.player_db_id ?? (await this.getPlayerIdByName(playerName, groupId))?.id;
     if (playerId) {
       const { data: playerData } = await supabase
@@ -2571,7 +2611,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data;
   },
 
-  async getKillerRanking(groupId: string): Promise<any> {
+  async getKillerRanking(groupId: string): Promise<RankingRpcRow | null> {
     const { data, error } = await supabase.rpc('get_killer_ranking', {
       p_group_id: groupId,
     });
@@ -2579,7 +2619,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getPaqueteRanking(groupId: string): Promise<any> {
+  async getPaqueteRanking(groupId: string): Promise<RankingRpcRow | null> {
     const { data, error } = await supabase.rpc('get_paquete_ranking', {
       p_group_id: groupId,
     });
@@ -2587,7 +2627,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getSharkRanking(groupId: string): Promise<any[]> {
+  async getSharkRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_shark_ranking', {
       p_group_id: groupId,
     });
@@ -2595,7 +2635,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getMetronomoRanking(groupId: string): Promise<any[]> {
+  async getMetronomoRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_metronomo_ranking', {
       p_group_id: groupId,
     });
@@ -2603,7 +2643,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getViciadoRanking(groupId: string): Promise<any[]> {
+  async getViciadoRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_viciado_ranking', {
       p_group_id: groupId,
     });
@@ -2611,7 +2651,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getFrancotiradorRanking(groupId: string): Promise<any[]> {
+  async getFrancotiradorRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_francotirador_ranking', {
       p_group_id: groupId,
     });
@@ -2619,7 +2659,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getMaquinaRanking(groupId: string): Promise<any[]> {
+  async getMaquinaRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_maquina_ranking', {
       p_group_id: groupId,
     });
@@ -2627,7 +2667,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getAmigoDelMasUnoRanking(groupId: string): Promise<any[]> {
+  async getAmigoDelMasUnoRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_amigo_del_mas_uno_ranking', {
       p_group_id: groupId,
     });
@@ -2635,7 +2675,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getReyDelBosqueRanking(groupId: string): Promise<any[]> {
+  async getReyDelBosqueRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_rey_del_bosque_ranking', {
       p_group_id: groupId,
     });
@@ -2643,7 +2683,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getTopoRanking(groupId: string): Promise<any[]> {
+  async getTopoRanking(groupId: string): Promise<RankingRpcRow[]> {
     const { data, error } = await supabase.rpc('get_topo_ranking', {
       p_group_id: groupId,
     });
@@ -2651,7 +2691,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-  async getLaPaliza(groupId: string): Promise<any> {
+  async getLaPaliza(groupId: string): Promise<RankingRpcRow | null> {
     const { data, error } = await supabase.rpc('get_la_paliza', {
       p_group_id: groupId,
     });
@@ -2659,7 +2699,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getHeadToHead(groupId: string, player1Name: string, player2Name: string): Promise<any> {
+  async getHeadToHead(groupId: string, player1Name: string, player2Name: string): Promise<RankingRpcRow | null> {
     const { data, error } = await supabase.rpc('get_head_to_head', {
       p_group_id: groupId,
       player1_name: player1Name,
@@ -2669,7 +2709,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getHoyoMuerte(groupId: string, courseName: string): Promise<any> {
+  async getHoyoMuerte(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
     const { data, error } = await supabase.rpc('get_hoyo_muerte', {
       p_group_id: groupId,
       p_course_name: courseName,
@@ -2678,7 +2718,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getHoyoGloria(groupId: string, courseName: string): Promise<any> {
+  async getHoyoGloria(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
     const { data, error } = await supabase.rpc('get_hoyo_gloria', {
       p_group_id: groupId,
       p_course_name: courseName,
@@ -2687,7 +2727,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getMejorRondaCampo(groupId: string, courseName: string): Promise<any> {
+  async getMejorRondaCampo(groupId: string, courseName: string): Promise<BestCourseRoundStatistics | null> {
     const { data, error } = await supabase.rpc('get_mejor_ronda_campo', {
       p_group_id: groupId,
       p_course_name: courseName,
@@ -2696,7 +2736,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getDailyRankingForDate(groupId: string, date: Date): Promise<any[]> {
+  async getDailyRankingForDate(groupId: string, date: Date): Promise<ArchivedDailyRanking[]> {
     const dateString = date.toISOString().split('T')[0];
 
     const { data: dailyRanking, error: rankingError } = await supabase
@@ -2721,11 +2761,12 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (roundsError) throw roundsError;
 
+    const archivedRoundRows = (rounds || []) as ArchivedRound[];
     const rankingWithNoPasoRojas = dailyRanking.map((ranking) => {
       let noPasoRojasCount = 0;
 
-      rounds?.forEach((round) => {
-        const playerStat = round.player_stats?.find((ps: any) => ps.player_name === ranking.player_name);
+      archivedRoundRows.forEach((round) => {
+        const playerStat = round.player_stats?.find((ps) => ps.player_name === ranking.player_name);
         if (playerStat) {
           noPasoRojasCount += playerStat.no_paso_rojas_count || 0;
         }
@@ -2740,7 +2781,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return rankingWithNoPasoRojas;
   },
 
-  async getArchivedRoundsForDate(groupId: string, date: Date): Promise<any[]> {
+  async getArchivedRoundsForDate(groupId: string, date: Date): Promise<ArchivedRound[]> {
     const dateString = date.toISOString().split('T')[0];
 
     const { data: rounds, error: roundsError } = await supabase
@@ -2848,7 +2889,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }
   },
 
-  async getCompletedRoundsSummaries(groupId?: string): Promise<any[]> {
+  async getCompletedRoundsSummaries(groupId?: string): Promise<CompletedRoundSummary[]> {
     const userId = getUserId();
 
     let query = supabase
@@ -2872,7 +2913,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data || [];
   },
 
-async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
+async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRound | null> {
   const userId = getUserId();
 
   // Definimos la consulta base
@@ -2949,7 +2990,7 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
     holes: GolfHole[],
     gameMode: GameMode = 'stableford',
     decidedResult: import('../types').DecidedResult | null = null
-  ): any {
+  ): QuickPlayAwardsSummary {
     const getPlayerStats = (player: RoundPlayer) => {
       const playerScores = scores.filter(s => s.player_id === player.id && !s.abandoned);
       const totalStablefordPoints = playerScores.reduce((sum, s) => sum + s.stableford_points, 0);
@@ -3093,8 +3134,8 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<any | null> {
         : 0;
 
       const teamRanking = [
-        { team: 0, players: team0Players, totalPoints: team0Points, handicap: team0Players.reduce((sum, p) => sum + p.playing_handicap, 0), label: 'Pareja 1' },
-        { team: 1, players: team1Players, totalPoints: team1Points, handicap: team1Players.reduce((sum, p) => sum + p.playing_handicap, 0), label: 'Pareja 2' },
+        { team: 0 as const, players: team0Players, totalPoints: team0Points, handicap: team0Players.reduce((sum, p) => sum + p.playing_handicap, 0), label: 'Pareja 1' },
+        { team: 1 as const, players: team1Players, totalPoints: team1Points, handicap: team1Players.reduce((sum, p) => sum + p.playing_handicap, 0), label: 'Pareja 2' },
       ].sort((a, b) => b.totalPoints - a.totalPoints || a.handicap - b.handicap);
 
       if (decidedResult?.winner_player_ids?.length) {

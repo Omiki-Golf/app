@@ -38,13 +38,13 @@ test('real score handler retains mode calculations, persists a whole hole once a
 });
 test('server denial displays the reason, revokes editing and refreshes the canonical status',async()=>{
  const h=harness('stableford',{code:'42501',message:'El creador ya ha finalizado esta partida.'});
- await h.change('0',1,{grossStrokes:4});
+ await h.change('0',1,{grossStrokes:4,netStrokes:4});
  assert.equal(h.state().hasEditAccess,false);assert.equal(h.state().round.status,'completed');
  assert.equal(h.alerts.at(-1),'El creador ya ha finalizado esta partida.');assert.equal(h.refreshes(),1);
 });
 test('network errors do not falsely revoke ownership or discard unsaved display data',async()=>{
  const h=harness('stableford',{message:'Sin conexión'});
- await h.change('0',1,{grossStrokes:4});
+ await h.change('0',1,{grossStrokes:4,netStrokes:4});
  assert.equal(h.state().hasEditAccess,true);assert.equal(h.state().scores,h.scores);
  assert.equal(h.alerts.at(-1),'Sin conexión');assert.equal(h.refreshes(),0);
 });

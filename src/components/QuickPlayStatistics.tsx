@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
   Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
@@ -9,13 +9,13 @@ import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
 import { calculateScoreToPar } from '../utils/calculations';
 import { safeStorage } from '../utils/safeStorage';
-import { GameMode } from '../types';
+import { GameMode, GolfHole, RoundPlayer, RoundScore, QuickPlayCompletedRound, QuickPlayAwardsSummary } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 
 interface QuickPlayStatisticsProps {
   onBack: () => void;
   roundId?: string;
-  sharedRoundData?: any | null;
+  sharedRoundData?: QuickPlayCompletedRound | null;
   messagesButton?: React.ReactNode;
 }
 
@@ -79,13 +79,80 @@ const validatePngBlob = (blob: Blob, minimumWidth: number, minimumHeight: number
   image.src = url;
 });
 
+const getEffectiveGrossStrokes = (score: RoundScore | undefined, hole?: GolfHole) => {
+  if (!score) return 0;
+  if (score.gross_strokes > 0) return score.gross_strokes;
+  if (score.abandoned && hole) return hole.par + (score.strokes_received || 0) + 2;
+  return 0;
+};
+
+const calculatePlayerHighlights = (
+  players: RoundPlayer[],
+  scores: RoundScore[],
+  holes: GolfHole[],
+): PlayerHighlights[] => {
+  const coursePar = holes.reduce((sum, hole) => sum + hole.par, 0);
+  return players.map(player => {
+    const playerScores = scores.filter(score => score.player_id === player.id);
+
+    let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doubleBogeyPlus = 0;
+    let bestHole = { holeNumber: 0, points: -999 };
+    let worstHole = { holeNumber: 0, points: 999 };
+    let totalPoints = 0;
+    let totalGrossStrokes = 0;
+
+    playerScores.forEach(score => {
+      const hole = holes.find(item => item.hole_number === score.hole_number);
+      totalGrossStrokes += getEffectiveGrossStrokes(score, hole);
+
+      if (score.abandoned) {
+        doubleBogeyPlus++;
+        return;
+      }
+      const diff = score.net_strokes - (hole?.par || 0);
+      const points = score.stableford_points || 0;
+
+      totalPoints += points;
+
+      if (points > bestHole.points) bestHole = { holeNumber: score.hole_number, points };
+      if (points < worstHole.points) worstHole = { holeNumber: score.hole_number, points };
+
+      if (diff <= -2) eagles++;
+      else if (diff === -1) birdies++;
+      else if (diff === 0) pares++;
+      else if (diff === 1) bogeys++;
+      else if (diff >= 2) doubleBogeyPlus++;
+    });
+
+    const scoreToPar = totalGrossStrokes === 0
+      ? { value: 0, display: '-' }
+      : calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap);
+
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      totalPoints,
+      totalGrossStrokes,
+      scoreToPar,
+      eagles,
+      birdies,
+      pares,
+      bogeys,
+      doubleBogeyPlus,
+      bestHole,
+      worstHole,
+      variability: bestHole.points - worstHole.points,
+    };
+  });
+};
+
 export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, sharedRoundData = null, messagesButton }) => {
   const isSharedView = !!sharedRoundData;
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
-  const [roundData, setRoundData] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [roundData, setRoundData] = useState<QuickPlayCompletedRound | null>(null);
+  const [stats, setStats] = useState<QuickPlayAwardsSummary | null>(null);
   const [highlights, setHighlights] = useState<PlayerHighlights[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -100,46 +167,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   useEffect(() => () => {
     if (shareAsset) URL.revokeObjectURL(shareAsset.url);
   }, [shareAsset]);
-
-  // Un solo useEffect inicial para cargar las rondas y la primera partida de forma directa
-  useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        if (sharedRoundData) {
-          setAvailableRounds([]);
-          setSelectedRoundId(sharedRoundData.round?.id || null);
-          setRoundData(sharedRoundData);
-          setStats(golfService.calculateQuickPlayAwards(
-            sharedRoundData.players,
-            sharedRoundData.scores,
-            sharedRoundData.holes,
-            sharedRoundData.round?.game_mode || 'stableford',
-            sharedRoundData.round?.decided_result || null
-          ));
-          setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
-          setLoading(false);
-          window.setTimeout(() => setAnimateIn(true), 150);
-          return;
-        }
-        const rounds = await golfService.getAvailableRoundsForStats();
-        setAvailableRounds(rounds);
-
-        if (rounds && rounds.length > 0) {
-          const firstRoundId = rounds[0].id;
-          setSelectedRoundId(firstRoundId);
-          await loadRoundData(firstRoundId);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Error inicializando lista de partidas:', err);
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [sharedRoundData]);
 
   const handleSelectRound = async (roundId: string) => {
     setShareAsset(null);
@@ -157,7 +184,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     minute: '2-digit'
   })} · ${getModeLabel(round.game_mode)}`;
 
-  const loadRoundData = async (roundId: string) => {
+  const loadRoundData = useCallback(async (roundId: string) => {
     try {
       setLoading(true);
       setAnimateIn(false);
@@ -189,85 +216,46 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getEffectiveGrossStrokes = (score: any, hole: any) => {
-    if (!score) return 0;
-    if (typeof score.gross_strokes === 'number' && score.gross_strokes > 0) {
-      return score.gross_strokes;
-    }
-    if (score.abandoned && hole) {
-      return hole.par + (score.strokes_received || 0) + 2;
-    }
-    return 0;
-  };
-
-  const calculatePlayerHighlights = (players: any[], scores: any[], holes: any[]): PlayerHighlights[] => {
-    const coursePar = holes.reduce((sum, h) => sum + h.par, 0);
-    const numHoles = holes.length;
-
-    return players.map(player => {
-      const playerScores = scores.filter(s => s.player_id === player.id);
-
-      let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doubleBogeyPlus = 0;
-      let bestHole = { holeNumber: 0, points: -999 };
-      let worstHole = { holeNumber: 0, points: 999 };
-      let totalPoints = 0;
-      let totalGrossStrokes = 0;
-
-      playerScores.forEach(score => {
-        const hole = holes.find(h => h.hole_number === score.hole_number);
-        totalGrossStrokes += getEffectiveGrossStrokes(score, hole);
-
-        if (score.abandoned) {
-          doubleBogeyPlus++;
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setLoading(true);
+        if (sharedRoundData) {
+          setAvailableRounds([]);
+          setSelectedRoundId(sharedRoundData.round.id || null);
+          setRoundData(sharedRoundData);
+          setStats(golfService.calculateQuickPlayAwards(
+            sharedRoundData.players,
+            sharedRoundData.scores,
+            sharedRoundData.holes,
+            sharedRoundData.round.game_mode || 'stableford',
+            sharedRoundData.round.decided_result || null
+          ));
+          setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
+          setLoading(false);
+          window.setTimeout(() => setAnimateIn(true), 150);
           return;
         }
-        const diff = score.net_strokes - (hole?.par || 0);
-        const points = score.stableford_points || 0;
+        const rounds = await golfService.getAvailableRoundsForStats();
+        setAvailableRounds(rounds);
 
-        totalPoints += points;
-
-        if (points > bestHole.points) {
-          bestHole = { holeNumber: score.hole_number, points };
+        if (rounds.length > 0) {
+          const firstRoundId = rounds[0].id;
+          setSelectedRoundId(firstRoundId);
+          await loadRoundData(firstRoundId);
+        } else {
+          setLoading(false);
         }
-        if (points < worstHole.points) {
-          worstHole = { holeNumber: score.hole_number, points };
-        }
+      } catch (err) {
+        console.error('Error inicializando lista de partidas:', err);
+        setLoading(false);
+      }
+    };
 
-        if (diff <= -2) eagles++;
-        else if (diff === -1) birdies++;
-        else if (diff === 0) pares++;
-        else if (diff === 1) bogeys++;
-        else if (diff >= 2) doubleBogeyPlus++;
-      });
-
-      const scoreToPar = totalGrossStrokes === 0
-        ? { value: 0, display: '-' }
-        : calculateScoreToPar(
-            totalGrossStrokes,
-            coursePar,
-            player.playing_handicap,
-            numHoles as 9 | 18
-          );
-
-      return {
-        playerId: player.id,
-        playerName: player.name,
-        totalPoints,
-        totalGrossStrokes,
-        scoreToPar,
-        eagles,
-        birdies,
-        pares,
-        bogeys,
-        doubleBogeyPlus,
-        bestHole,
-        worstHole,
-        variability: bestHole.points - worstHole.points
-      };
-    });
-  };
+    void init();
+  }, [sharedRoundData, loadRoundData]);
 
   const handleDelete = async () => {
     if (!selectedRoundId) return;
@@ -590,7 +578,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     name: string;
     totalPoints: number;
     handicap?: number;
-    scores: any[];
+    scores: RoundScore[];
     rank: number;
   }[] = [];
 
@@ -598,20 +586,20 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     const team0Players = roundData.players.slice(0, 2);
     const team1Players = roundData.players.slice(2, 4);
 
-    const buildTeamRow = (players: any[], label: string) => {
+    const buildTeamRow = (players: RoundPlayer[], label: string) => {
       const rep = players[0];
       const playerScores = rep
-        ? roundData.scores.filter((s: any) => s.player_id === rep.id)
+        ? roundData.scores.filter((s) => s.player_id === rep.id)
         : [];
       const totalPoints = rep
         ? playerScores
-            .reduce((sum: number, s: any) => sum + (s.mode_points || 0), 0)
+            .reduce((sum, s) => sum + (s.mode_points || 0), 0)
         : 0;
       return {
         key: label,
-        name: players.map((p: any) => p.name).join(' / '),
+        name: players.map((p) => p.name).join(' / '),
         totalPoints,
-        handicap: players.reduce((sum: number, player: any) => sum + player.playing_handicap, 0),
+        handicap: players.reduce((sum, player) => sum + player.playing_handicap, 0),
         scores: playerScores,
         rank: 0,
       };
@@ -624,11 +612,11 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
     holeTableRows.forEach((row, idx) => { row.rank = idx; });
   } else {
-    holeTableRows = ranking.map((entry: any, index: number) => ({
+    holeTableRows = ranking.map((entry, index) => ({
       key: entry.player.id,
       name: entry.player.name,
       totalPoints: entry.totalPoints,
-      scores: roundData.scores.filter((s: any) => s.player_id === entry.player.id),
+      scores: roundData.scores.filter((s) => s.player_id === entry.player.id),
       rank: index,
     }));
   }
@@ -792,7 +780,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     <th className="statistics-table-text text-left font-bold p-2">
                       {isParejasMode ? 'Pareja' : 'Jugador'}
                     </th>
-                    {holes.map((hole: any) => (
+                    {holes.map((hole) => (
                       <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
@@ -817,8 +805,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                             {row.name}
                           </span>
                         </td>
-                        {holes.map((hole: any) => {
-                          const score = row.scores.find((s: any) => s.hole_number === hole.hole_number);
+                        {holes.map((hole) => {
+                          const score = row.scores.find((s) => s.hole_number === hole.hole_number);
                           const isAbandoned = score?.abandoned;
                           const points = isMatchMode || isSindicatoMode || isParejasMode
                             ? (score?.mode_points || 0)
@@ -873,7 +861,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <thead>
                   <tr className="statistics-table-line border-b-2">
                     <th className="statistics-table-text text-left font-bold p-2">Jugador</th>
-                    {holes.map((hole: any) => (
+                    {holes.map((hole) => (
                       <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
@@ -882,10 +870,10 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   </tr>
                 </thead>
                 <tbody>
-                  {ranking.map((entry: any, index: number) => {
-                    const playerScores = roundData.scores.filter((s: any) => s.player_id === entry.player.id);
-                    const totalGross = playerScores.reduce((sum: number, score: any) => {
-                      const hole = holes.find((h: any) => h.hole_number === score.hole_number);
+                  {ranking.map((entry, index) => {
+                    const playerScores = roundData.scores.filter((s) => s.player_id === entry.player.id);
+                    const totalGross = playerScores.reduce((sum, score) => {
+                      const hole = holes.find((h) => h.hole_number === score.hole_number);
                       return sum + getEffectiveGrossStrokes(score, hole);
                     }, 0);
 
@@ -904,8 +892,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                             {entry.player.name}
                           </div>
                         </td>
-                        {holes.map((hole: any) => {
-                          const score = playerScores.find((s: any) => s.hole_number === hole.hole_number);
+                        {holes.map((hole) => {
+                          const score = playerScores.find((s) => s.hole_number === hole.hole_number);
                           const value = getEffectiveGrossStrokes(score, hole);
                           return (
                             <td key={hole.hole_number} className="statistics-table-text text-center p-2 font-bold">
@@ -959,7 +947,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Zap size={20} className="text-yellow-400" />
                       <p className="text-yellow-300 font-bold text-sm">Hole in One</p>
                     </div>
-                    <p className="statistics-table-text font-bold text-lg">{awards.holeInOne.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">
+                      {awards.holeInOne.players.map(({ player }) => player.name).join(' / ')}
+                    </p>
                     <p className="text-yellow-300 text-sm">¡Hoyo en uno increíble!</p>
                   </div>
                 )}
@@ -1179,8 +1169,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Trophy size={32} className="mx-auto text-yellow-900 mb-2" />
                       <p className="text-yellow-900 font-black text-lg">
                         {teamResult.isTie
-                          ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                          : teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                          ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </p>
                       <p className="text-5xl font-black text-yellow-900 mt-2">{teamResult.winningTeam?.totalPoints ?? 0}</p>
                       <p className="text-yellow-800 text-sm font-semibold mt-1">puntos</p>
@@ -1207,8 +1197,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <TrendingDown size={32} className="mx-auto text-slate-300 mb-2" />
                       <p className="text-white font-black text-lg">
                         {teamResult.isTie
-                          ? `${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                          : teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                          ? `${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </p>
                       <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? 0}</p>
                       <p className="text-slate-300 text-sm font-semibold mt-1">puntos</p>
@@ -1373,8 +1363,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <span className="text-amber-300 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Ganadora'}</span>
                   <h2 className="text-2xl font-black text-white mt-1">
                     {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                      : teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                      : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                   </h2>
                   <p className="text-5xl font-black text-amber-400 mt-2">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
@@ -1388,8 +1378,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <span className="text-slate-400 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Perdedora'}</span>
                   <h2 className="text-2xl font-black text-white mt-1">
                     {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                      : teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                      : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                   </h2>
                   <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
@@ -1398,7 +1388,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
             {(isStablefordMode || isSindicatoMode) && (
               <div className="grid grid-cols-3 gap-6 mb-8">
-                {ranking.slice(0, 3).map((entry: any, index: number) => (
+                {ranking.slice(0, 3).map((entry, index) => (
                   <div 
                     key={entry.player.id} 
                     className={`p-6 rounded-2xl border-2 text-center ${

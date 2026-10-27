@@ -15,6 +15,21 @@ export interface PaymentStatus {
   amount?: number;
 }
 
+interface BTCPayPaymentMethod {
+  paymentMethod?: string;
+  paymentMethodId?: string;
+  destination?: string;
+  paymentLink?: string;
+  bip21?: string;
+  paymentMethodDetails?: { destination?: string };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isBTCPayPaymentMethod = (value: unknown): value is BTCPayPaymentMethod =>
+  isRecord(value);
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const createInvoice = async (
@@ -43,7 +58,10 @@ export const createInvoice = async (
     throw new Error(`BTCPay error: ${err}`);
   }
 
-  const invoiceData = await res.json();
+  const invoiceData: unknown = await res.json();
+  if (!isRecord(invoiceData) || typeof invoiceData.id !== 'string') {
+    throw new Error('BTCPay devolvió una factura no válida.');
+  }
   const invoiceId = invoiceData.id;
 
   let bolt11 = '';
@@ -62,24 +80,28 @@ export const createInvoice = async (
     );
 
     if (methodsRes.ok) {
-      const methods = await methodsRes.json();
+      const methods: unknown = await methodsRes.json();
       
       // Buscar el objeto correspondiente a BTC-LN o Lightning
       const lnMethod = Array.isArray(methods)
-        ? methods.find(
-            (m: any) =>
-              m.paymentMethod === 'BTC-LN' ||
-              m.paymentMethodId === 'BTC-LN' ||
-              m.paymentMethod?.includes('LN')
-          )
+        ? methods.find((method): method is BTCPayPaymentMethod => {
+            if (!isBTCPayPaymentMethod(method)) return false;
+            const methodName = [method.paymentMethod, method.paymentMethodId]
+              .find((candidate): candidate is string => typeof candidate === 'string');
+            return methodName?.includes('LN') ?? false;
+          })
         : null;
 
       if (lnMethod) {
+        const detailDestination = isRecord(lnMethod.paymentMethodDetails)
+          && typeof lnMethod.paymentMethodDetails.destination === 'string'
+          ? lnMethod.paymentMethodDetails.destination
+          : '';
         bolt11 =
           lnMethod.destination ||
           lnMethod.paymentLink ||
           lnMethod.bip21 ||
-          lnMethod.paymentMethodDetails?.destination ||
+          detailDestination ||
           '';
 
         if (bolt11) break;
@@ -88,7 +110,7 @@ export const createInvoice = async (
   }
 
   // 3. Fallback: Si no se obtiene la cadena lnbc directa, usar el checkoutLink nativo
-  if (!bolt11 && invoiceData.checkoutLink) {
+  if (!bolt11 && typeof invoiceData.checkoutLink === 'string') {
     bolt11 = invoiceData.checkoutLink;
   }
 
@@ -118,10 +140,13 @@ export const checkPayment = async (invoiceId: string): Promise<PaymentStatus> =>
 
   if (!res.ok) return { paid: false };
 
-  const data = await res.json();
+  const data: unknown = await res.json();
+  if (!isRecord(data)) return { paid: false };
   return {
     paid: data.status === 'Settled' || data.status === 'Processing',
-    amount: Number(data.amount),
+    amount: typeof data.amount === 'string' || typeof data.amount === 'number'
+      ? Number(data.amount)
+      : undefined,
   };
 };
 

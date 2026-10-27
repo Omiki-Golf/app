@@ -44,7 +44,7 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, sho
   const { userId, nick, displayName } = account;
   useEffect(() => {
     let live = true;
-    golfService.getCareerData(userId)
+    golfService.getCareerData()
       .then(data => { if (live) setStats(computeCareerStats({ userId, nick, displayName }, data.rounds, data.players, data.scores, data.courseNames)); })
       .catch(() => { if (live) setError('No se han podido cargar tus estadísticas. Inténtalo de nuevo.'); });
     return () => { live = false; };

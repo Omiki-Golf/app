@@ -1,12 +1,8 @@
-type RoundEvent = {
-  eventType?: string;
-  new?: Record<string, unknown>;
-  old?: Record<string, unknown>;
-};
+import type { RealtimeEvent } from '../types';
 
 // Keep ambiguous events (especially deletes, which may contain only a primary key).
 export function shouldRefreshRoundList(
-  event: RoundEvent | null | undefined,
+  event: RealtimeEvent | null | undefined,
   groupId: string | null,
   visibleIds: ReadonlySet<string>,
   loaded: boolean,

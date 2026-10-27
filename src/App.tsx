@@ -3,7 +3,7 @@ import { useNotificationCount } from './hooks/useNotificationCount';
 import { useReadOnly } from './context/ReadOnlyContext';
 import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType } from './types';
+import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType, ScoreChangeInput, QuickPlayCompletedRound } from './types';
 import { golfService } from './services/golfService';
 import { calculateModePoints, ModeScoreInput } from './utils/calculations';
 import { accessCodeStorage } from './utils/accessCode';
@@ -20,10 +20,8 @@ import { HoleConfiguration } from './components/HoleConfiguration';
 import { GamePoints } from './components/GamePoints';
 import { AccessCodeModal } from './components/AccessCodeModal';
 import { ConfirmModal } from './components/ConfirmModal';
-import GroupSetup from './components/GroupSetup';
 import Auth from './components/Auth';
 import MyGroups from './components/MyGroups';
-import { PremiumModal } from './components/PremiumModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
 import { PlayerCheckout } from './components/PlayerCheckout';
@@ -41,6 +39,7 @@ import { useSubscription } from './hooks/useSubscription';
 import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
+import type { User } from '@supabase/supabase-js';
 
 const Statistics = lazy(() => import('./components/Statistics').then(module => ({ default: module.Statistics })));
 const QuickPlayStatistics = lazy(() => import('./components/QuickPlayStatistics').then(module => ({ default: module.QuickPlayStatistics })));
@@ -70,7 +69,7 @@ function App() {
   const readOnly = useReadOnly();
   const { user, logout } = useAuth(); // 👈 Usar el contexto global
   const [isIncognito, setIsIncognito] = useState(false);
-  const [authUser, setAuthUser] = useState<any>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
@@ -129,9 +128,9 @@ function App() {
   const [showAccessCodeModal, setShowAccessCodeModal] = useState(false);
   const [pendingRoundId, setPendingRoundId] = useState<string | null>(null);
   const [accessCodeError, setAccessCodeError] = useState('');
-  const [sharedExpressStats, setSharedExpressStats] = useState<any | null>(null);
+  const [sharedExpressStats, setSharedExpressStats] = useState<QuickPlayCompletedRound | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
-  const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+  const { planType, profile, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
   const activityScope = currentGroup
     ? { groupId: currentGroup.id }
     : { roundId: roundState.round?.group_id ? null : roundState.round?.id, accessCode: roundState.round?.id ? accessCodeStorage.getAccessCode(roundState.round.id) : null };
@@ -153,8 +152,8 @@ function App() {
   }, [refreshNotifications, refreshGroupMembership]);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [paymentDescription, setPaymentDescription] = useState('');
+  const [paymentAmount] = useState(0);
+  const [paymentDescription] = useState('');
   const [simulatorEnabled, setSimulatorEnabled] = useState(false);
   const [simulatedPlan, setSimulatedPlan] = useState<PlanType | null>(null);
   const [simulatorUpdating, setSimulatorUpdating] = useState(false);
@@ -173,7 +172,7 @@ function App() {
       setEmailConfirmed(false);
       setCurrentView('player-checkout');
     }
-  }, [user?.id, pendingPlayerId]);
+  }, [user, pendingPlayerId, setCurrentView]);
 
   useEffect(() => {
     // Simulator state belongs to a single authenticated user. Keeping it when
@@ -341,46 +340,36 @@ function App() {
     return () => {
       window.removeEventListener('open-profile-screen', handleOpenProfileScreen);
     };
-  }, [authUser]);
+  }, [authUser, setCurrentView]);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        console.log('🔐 Listening auth changes...');
-        const { supabase } = await import('./services/supabaseClient');
-        console.log('✅ Supabase client imported');
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          console.log('No user authenticated');
-          setAuthUser(null);
-        } else {
-          console.log('✅ User authenticated:', user.email);
-          setAuthUser(user);
-        }
-        const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-          console.log('🔄 Auth state change:', event);
-          if (event === 'PASSWORD_RECOVERY') {
-            setCurrentView('auth');
-          } else if (event === 'SIGNED_IN') {
-            setAuthUser(session?.user || null);
-          } else if (event === 'SIGNED_OUT') {
-            setAuthUser(null);
-          }
-        });
-
-        return () => {
-          authListener.subscription.unsubscribe();
-        };
-      } catch (error) {
-        console.error('❌ Error in checkAuth:', error);
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', event);
+      if (event === 'PASSWORD_RECOVERY') {
+        setCurrentView('auth');
+      } else if (event === 'SIGNED_IN') {
+        setAuthUser(session?.user || null);
+      } else if (event === 'SIGNED_OUT') {
+        setAuthUser(null);
       }
+    });
+
+    void supabase.auth.getUser()
+      .then(({ data, error }) => {
+        if (error) throw error;
+        if (!active) return;
+        if (!data.user) console.log('No user authenticated');
+        else console.log('✅ User authenticated:', data.user.email);
+        setAuthUser(data.user);
+      })
+      .catch((error: unknown) => console.error('❌ Error in checkAuth:', error));
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
     };
-    checkAuth();
-  }, []);
+  }, [setCurrentView]);
 
   useEffect(() => {
     const checkGroup = async () => {
@@ -410,12 +399,14 @@ function App() {
     checkGroup();
   }, []);
 
+  const hasActiveRound = Boolean(roundState.round);
+
   useEffect(() => {
     const restoreActiveRound = async () => {
       if (groupLoading) return;
 
       const activeRoundId = storageUtils.getActiveRoundId();
-      if (activeRoundId && !roundState.round) {
+      if (activeRoundId && !hasActiveRound) {
         try {
           setLoading(true);
           const roundData = await golfService.getRoundWithDetails(activeRoundId);
@@ -458,16 +449,17 @@ function App() {
       }
     };
     restoreActiveRound();
-  }, [groupLoading]);
+  }, [groupLoading, hasActiveRound, setCurrentView]);
 
   useEffect(() => {
-    if (!roundState.round || (currentView !== 'scorecard' && currentView !== 'leaderboard' && currentView !== 'players')) {
+    const roundId = roundState.round?.id;
+    if (!roundId || (currentView !== 'scorecard' && currentView !== 'leaderboard' && currentView !== 'players')) {
       return;
     }
 
-    const scoresSubscription = golfService.subscribeToRoundScores(roundState.round.id, async () => {
+    const scoresSubscription = golfService.subscribeToRoundScores(roundId, async () => {
       try {
-        const scores = await golfService.getRoundScores(roundState.round!.id);
+        const scores = await golfService.getRoundScores(roundId);
         setRoundState((prev) => ({
           ...prev,
           scores,
@@ -477,9 +469,9 @@ function App() {
       }
     });
 
-    const playersSubscription = golfService.subscribeToRoundPlayers(roundState.round.id, async () => {
+    const playersSubscription = golfService.subscribeToRoundPlayers(roundId, async () => {
       try {
-        const players = await golfService.getRoundPlayers(roundState.round!.id);
+        const players = await golfService.getRoundPlayers(roundId);
         setRoundState((prev) => ({
           ...prev,
           players,
@@ -550,14 +542,7 @@ function App() {
       window.removeEventListener('focus', check);
       void supabase.removeChannel(statusSubscription);
     };
-  }, [roundState.round?.id, roundState.round?.group_id]);
-
-  const handleGroupCreated = async (group: Group) => {
-    setCurrentGroup(group);
-    setIsGroupCreator(true);
-    setHasLimitedAccess(false);
-    storageUtils.saveCurrentGroup(group.id, group.group_code, true, false);
-  };
+  }, [roundState.round?.id, roundState.round?.group_id, setCurrentView]);
 
   // El botón de Team de la pantalla de inicio muestra el grupo propio cuando ya existe.
   useEffect(() => {
@@ -617,7 +602,7 @@ function App() {
     setShowLeaveGroupConfirm(false);
   };
 
-  const handleRoundCreated = async (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean) => {
+  const handleRoundCreated = async (roundId: string, courseId: string) => {
     try {
       setLoading(true);
       const roundData = await golfService.getRoundWithDetails(roundId);
@@ -700,7 +685,7 @@ function App() {
     setRoundState((prev) => ({ ...prev, currentHole: holeNumber }));
   };
 
-  const handleScoreChange = async (playerId: string, holeNumber: number, score: any) => {
+  const handleScoreChange = async (playerId: string, holeNumber: number, score: ScoreChangeInput | null) => {
     console.log('=== handleScoreChange llamado ===');
 
     if (!roundState.round || !roundState.hasEditAccess || readOnly) {
@@ -723,6 +708,9 @@ function App() {
       const grossStrokes = score.grossStrokes ?? score.gross_strokes;
       const strokesReceived = score.strokesReceived ?? score.strokes_received;
       const netStrokes = score.netStrokes ?? score.net_strokes;
+      if (typeof netStrokes !== 'number') {
+        throw new Error('El resultado del hoyo no contiene los golpes netos.');
+      }
       const stablefordPoints = score.stablefordPoints ?? score.stableford_points;
       const noPasoRojas = score.no_paso_rojas ?? false;
       const spanishHands = score.spanish_hands ?? false;
@@ -1208,7 +1196,7 @@ function App() {
           <TeamCreation
             userId={user.id}
             onBack={() => setCurrentView('main')}
-            onTeamCreated={(groupId) => {
+            onTeamCreated={() => {
               refreshSubscription();
               setCurrentView('my-groups');
             }}

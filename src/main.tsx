@@ -8,7 +8,7 @@ if (import.meta.env.DEV) {
 }
 import { ApplicationGateway } from './components/admin/ApplicationGateway';
 import ErrorBoundary from './components/ErrorBoundary';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './context/AuthProvider';
 import { initializeTheme } from './hooks/useTheme';
 import './i18n';
 import './index.css';

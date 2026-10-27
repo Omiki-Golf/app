@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
-import { GolfHole, RoundPlayer, RoundScore, GameMode, DecidedResult } from '../types';
+import { GolfHole, RoundPlayer, RoundScore, GameMode, DecidedResult, ScoreChangeInput } from '../types';
 import { HoleCard } from './HoleCard';
 import { ConfirmModal } from './ConfirmModal';
 import { CourseChangeModal } from './CourseChangeModal';
@@ -38,7 +38,7 @@ interface ScorecardProps {
   gameMode?: GameMode;
   decidedResult?: DecidedResult | null;
   onHoleChange: (holeNumber: number) => void;
-  onScoreChange: (playerId: string, holeNumber: number, score: any) => void;
+  onScoreChange: (playerId: string, holeNumber: number, score: ScoreChangeInput | null) => void;
   onShowLeaderboard: () => void;
   onResetGame: () => void;
   backDestination?: 'back' | 'home';
@@ -57,7 +57,6 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   courseId,
   accessCode,
   hasEditAccess = true,
-  isCreator = false,
   canFinishRound = false,
   isRoundFinished = false,
   courseName = '',
@@ -688,7 +687,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
                 const coursePar = playableHoles.reduce((sum, h) => sum + h.par, 0);
                 const scoreToPar = totalGrossStrokes > 0
-                  ? calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap, numHoles)
+                  ? calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap)
                   : null;
 
                 return (

@@ -11,6 +11,7 @@ import { isExistingAccountSignup } from '../utils/playerRegistration';
 import { userService } from '../services/userService';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
 import { useTranslation } from 'react-i18next';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface AuthProps {
   onAuthSuccess: (userId: string) => void | Promise<void>;
@@ -118,8 +119,8 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         if (!(await getReadOnly())) await golfService.linkGroupsToAuthUser();
         await onAuthSuccess(signedInUser.id);
       }
-    } catch (err: any) {
-      setError(err.message || t('auth.errors.login'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.errors.login')));
     } finally {
       setLoading(false);
     }
@@ -188,8 +189,8 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
       } else if (data.user) {
         setShowEmailSentModal(true);
       }
-    } catch (err: any) {
-      setError(err.message || t('auth.errors.register'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.errors.register')));
     } finally {
       setLoading(false);
     }
@@ -212,8 +213,8 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
       }
 
       setMessage(t('auth.messages.recoverySent'));
-    } catch (err: any) {
-      setError(err.message || t('auth.errors.recovery'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.errors.recovery')));
     } finally {
       setLoading(false);
     }
@@ -250,8 +251,8 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
         setPassword('');
         setConfirmPassword('');
       }, 2000);
-    } catch (err: any) {
-      setError(err.message || t('auth.errors.update'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('auth.errors.update')));
     } finally {
       setLoading(false);
     }

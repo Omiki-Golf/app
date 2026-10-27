@@ -2,6 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, X, AlertCircle, Info } from 'lucide-react';
 import { golfService } from '../services/golfService';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface HandicapUpdateModalProps {
   onClose: () => void;
@@ -34,8 +35,8 @@ export const HandicapUpdateModal: React.FC<HandicapUpdateModalProps> = ({
         setError('');
         const data = await golfService.getHandicapUpdatePreview();
         if (!cancelled) setPreview(data);
-      } catch (err: any) {
-        if (!cancelled) setError(err.message || 'Error cargando preview');
+      } catch (err: unknown) {
+        if (!cancelled) setError(getErrorMessage(err, 'Error cargando preview'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -58,8 +59,8 @@ export const HandicapUpdateModal: React.FC<HandicapUpdateModalProps> = ({
       setError('');
       await golfService.applyHandicapUpdate();
       onSuccess();
-    } catch (err: any) {
-      setError(err.message || 'Error actualizando handicaps');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error actualizando handicaps'));
     } finally {
       setUpdating(false);
     }

@@ -10,7 +10,9 @@ const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const normalized = app.replace(/\r\n/g, '\n');
 const effectStart = normalized.indexOf('  useEffect(() => {\n    const roundId = roundState.round?.id;');
 assert.ok(effectStart >= 0);
-const effect = normalized.slice(effectStart, normalized.indexOf('  const handleGroupCreated', effectStart))
+const effectEnd = normalized.indexOf('  // El botón de Team de la pantalla de inicio', effectStart);
+assert.ok(effectEnd > effectStart);
+const effect = normalized.slice(effectStart, effectEnd)
   .replace("const { supabase } = await import('./services/supabaseClient');", '');
 const flush = () => new Promise(resolve => setImmediate(resolve));
 
@@ -24,6 +26,7 @@ test('actual open-card status subscription and focus revoke stale member editing
     let writes = 0;
     const context = vm.createContext({
       roundState: state,
+      currentView: 'scorecard',
       useEffect(fn) { fn(); },
       setRoundState(fn) { Object.assign(state, fn(state)); },
       setCurrentView() {},
@@ -41,7 +44,14 @@ test('actual open-card status subscription and focus revoke stale member editing
       },
       console: { log() {}, error() {} },
       readOnly: false,
-      golfService: { async recordScore() { writes++; }, async deleteScore() { writes++; } },
+      golfService: {
+        subscribeToRoundScores() { return { unsubscribe() {} }; },
+        subscribeToRoundPlayers() { return { unsubscribe() {} }; },
+        async getRoundScores() { return []; },
+        async getRoundPlayers() { return []; },
+        async recordScore() { writes++; },
+        async deleteScore() { writes++; },
+      },
     });
     const handlerStart = normalized.indexOf('  const handleScoreChange =');
     const handler = normalized.slice(handlerStart, normalized.indexOf('  const handleHolesUpdated', handlerStart));

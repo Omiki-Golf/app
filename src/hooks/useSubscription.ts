@@ -18,6 +18,9 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const refreshVersion = useRef(0);
+  const invalidatePendingRefresh = useCallback(() => {
+    refreshVersion.current++;
+  }, []);
 
   const refresh = useCallback(async () => {
     const version = ++refreshVersion.current;
@@ -65,12 +68,12 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
     const timer = window.setInterval(check, 30000);
     window.addEventListener('focus', check);
     return () => {
-      refreshVersion.current++;
+      invalidatePendingRefresh();
       window.clearInterval(timer);
       window.removeEventListener('focus', check);
       authListener.subscription.unsubscribe();
     };
-  }, [refresh]);
+  }, [refresh, invalidatePendingRefresh]);
 
   const belongsToCurrentUser = authenticatedUserId === undefined || loadedUserId === authenticatedUserId;
 

@@ -5,6 +5,7 @@ import { Info, Search, UserPlus, Check, X, Users} from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface TeamCreationProps {
   userId: string;
@@ -83,7 +84,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
       }
     }, 400);
     return () => { if (searchTimer.current) clearTimeout(searchTimer.current); };
-  }, [searchNick]);
+  }, [searchNick, userId]);
 
   const generateCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -151,8 +152,8 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
       }
 
       setStep(4);
-    } catch (err: any) {
-      setError(err.message || 'Error al crear el grupo');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al crear el grupo'));
     } finally {
       setLoading(false);
     }

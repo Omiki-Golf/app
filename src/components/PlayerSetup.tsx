@@ -1,13 +1,12 @@
 import { WriteButton, WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
-import React, { useState, useEffect, useRef } from 'react';
-import { RoundPlayer, Player, GameMode, UserProfile } from '../types';
-import { calculatePlayingHandicap } from '../utils/calculations';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { RoundPlayer, Player, GameMode, UserProfile, Group, GolfHole } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { golfService } from '../services/golfService';
 import { userService } from '../services/userService';
-import { Trash2, Plus, Settings, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
+import { Trash2, Plus, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
@@ -21,7 +20,7 @@ interface PlayerSetupProps {
   courseId: string;
   accessCode?: string;
   hasEditAccess?: boolean;
-  currentGroup?: any;
+  currentGroup?: Group | null;
   gameMode?: GameMode;
   onPlayersUpdated: (players: RoundPlayer[]) => void;
   onStartRound: () => void;
@@ -30,7 +29,7 @@ interface PlayerSetupProps {
   /** Campana de avisos en la cabecera (no flotante), como en el resto de pantallas. */
   messagesButton?: React.ReactNode;
   onOpenHoleConfig: () => void;
-  onHolesChanged?: (numHoles: 9 | 18, holes: any[]) => void;
+  onHolesChanged?: (numHoles: 9 | 18, holes: GolfHole[]) => void;
   onBack?: () => void;
   backDestination?: 'back' | 'home';
   loading?: boolean;
@@ -83,7 +82,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [playerNamesInActiveRounds, setPlayerNamesInActiveRounds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [creatingUnlinked, setCreatingUnlinked] = useState(false);
-  const [canManage, setCanManage] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   // Partida rápida con sesión: compañeros registrados encontrados por nick y el elegido.
   const [registeredResults, setRegisteredResults] = useState<UserProfile[]>([]);
@@ -93,8 +91,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [adding, setAdding] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  const [changingHoles, setChangingHoles] = useState(false);
-  const [courseHoleCount, setCourseHoleCount] = useState<number>(18);
+  const [, setChangingHoles] = useState(false);
   const [showHolesRangeModal, setShowHolesRangeModal] = useState(false);
   const [pendingNumHoles, setPendingNumHoles] = useState<9 | 18 | null>(null);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
@@ -107,6 +104,45 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [showEditPlayerModal, setShowEditPlayerModal] = useState(false);
 
+  const loadPlayers = useCallback(async () => {
+    const request = ++playerLoadVersion.current;
+    try {
+      let allPlayersData: Player[] = [];
+
+      if (currentGroup || user) {
+        allPlayersData = await golfService.getAllPlayers(currentGroup?.id);
+      } else {
+        const localPlayers = localStorage.getItem('quickPlayPlayers');
+        if (localPlayers) {
+          allPlayersData = JSON.parse(localPlayers);
+        }
+      }
+
+      const [playersInRounds, namesInRounds] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, currentGroup?.id)]);
+      if (request !== playerLoadVersion.current) return;
+      setAllPlayers(allPlayersData);
+      setPlayersInActiveRounds(playersInRounds);
+      setPlayerNamesInActiveRounds(namesInRounds);
+    } catch (err) {
+      console.error('Error loading players:', err);
+    }
+  }, [currentGroup, roundId, user]);
+
+  const loadSlope = useCallback(async () => {
+    if (!useSlope) return;
+
+    try {
+      const slopeInfo = await golfService.getRoundSlope(roundId);
+      if (slopeInfo) {
+        setCurrentSlope(slopeInfo.slope);
+        setIsManualSlope(slopeInfo.isManual);
+        setTeeName(slopeInfo.teeName || '');
+      }
+    } catch (err) {
+      console.error('Error loading slope:', err);
+    }
+  }, [roundId, useSlope]);
+
   useEffect(() => {
     let active = true;
     const refresh = () => { if (active) void loadPlayers(); };
@@ -114,25 +150,13 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     void loadSlope();
     const timer = window.setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
-    return () => { active = false; playerLoadVersion.current++; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [roundId, currentGroup?.id, user?.id]);
+    const loadVersionRef = playerLoadVersion;
+    return () => { active = false; loadVersionRef.current++; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [loadPlayers, loadSlope]);
 
   useEffect(() => {
-    const loadCourseDetails = async () => {
-      try {
-        const holeCount = await golfService.getCourseHoleCount(courseId);
-        setCourseHoleCount(holeCount);
-      } catch (err) {
-        console.error('Error loading course details:', err);
-      }
-    };
-
-    loadCourseDetails();
-  }, [courseId]);
-
-  useEffect(() => {
-    loadSlope();
-  }, [roundId, numHoles]);
+    void loadSlope();
+  }, [loadSlope, numHoles]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -159,7 +183,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       } catch { if (active) setRegisteredResults([]); }
     }, 350);
     return () => { active = false; window.clearTimeout(timer); };
-  }, [searchTerm, user?.id, currentGroup?.id, selectedAccount, account?.userId]);
+  }, [searchTerm, user, currentGroup, selectedAccount, account?.userId]);
 
   const handleSelectAccount = (profile: UserProfile) => {
     setCreatingUnlinked(false);
@@ -170,46 +194,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
     setHandicap(String(Math.round(forHoles * 10) / 10));
     setShowDropdown(false);
-  };
-
-  const loadPlayers = async () => {
-    const request = ++playerLoadVersion.current;
-    try {
-      let allPlayersData: Player[] = [];
-
-      if (currentGroup || user) {
-        allPlayersData = await golfService.getAllPlayers(currentGroup?.id);
-      } else {
-        const localPlayers = localStorage.getItem('quickPlayPlayers');
-        if (localPlayers) {
-          allPlayersData = JSON.parse(localPlayers);
-        }
-      }
-
-      const [playersInRounds, namesInRounds] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, currentGroup?.id)]);
-      if (request !== playerLoadVersion.current) return;
-      setAllPlayers(allPlayersData);
-      setCanManage(allPlayersData.some(player => player.can_manage));
-      setPlayersInActiveRounds(playersInRounds);
-      setPlayerNamesInActiveRounds(namesInRounds);
-    } catch (err) {
-      console.error('Error loading players:', err);
-    }
-  };
-
-  const loadSlope = async () => {
-    if (!useSlope) return;
-
-    try {
-      const slopeInfo = await golfService.getRoundSlope(roundId);
-      if (slopeInfo) {
-        setCurrentSlope(slopeInfo.slope);
-        setIsManualSlope(slopeInfo.isManual);
-        setTeeName(slopeInfo.teeName || '');
-      }
-    } catch (err) {
-      console.error('Error loading slope:', err);
-    }
   };
 
   const handleEditSlope = () => {
@@ -395,17 +379,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     }
   };
 
-  const handleChangeHoles = async (newNumHoles: 9 | 18) => {
-    if (!onHolesChanged) return;
-
-    if (newNumHoles === 9 && courseHoleCount === 18) {
-      setPendingNumHoles(newNumHoles);
-      setShowHolesRangeModal(true);
-    } else {
-      await executeHolesChange(newNumHoles, null);
-    }
-  };
-
   const executeHolesChange = async (newNumHoles: 9 | 18, holesRange: '1-9' | '10-18' | null) => {
     if (!onHolesChanged) return;
 
@@ -436,11 +409,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const handleHolesRangeCancel = () => {
     setPendingNumHoles(null);
     setShowHolesRangeModal(false);
-  };
-
-  const handleOpenHoleConfigClick = () => {
-    setShowAdminPinModal(true);
-    setPinError('');
   };
 
   const handlePinSubmit = (pin: string) => {

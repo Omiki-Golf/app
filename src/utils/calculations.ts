@@ -196,6 +196,7 @@ export const calculateModePoints = (
 
 interface RoundScoreLike {
   mode_points?: number;
+  gross_strokes?: number;
 }
 
 export const getTotalModePoints = (scores: Record<number, RoundScoreLike>): number => {
@@ -205,8 +206,7 @@ export const getTotalModePoints = (scores: Record<number, RoundScoreLike>): numb
 export const calculateScoreToPar = (
   totalGrossStrokes: number,
   coursePar: number,
-  playerHandicap: number,
-  numHoles: number
+  playerHandicap: number
 ): { value: number; display: string } => {
   const personalPar = coursePar + playerHandicap;
   const scoreToPar = totalGrossStrokes - personalPar;
@@ -232,7 +232,7 @@ export interface MatchStatusResult {
 }
 
 export const checkMatchPlayStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string; playing_handicap: number }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -278,7 +278,7 @@ export const checkMatchPlayStatus = (
 };
 
 export const checkParejasStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -328,7 +328,7 @@ export const checkParejasStatus = (
 };
 
 export const checkSindicatoStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string; playing_handicap: number }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -346,7 +346,7 @@ export const checkSindicatoStatus = (
     if (isHoleComplete) {
       playedHolesCount++;
       holeScores.forEach((score, index) => {
-        totals[index].points += score.mode_points ?? 0;
+        totals[index].points += score?.mode_points ?? 0;
       });
     }
   }

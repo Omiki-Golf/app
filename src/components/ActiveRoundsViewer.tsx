@@ -4,15 +4,15 @@ import { ThemeToggle } from './ThemeToggle';
 import { TopBar } from './TopBar';
 import React, { useState, useEffect, useRef } from 'react';
 import { shouldRefreshRoundList } from '../utils/roundListEvents';
-import { GolfRound, RoundPlayer, RoundScore, Group } from '../types';
+import { GolfRound, RoundPlayer, RoundScore, Group, Player } from '../types';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
 import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
-import { RoundStatistics } from './RoundStatistics';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId } from '../utils/userId';
 import { Eye, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive } from 'lucide-react';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const gameModeLabels: Record<string, string> = {
   stableford: 'Stableford',
@@ -62,7 +62,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [roundToDelete, setRoundToDelete] = useState<string | null>(null);
   const [roundToFinishAndArchive, setRoundToFinishAndArchive] = useState<string | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState<string | null>(null);
-  const [availablePlayers, setAvailablePlayers] = useState<any[]>([]);
+  const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerHandicap, setNewPlayerHandicap] = useState('');
@@ -77,7 +77,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     listSnapshot.current = { loaded: false, ids: new Set<string>() };
     loadActiveRounds();
 
-    const subscription = golfService.subscribeToRounds((payload: any) => {
+    const subscription = golfService.subscribeToRounds((payload) => {
       const snapshot = listSnapshot.current;
       // If the screen changes context, retain reloads rather than filter with a stale closure.
       const sameContext = listGroupId.current === (currentGroup?.id ?? null);
@@ -89,7 +89,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [currentGroup?.id]);
 
   const loadActiveRounds = async () => {
     try {
@@ -377,8 +377,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
       setShowAddPlayerModal(null);
       await loadActiveRounds();
-    } catch (err: any) {
-      setError(err.message || 'Error añadiendo jugador');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error añadiendo jugador'));
       console.error(err);
     }
   };
@@ -391,8 +391,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       await golfService.updateHandicapsFromLastRanking();
 
       await loadActiveRounds();
-    } catch (err: any) {
-      setError(err.message || 'Error actualizando handicaps');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error actualizando handicaps'));
       console.error(err);
     } finally {
       setUpdatingHandicaps(false);

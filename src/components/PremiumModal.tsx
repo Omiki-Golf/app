@@ -4,6 +4,7 @@ import { X, Zap, CheckCircle2, Copy, Check } from 'lucide-react';
 import { createInvoice, checkPayment, LightningInvoice } from '../services/lightningService';
 import { supabase } from '../services/supabaseClient';
 import { UserTier } from '../types';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface PremiumModalProps {
   isOpen: boolean;
@@ -70,9 +71,9 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
         }
       }, 3000);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al generar la factura:', err);
-      setError(err.message || 'Error al conectar con la pasarela BTCPay');
+      setError(getErrorMessage(err, 'Error al conectar con la pasarela BTCPay'));
       setLoading(false);
     }
   };

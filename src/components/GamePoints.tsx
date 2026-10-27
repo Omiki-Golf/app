@@ -3,7 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
 import { Users, Trophy, TrendingUp, ChevronDown, ChevronUp, UserX, History, Edit2, Save, X, User } from 'lucide-react';
 import { golfService } from '../services/golfService';
-import { Player } from '../types';
+import { HandicapHistoryEntry, Player } from '../types';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
@@ -32,7 +32,7 @@ interface GamePointsProps {
 export function GamePoints({ onBack, groupId }: GamePointsProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [dailyRankings, setDailyRankings] = useState<DailyRanking[]>([]);
-  const [handicapHistory, setHandicapHistory] = useState<any[]>([]);
+  const [handicapHistory, setHandicapHistory] = useState<HandicapHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPlayers, setShowPlayers] = useState(false);
   const [showHandicapHistory, setShowHandicapHistory] = useState(false);

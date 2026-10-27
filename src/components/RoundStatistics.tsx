@@ -30,7 +30,6 @@ export const RoundStatistics: React.FC<RoundStatisticsProps> = ({
   players,
   scores,
   isCompleted,
-  numHoles,
   roundId,
 }) => {
   const [holes, setHoles] = useState<GolfHole[]>([]);

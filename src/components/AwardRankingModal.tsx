@@ -3,10 +3,10 @@ import { X } from 'lucide-react';
 
 interface RankingEntry {
   player_name: string;
-  player_id: string;
-  value: number;
+  player_id?: string | null;
+  value?: number;
   handicap: number | null;
-  rounds_played: number;
+  rounds_played?: number;
 }
 
 interface AwardRankingModalProps {

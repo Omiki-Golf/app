@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect, useRef } from 'react';
-import { GolfCourse, GolfHole, Group, GameMode } from '../types';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { GolfCourse, Group, GameMode } from '../types';
 import { golfService } from '../services/golfService';
 import { ChevronRight, Copy, Check, Info, Lock } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
@@ -12,9 +12,9 @@ import { safeStorage } from '../utils/safeStorage';
 import { MAX_EXPRESS_GAMES } from '../services/expressTierGuard';
 import { ParTeeUpgradeModal } from './ParTeeUpgradeModal';
 import { trackExpressGameCreated } from '../services/expressTierGuard';
-import { supabase } from '../services/supabaseClient';
 import { getUserId } from '../utils/userId';
 import { CourseCatalogPicker } from './CourseCatalogPicker';
+import { getErrorMessage } from '../utils/errorMessage';
 
 // Borrador de la última configuración elegida (campo y recorrido, hoyos, tramo y modalidad).
 // Se guarda en este dispositivo al cambiar cualquier opción, también si la partida no llega a crearse.
@@ -58,7 +58,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   onViewActiveRounds,
   onViewGamePoints,
   onViewStatistics,
-  onJoinWithCode,
   onLeaveGroup,
   onBack,
   currentGroup,
@@ -94,31 +93,16 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [pendingNumHoles, setPendingNumHoles] = useState<9 | 18 | null>(null);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pinError, setPinError] = useState('');
-  const [completedRounds, setCompletedRounds] = useState<any[]>([]);
+  const [completedRounds, setCompletedRounds] = useState<Array<{ id: string; created_at: string; status: string }>>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('stableford');
-  const [completedRoundsCount, setCompletedRoundsCount] = useState<number>(0);
 
   const [quickPlayRoundsCount, setQuickPlayRoundsCount] = useState<number | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const draftModeApplied = useRef(false);
   const currentDraftKey = draftKey(currentGroup?.id);
 
-  useEffect(() => {
-    loadCourses();
-    loadActiveRoundsCount();
-    loadCompletedRounds();
-    loadQuickPlayRoundsCount();
-  }, []);
-
-  useEffect(() => {
-    const refreshCount = () => { void loadQuickPlayRoundsCount(); };
-    const timer = window.setInterval(refreshCount, 30000);
-    window.addEventListener('focus', refreshCount);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshCount); };
-  }, [currentGroup]);
-
-  const loadQuickPlayRoundsCount = async () => {
+  const loadQuickPlayRoundsCount = useCallback(async () => {
     if (!currentGroup) {
       try {
         const count = await golfService.countQuickRounds();
@@ -127,7 +111,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         console.error('Error al contar partidas rápidas:', err);
       }
     }
-  };
+  }, [currentGroup]);
 
   useEffect(() => {
     const loadCourseDetails = async () => {
@@ -175,7 +159,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     safeStorage.setItem(currentDraftKey, JSON.stringify(draft));
   }, [draftReady, selectedCourse, numHoles, holesRange, gameMode, isExpress, currentDraftKey]);
 
-  const loadCourses = async () => {
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
       const data = await golfService.getCourses();
@@ -196,18 +180,18 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDraftKey, t]);
 
-  const loadActiveRoundsCount = async () => {
+  const loadActiveRoundsCount = useCallback(async () => {
     try {
       const activeRounds = await golfService.getActiveRounds();
       setActiveRoundsCount(activeRounds.length);
     } catch (err) {
       console.error('Error cargando contador de partidas:', err);
     }
-  };
+  }, []);
 
-  const loadCompletedRounds = async () => {
+  const loadCompletedRounds = useCallback(async () => {
     try {
       if (!currentGroup) {
         const availableRounds = await golfService.getAvailableRoundsForStats(4);
@@ -217,7 +201,21 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     } catch (err) {
       console.error('Error cargando partidas para estadísticas:', err);
     }
-  };
+  }, [currentGroup]);
+
+  useEffect(() => {
+    void loadCourses();
+    void loadActiveRoundsCount();
+    void loadCompletedRounds();
+    void loadQuickPlayRoundsCount();
+  }, [loadCourses, loadActiveRoundsCount, loadCompletedRounds, loadQuickPlayRoundsCount]);
+
+  useEffect(() => {
+    const refreshCount = () => { void loadQuickPlayRoundsCount(); };
+    const timer = window.setInterval(refreshCount, 30000);
+    window.addEventListener('focus', refreshCount);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshCount); };
+  }, [loadQuickPlayRoundsCount]);
 
   const handleCreateRound = async () => {
     if (isArchivedGroup) {
@@ -301,9 +299,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
       safeStorage.setItem('lastSelectedCourse', selectedCourse);
       onRoundCreated(round.id, round.course_id, round.num_holes, round.use_slope);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al crear la partida:', err);
-      setError(err.message || t('roundSetup.errors.create'));
+      setError(getErrorMessage(err, t('roundSetup.errors.create')));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);

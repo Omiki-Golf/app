@@ -35,7 +35,7 @@ class SafeStorage implements SupportedStorage {
       const result = window.localStorage.getItem(testKey);
       window.localStorage.removeItem(testKey);
       return result === 'test';
-    } catch (e) {
+    } catch {
       return false;
     }
   }
@@ -45,12 +45,12 @@ class SafeStorage implements SupportedStorage {
       if (this.isLocalStorageAvailable) {
         try {
           return window.localStorage.getItem(key);
-        } catch (e) {
+        } catch {
           this.isLocalStorageAvailable = false;
         }
       }
       return this.memoryStorage.get(key) || null;
-    } catch (error) {
+    } catch {
       return this.memoryStorage.get(key) || null;
     }
   }
@@ -60,12 +60,12 @@ class SafeStorage implements SupportedStorage {
       if (this.isLocalStorageAvailable) {
         try {
           window.localStorage.setItem(key, value);
-        } catch (e) {
+        } catch {
           this.isLocalStorageAvailable = false;
         }
       }
       this.memoryStorage.set(key, value);
-    } catch (error) {
+    } catch {
       this.memoryStorage.set(key, value);
     }
   }
@@ -75,12 +75,12 @@ class SafeStorage implements SupportedStorage {
       if (this.isLocalStorageAvailable) {
         try {
           window.localStorage.removeItem(key);
-        } catch (e) {
+        } catch {
           this.isLocalStorageAvailable = false;
         }
       }
       this.memoryStorage.delete(key);
-    } catch (error) {
+    } catch {
       this.memoryStorage.delete(key);
     }
   }
@@ -90,12 +90,12 @@ class SafeStorage implements SupportedStorage {
       if (this.isLocalStorageAvailable) {
         try {
           window.localStorage.clear();
-        } catch (e) {
+        } catch {
           this.isLocalStorageAvailable = false;
         }
       }
       this.memoryStorage.clear();
-    } catch (error) {
+    } catch {
       this.memoryStorage.clear();
     }
   }

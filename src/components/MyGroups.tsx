@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
@@ -10,6 +10,8 @@ import { PremiumModal } from './PremiumModal';
 import { GroupMemberList } from './GroupMemberList';
 import { useSubscription } from '../hooks/useSubscription';
 import { useTranslation } from 'react-i18next';
+import type { User } from '@supabase/supabase-js';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface MyGroupsProps {
   onBack: () => void;
@@ -52,24 +54,16 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [groupToArchive, setGroupToArchive] = useState<string | null>(null);
   const [openMembers, setOpenMembers] = useState<string | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // ─── PREMIUM ───
   const [showPremium, setShowPremium] = useState(false);
   const { isPremium, loading: subLoading } = useSubscription(user?.id ?? null);
 
-  useEffect(() => {
-    loadGroups();
-
-    // Obtener usuario logueado para el modal Premium
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
-  }, []);
-
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
 
       if (!user) {
         setError(t('groups.noSession'));
@@ -104,12 +98,16 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       }
 
       setGroups(sortGroups([...ownedGroups, ...joinedGroups]));
-    } catch (err: any) {
-      setError(err.message || t('groups.loadError'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('groups.loadError')));
     } finally {
       setLoading(false);
     }
-  };
+  }, [t]);
+
+  useEffect(() => {
+    void loadGroups();
+  }, [loadGroups]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -130,8 +128,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       setOpenMembers(current => current === groupToArchive ? null : current);
       onGroupArchived?.(groupToArchive, data);
       setGroupToArchive(null);
-    } catch (err: any) {
-      setError(err.message || 'No se pudo archivar el grupo');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'No se pudo archivar el grupo'));
       setGroupToArchive(null);
     }
   };
@@ -147,8 +145,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       setGroups(groups.filter(g => g.id !== groupToDelete));
       onGroupDeleted?.(groupToDelete);
       setGroupToDelete(null);
-    } catch (err: any) {
-      setError(err.message || t('groups.deleteError'));
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, t('groups.deleteError')));
       setGroupToDelete(null);
     }
   };

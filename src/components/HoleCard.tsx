@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ScoreChangeInput } from '../types';
 import { GolfHole, RoundPlayer, RoundScore, GameMode } from '../types';
 import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput } from '../utils/calculations';
 import { ChevronDown, Minus } from 'lucide-react';
@@ -18,7 +19,7 @@ interface HoleCardProps {
   hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   teamAssignments?: Record<string, 0 | 1>;
-  onScoreChange: (playerId: string, score: any) => void;
+  onScoreChange: (playerId: string, score: ScoreChangeInput | null) => void;
 }
 
 const markerColors = [
