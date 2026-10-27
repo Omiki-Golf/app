@@ -8,7 +8,7 @@ const roster = await readFile(new URL('../src/components/GroupMemberList.tsx', i
 
 test('only the round creator receives UI write access', () => {
   assert.doesNotMatch(app, /isCreator \|\| storedCode === roundData\.round\.access_code/);
-  assert.match(app, /const hasEditAccess = isCreator && roundData\.round\.status === 'active'/);
+  assert.match(app, /const hasEditAccess = canEditRoundScores\(isCreator, roundData\.round\.status\)/);
   assert.match(app, /if \(!roundState\.round \|\| !roundState\.hasEditAccess \|\| readOnly\)/);
   assert.match(scorecard, /readonly=\{!hasEditAccess\}/);
 });

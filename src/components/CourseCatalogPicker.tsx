@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Route, Search, SlidersHorizontal, X } from 'lucide-react';
 import { SelectMenu } from './SelectMenu';
 import type { GolfCourse } from '../types';
-import catalogUrl from '../data/recorridos-golf-espana.json?url';
+import catalogUrl from '../data/generated/course-search.json?url';
 
-interface CatalogRoute { recorrido: string; variante?: number; hoyos: unknown[] }
+interface CatalogRoute { recorrido: string; variante?: number }
 interface CatalogClub { codigo: string; campo: string; comunidad_autonoma: string; provincia: string; recorridos: CatalogRoute[] }
 interface Catalog { campos: CatalogClub[] }
 interface Result { key: string; label: string; club: CatalogClub; route: CatalogRoute; routeIndex: number }
@@ -45,13 +45,15 @@ export function CourseCatalogPicker({ courses, selectedCourseId, onSelect, onUna
     key: `${club.codigo}:${index}`,
     label: `${club.campo} — ${route.recorrido}${route.variante ? ` (variante ${route.variante})` : ''}`,
     club, route, routeIndex: index,
+    searchText: normalize(`${club.campo} — ${route.recorrido}${route.variante ? ` (variante ${route.variante})` : ''} ${club.provincia} ${club.comunidad_autonoma}`),
   }))) ?? [], [catalog]);
-  const normalizedQuery = normalize(query.trim());
-  const results = normalizedQuery.length >= 2 ? allResults.filter(result => normalize(`${result.label} ${result.club.provincia} ${result.club.comunidad_autonoma}`).includes(normalizedQuery)).slice(0, 12) : [];
-  const legacyResults = normalizedQuery.length >= 2 ? courses.filter(course => !course.catalog_key && normalize(course.name).includes(normalizedQuery)).slice(0, 5) : [];
-  const regions = [...new Set((catalog?.campos ?? []).map(club => club.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es'));
-  const provinces = [...new Set((catalog?.campos ?? []).filter(club => !region || club.comunidad_autonoma === region).map(club => club.provincia))].sort((a, b) => a.localeCompare(b, 'es'));
-  const clubs = (catalog?.campos ?? []).filter(club => (!region || club.comunidad_autonoma === region) && (!province || club.provincia === province));
+  const legacyIndex = useMemo(() => courses.filter(course => !course.catalog_key).map(course => ({ course, searchText: normalize(course.name) })), [courses]);
+  const normalizedQuery = useMemo(() => normalize(query.trim()), [query]);
+  const results = useMemo(() => normalizedQuery.length >= 2 ? allResults.filter(result => result.searchText.includes(normalizedQuery)).slice(0, 12) : [], [allResults, normalizedQuery]);
+  const legacyResults = useMemo(() => normalizedQuery.length >= 2 ? legacyIndex.filter(item => item.searchText.includes(normalizedQuery)).slice(0, 5).map(item => item.course) : [], [legacyIndex, normalizedQuery]);
+  const regions = useMemo(() => [...new Set((catalog?.campos ?? []).map(club => club.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es')), [catalog]);
+  const provinces = useMemo(() => [...new Set((catalog?.campos ?? []).filter(club => !region || club.comunidad_autonoma === region).map(club => club.provincia))].sort((a, b) => a.localeCompare(b, 'es')), [catalog, region]);
+  const clubs = useMemo(() => (catalog?.campos ?? []).filter(club => (!region || club.comunidad_autonoma === region) && (!province || club.provincia === province)), [catalog, region, province]);
   const club = clubs.find(item => item.codigo === clubCode);
 
   const choose = (result: Result) => {

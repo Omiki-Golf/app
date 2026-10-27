@@ -291,7 +291,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         useSlope,
         numHoles === 9 ? holesRange : undefined,
         undefined,
-        gameMode
+        gameMode,
+        currentGroup?.id ?? null
       );
 
       if (isExpress && !currentGroup) {

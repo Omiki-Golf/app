@@ -1,14 +1,15 @@
 import { supabase } from './services/supabaseClient';
 import { useNotificationCount } from './hooks/useNotificationCount';
 import { useReadOnly } from './context/ReadOnlyContext';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType } from './types';
 import { golfService } from './services/golfService';
 import { calculateModePoints, ModeScoreInput } from './utils/calculations';
 import { accessCodeStorage } from './utils/accessCode';
 import { storageUtils } from './utils/storage';
-import { getUserId } from './utils/userId';
+import { getUserId, getDeviceUserId, isVerifiedLocalRoundCreator } from './utils/userId';
+import { canEditRoundScores } from './utils/roundEditing';
 import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthContext
 import { RoundSetup } from './components/RoundSetup';
 import { PlayerSetup } from './components/PlayerSetup';
@@ -17,8 +18,6 @@ import { Leaderboard } from './components/Leaderboard';
 import { ActiveRoundsViewer } from './components/ActiveRoundsViewer';
 import { HoleConfiguration } from './components/HoleConfiguration';
 import { GamePoints } from './components/GamePoints';
-import { Statistics } from './components/Statistics';
-import { QuickPlayStatistics } from './components/QuickPlayStatistics';
 import { AccessCodeModal } from './components/AccessCodeModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import GroupSetup from './components/GroupSetup';
@@ -27,7 +26,6 @@ import MyGroups from './components/MyGroups';
 import { PremiumModal } from './components/PremiumModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
-import { CareerStatistics } from './components/CareerStatistics';
 import { PlayerCheckout } from './components/PlayerCheckout';
 import { playerIntent, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -43,6 +41,10 @@ import { useSubscription } from './hooks/useSubscription';
 import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
+
+const Statistics = lazy(() => import('./components/Statistics').then(module => ({ default: module.Statistics })));
+const QuickPlayStatistics = lazy(() => import('./components/QuickPlayStatistics').then(module => ({ default: module.QuickPlayStatistics })));
+const CareerStatistics = lazy(() => import('./components/CareerStatistics').then(module => ({ default: module.CareerStatistics })));
 
 type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics';
 
@@ -418,13 +420,10 @@ function App() {
           setLoading(true);
           const roundData = await golfService.getRoundWithDetails(activeRoundId);
           if (roundData) {
-            const { getUserId } = await import('./utils/userId');
-            const currentUserId = getUserId();
+            const isCreator = isVerifiedLocalRoundCreator(roundData.round.user_id);
+            const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status);
 
-            const isCreator = currentUserId === roundData.round.user_id;
-            const hasEditAccess = isCreator && roundData.round.status === 'active';
-
-            if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator) {
+            if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator && roundData.round.user_id !== getDeviceUserId()) {
               accessCodeStorage.removeAccessCode(activeRoundId);
               storageUtils.clearActiveRound();
               setCurrentView('setup');
@@ -514,9 +513,9 @@ function App() {
         }
         if (!live) return;
         if (isGroupRound) {
-          // En grupos los permisos de edición se calculan aparte; aquí solo se sigue el estado.
+          // El creador puede corregir resultados finalizados hasta archivar la partida.
           setRoundState(prev => prev.round?.id === roundId
-            ? { ...prev, round: data, hasEditAccess: data.status === 'active' && prev.hasEditAccess }
+            ? { ...prev, round: data, hasEditAccess: canEditRoundScores(prev.isCreator, data.status) }
             : prev);
           return;
         }
@@ -534,7 +533,7 @@ function App() {
           setCurrentView('setup');
           return;
         }
-        const edit = data.status === 'active' && data.user_id === getUserId();
+        const edit = canEditRoundScores(isVerifiedLocalRoundCreator(data.user_id), data.status);
         setRoundState(prev => prev.round?.id === roundId ? {...prev, round: data, hasEditAccess: edit} : prev);
       } catch { /* Keep the existing view on a transient network failure. */ }
     };
@@ -652,12 +651,9 @@ function App() {
       setLoading(true);
       const roundData = await golfService.getRoundWithDetails(roundId);
       if (roundData) {
-        const { getUserId } = await import('./utils/userId');
-        const currentUserId = getUserId();
-
-        const isCreator = currentUserId === roundData.round.user_id;
+        const isCreator = isVerifiedLocalRoundCreator(roundData.round.user_id);
         const storedCode = accessCodeStorage.getAccessCode(roundId);
-        const hasEditAccess = isCreator && roundData.round.status === 'active';
+        const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status);
 
         if (!roundData.round.group_id && !isCreator && storedCode === roundData.round.access_code) {
           await golfService.registerExpressRoundAccess(roundId, storedCode);
@@ -711,6 +707,8 @@ function App() {
       console.log('No hay round activo');
       return;
     }
+    const editingRoundId = roundState.round.id;
+    setError('');
 
     try {
       if (score === null) {
@@ -730,20 +728,6 @@ function App() {
       const spanishHands = score.spanish_hands ?? false;
       const abandoned = score.abandoned ?? false;
       const modePoints = score.mode_points ?? 0;
-
-      await golfService.recordScore(
-        roundState.round.id,
-        playerId,
-        holeNumber,
-        grossStrokes,
-        strokesReceived,
-        netStrokes,
-        stablefordPoints,
-        noPasoRojas,
-        spanishHands,
-        abandoned,
-        modePoints
-      );
 
       const gameMode = (roundState.round.game_mode || 'stableford') as GameMode;
       const isModeScoring = gameMode !== 'stableford';
@@ -777,19 +761,6 @@ function App() {
         for (const existing of otherScores) {
           const newModePoints = calculateModePoints(gameMode, existing.player_id, allInputs, teamAssignments);
           if (newModePoints !== existing.mode_points) {
-            await golfService.recordScore(
-              roundState.round.id,
-              existing.player_id,
-              holeNumber,
-              existing.gross_strokes,
-              existing.strokes_received,
-              existing.net_strokes,
-              existing.stableford_points,
-              existing.no_paso_rojas,
-              existing.spanish_hands ?? false,
-              existing.abandoned,
-              newModePoints
-            );
             updatedOtherScores.push({
               ...existing,
               mode_points: newModePoints,
@@ -799,6 +770,13 @@ function App() {
         }
       }
 
+      const savedScores = await golfService.recordHoleScores(editingRoundId, holeNumber, [
+        { round_id: editingRoundId, player_id: playerId, hole_number: holeNumber,
+          gross_strokes: grossStrokes, strokes_received: strokesReceived, net_strokes: netStrokes,
+          stableford_points: stablefordPoints, no_paso_rojas: noPasoRojas,
+          spanish_hands: spanishHands, abandoned, mode_points: modePoints },
+        ...updatedOtherScores,
+      ]);
       let decidedResult = roundState.round.decided_result || null;
       if (isModeScoring && !decidedResult) {
         try {
@@ -808,34 +786,29 @@ function App() {
         }
       }
 
-      setRoundState((prev) => ({
+      setRoundState((prev) => prev.round?.id !== editingRoundId ? prev : ({
         ...prev,
         round: prev.round && decidedResult
           ? { ...prev.round, decided_result: decidedResult, decided_at: prev.round.decided_at || new Date().toISOString() }
           : prev.round,
         scores: [
-          ...prev.scores.filter((s) => !(s.hole_number === holeNumber && s.player_id === playerId)),
-          ...updatedOtherScores,
-          {
-            id: `score_${Date.now()}`,
-            round_id: roundState.round!.id,
-            player_id: playerId,
-            hole_number: holeNumber,
-            gross_strokes: grossStrokes,
-            strokes_received: strokesReceived,
-            net_strokes: netStrokes,
-            stableford_points: stablefordPoints,
-            no_paso_rojas: noPasoRojas,
-            spanish_hands: spanishHands,
-            abandoned: abandoned,
-            mode_points: modePoints,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
+          ...prev.scores.filter(s => !savedScores.some(saved => saved.player_id === s.player_id && saved.hole_number === s.hole_number)),
+          ...savedScores,
         ],
       }));
     } catch (err) {
-      console.error('Error recording score:', err);
+      const denied = !!err && typeof err === 'object' && 'code' in err && err.code === '42501';
+      setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se ha guardado el golpe. Comprueba la conexión e inténtalo de nuevo.');
+      if (denied) {
+        const roundId = editingRoundId;
+        setRoundState(prev => prev.round?.id === roundId ? { ...prev, hasEditAccess: false } : prev);
+        if (roundId) {
+          try {
+            const fresh = await golfService.getRoundWithDetails(roundId);
+            if (fresh) setRoundState(prev => prev.round?.id === roundId ? { ...prev, round: fresh.round, scores: fresh.scores, hasEditAccess: false } : prev);
+          } catch { /* Keep the explicit denial and existing card on a network failure. */ }
+        }
+      }
     }
   };
 
@@ -1030,6 +1003,7 @@ function App() {
     || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
+    {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
     {showExitHint && (
       <div role="status" className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg">
         Pulsa atrás otra vez para salir
@@ -1186,12 +1160,12 @@ function App() {
       <>
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
-          <CareerStatistics
+          <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><CareerStatistics
             account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
             showMoments={activePlanType !== 'player'}
             onBack={() => setCurrentView('profile')}
             messagesButton={inlineMessagesButton}
-          />
+          /></Suspense>
         </div>
       </>
     );
@@ -1538,15 +1512,15 @@ function App() {
       )}
 
       {currentView === 'statistics' && currentGroup && (
-        <Statistics backDestination={returnToProfile ? 'back' : 'home'}
+        <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><Statistics backDestination={returnToProfile ? 'back' : 'home'}
           onBack={() => backFromProfileSection('main')}
           currentGroup={currentGroup}
           messagesButton={inlineMessagesButton}
-        />
+        /></Suspense>
       )}
 
       {currentView === 'quickplay-statistics' && !currentGroup && (
-        <QuickPlayStatistics
+        <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><QuickPlayStatistics
           roundId={roundState.round?.id}
           sharedRoundData={sharedExpressStats}
           onBack={() => {
@@ -1554,7 +1528,7 @@ function App() {
             backFromProfileSection('setup');
           }}
           messagesButton={sharedExpressStats ? undefined : inlineMessagesButton}
-        />
+        /></Suspense>
       )}
 
 

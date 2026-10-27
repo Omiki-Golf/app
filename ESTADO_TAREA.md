@@ -1,5 +1,19 @@
 # Estado para continuar — 30/09/2026
 
+## Permisos de puntuación — preparación local, 27/10/2026
+
+- Código y migración `20261028100000_verified_round_owners.sql` preparados; no aplicada ni publicado el código. Detalles y secuencia de publicación en `SCORE_PERMISSIONS_REVIEW.md`.
+- Identificación privada Express nueva, validación de propietario y estado en servidor, límite de cuatro protegido ante concurrencia y traslado verificado a cuenta. El usuario permite limpiar las Express antiguas de prueba; no se ha eliminado ninguna en esta tarea.
+- La consulta de historial remoto devuelve 79 versiones y solo esta migración pendiente. No habilitar Realtime ni publicar frontend sin coordinar la migración. Las pruebas de escritura se han hecho en bases aisladas.
+
+## Caché de producción — 27/10/2026
+
+- Aplicada únicamente la regla de caché para `/assets/*-v<versión>-<hash>.js|css|json` en el Nginx del contenedor activo `lapartideta-app`. El cambio está preparado también en `scripts/vps/nginx.conf` para la siguiente publicación normal; aún sin commit. No se publicó el código pendiente ni se aplicaron migraciones.
+- Copia previa en el VPS: `/root/lapartideta-cache-before-y8rru4pv/default.conf`. Configuración nueva SHA-256: `f477a717b94c18b993abb79227ccce1fccddcfa1e158079227f674d6172d4111`.
+- Validación previa en contenedor temporal y posterior por HTTPS en ambos dominios: assets versionados con `public, max-age=31536000, immutable`; raíz, HTML y manifiesto revalidan; 404 de assets versionados sin caché larga; gzip conservado; HTML sin cambios. Recarga de Nginx, sin reinicio del contenedor.
+- El ajuste activo reside en el contenedor, no en su imagen anterior. Una recreación con esa imagen anterior lo perdería; conservar el cambio local en la siguiente publicación mediante el flujo npm habitual. No recrear el contenedor solo para persistir esta mejora.
+- Sigue pendiente la revisión independiente de permisos de puntuaciones descrita en `SCORE_PERMISSIONS_REVIEW.md`, antes de publicar los cambios de aplicación preparados en este chat.
+
 ## Sincronización comprobada (30/09/2026, tarde)
 
 - La integración ya está en `main` y subida: `origin/main` = `ceb08de`. Trabajar en `main`; la rama `integrate/local-github-20260930` ya no es necesaria.

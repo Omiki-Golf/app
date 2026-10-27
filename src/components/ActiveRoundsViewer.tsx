@@ -2,7 +2,8 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
 import { TopBar } from './TopBar';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { shouldRefreshRoundList } from '../utils/roundListEvents';
 import { GolfRound, RoundPlayer, RoundScore, Group } from '../types';
 import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
@@ -46,6 +47,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   messagesButton,
 }) => {
   const [rounds, setRounds] = useState<RoundStats[]>([]);
+  const listSnapshot = useRef({ loaded: false, ids: new Set<string>() });
+  const listGroupId = useRef(currentGroup?.id ?? null);
+  listGroupId.current = currentGroup?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRound, setSelectedRound] = useState<string | null>(null);
@@ -70,10 +74,16 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [updatingHandicaps, setUpdatingHandicaps] = useState(false);
 
   useEffect(() => {
+    listSnapshot.current = { loaded: false, ids: new Set<string>() };
     loadActiveRounds();
 
     const subscription = golfService.subscribeToRounds((payload: any) => {
-      loadActiveRounds();
+      const snapshot = listSnapshot.current;
+      // If the screen changes context, retain reloads rather than filter with a stale closure.
+      const sameContext = listGroupId.current === (currentGroup?.id ?? null);
+      if (shouldRefreshRoundList(payload, listGroupId.current, snapshot.ids, snapshot.loaded && sameContext)) {
+        loadActiveRounds();
+      }
     });
 
     return () => {
@@ -96,6 +106,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       );
 
       setRounds(roundsWithDetails);
+      listSnapshot.current = { loaded: true, ids: new Set(roundsWithDetails.map(item => item.round.id)) };
     } catch (err) {
       setError('Error cargando partidas activas');
       console.error(err);

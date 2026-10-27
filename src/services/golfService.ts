@@ -15,10 +15,11 @@ import { calculatePlayingHandicap, calculateScore } from '../utils/calculations'
 import { getUserId } from '../utils/userId';
 import { storageUtils } from '../utils/storage';
 import { generateAccessCode } from '../utils/accessCode';
+import { ensureExpressIdentity } from './expressIdentity';
 
 const getRoundOwnerId = async (): Promise<string> => {
   const { data: { session } } = await supabase.auth.getSession();
-  return session?.user.id ?? getUserId();
+  return session?.user.id ?? await ensureExpressIdentity();
 };
 
 export const golfService = {
@@ -401,11 +402,10 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     useSlope: boolean = true,
     holesRange?: '1-9' | '10-18',
     teeId?: string,
-    gameMode: GameMode = 'stableford'
+    gameMode: GameMode = 'stableford',
+    groupId: string | null = null
   ): Promise<GolfRound> {
     const userId = await getRoundOwnerId();
-    const groupId = storageUtils.getCurrentGroupId();
-
     // Generate a unique access code
     let accessCode = generateAccessCode();
     let isUnique = false;
@@ -691,23 +691,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       p_round: roundId,
       p_actor: getUserId(),
     });
-    if (!error) return;
-
-    const functionIsPending = error.code === 'PGRST202'
-      || error.message?.toLowerCase().includes('finish_round')
-        && error.message?.toLowerCase().includes('schema cache');
-    if (!functionIsPending) throw error;
-
-    // Compatibility while the creator-only migration is pending on the shared
-    // database. The UI still exposes finalization exclusively to the creator.
-    const { data: round, error: roundError } = await supabase
-      .from('golf_rounds')
-      .select('group_id')
-      .eq('id', roundId)
-      .single();
-    if (roundError) throw roundError;
-    if (round?.group_id) await this.updateRoundStatus(roundId, 'completed');
-    else await this.finishExpressRound(roundId);
+    if (error) throw error;
   },
 
   async recordRoundDecision(roundId: string): Promise<import('../types').DecidedResult | null> {
@@ -1083,6 +1067,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   },
 
   async registerExpressRoundAccess(roundId: string, accessCode: string): Promise<void> {
+    await getRoundOwnerId(); // A spectator gets an identity, never the creator's credential.
     const { error } = await supabase.rpc('register_express_round_access', {
       p_round: roundId,
       p_access_code: accessCode.toUpperCase(),
@@ -1392,34 +1377,23 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     abandoned: boolean = false,
     modePoints: number = 0
   ): Promise<RoundScore> {
-    const { data, error } = await supabase
-      .from('round_scores')
-      .upsert(
-        [
-          {
-            round_id: roundId,
-            player_id: playerId,
-            hole_number: holeNumber,
-            gross_strokes: grossStrokes,
-            strokes_received: strokesReceived,
-            net_strokes: netStrokes,
-            stableford_points: stablefordPoints,
-            no_paso_rojas: noPasoRojas,
-            spanish_hands: spanishHands,
-            abandoned: abandoned,
-            mode_points: modePoints,
-            updated_at: new Date().toISOString(),
-          },
-        ],
-        {
-          onConflict: 'round_id,player_id,hole_number',
-        }
-      )
-      .select()
-      .single();
-
+    const { data, error } = await supabase.rpc('write_verified_round_score', {
+      p_score: {
+        round_id: roundId, player_id: playerId, hole_number: holeNumber,
+        gross_strokes: grossStrokes, strokes_received: strokesReceived,
+        net_strokes: netStrokes, stableford_points: stablefordPoints,
+        no_paso_rojas: noPasoRojas, spanish_hands: spanishHands,
+        abandoned, mode_points: modePoints,
+      },
+    }).single<RoundScore>();
     if (error) throw error;
     return data;
+  },
+
+  async recordHoleScores(roundId: string, holeNumber: number, scores: Array<Partial<RoundScore>>): Promise<RoundScore[]> {
+    const { data, error } = await supabase.rpc('write_verified_hole_scores', { p_round: roundId, p_hole: holeNumber, p_scores: scores });
+    if (error) throw error;
+    return data || [];
   },
 
   async getRoundScores(roundId: string): Promise<RoundScore[]> {
@@ -1438,13 +1412,9 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     playerId: string,
     holeNumber: number
   ): Promise<void> {
-    const { error } = await supabase
-      .from('round_scores')
-      .delete()
-      .eq('round_id', roundId)
-      .eq('player_id', playerId)
-      .eq('hole_number', holeNumber);
-
+    const { error } = await supabase.rpc('delete_verified_round_score', {
+      p_round: roundId, p_player: playerId, p_hole: holeNumber,
+    });
     if (error) throw error;
   },
 

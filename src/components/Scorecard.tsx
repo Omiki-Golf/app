@@ -313,7 +313,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               <div className="flex items-center gap-2">
                 <Lock className="text-amber-700" size={20} />
                 <span className="text-sm font-medium text-amber-900">
-                  Solo lectura - No tienes permiso para editar esta partida
+                  {isRoundFinished ? 'Esta partida está finalizada. Puedes consultar los resultados, pero no modificarlos.' : 'Solo lectura - No tienes permiso para editar esta partida'}
                 </span>
               </div>
             </div>
@@ -380,10 +380,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 type="button"
                 disabled
                 title={isRoundFinished ? 'El creador ha finalizado la partida' : 'Solo el creador puede finalizar la partida'}
-                className="flex-1 bg-neutral text-ink-3 font-semibold py-3 rounded-lg flex items-center justify-center gap-2 cursor-not-allowed"
+                className="flex-1 min-w-0 bg-neutral text-ink-3 text-sm sm:text-base font-semibold px-3 py-3 rounded-lg flex items-center justify-center gap-2 text-center cursor-not-allowed"
               >
-                {isRoundFinished ? <Lock size={20} /> : <Trophy size={20} />}
-                {isRoundFinished ? 'Finalizada' : 'Pendiente de finalizar'}
+                {isRoundFinished && <Lock size={20} className="shrink-0" />}
+                <span>{isRoundFinished ? 'Finalizada' : 'Pendiente de finalizar'}</span>
               </button>
             ) : (
               <button

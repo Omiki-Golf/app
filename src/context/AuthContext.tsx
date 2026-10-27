@@ -3,7 +3,8 @@ import { effectivePlan } from '../utils/effectivePlan';
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { clearStoredAuthSession, supabase } from '../services/supabaseClient';
-import { getDeviceUserId, setAuthenticatedUserId } from '../utils/userId';
+import { setAuthenticatedUserId } from '../utils/userId';
+import { readExpressCredential } from '../utils/expressCredential';
 
 export interface UserSubscription {
   planType: string;
@@ -33,9 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const claimedForUser = useRef<string | null>(null);
   // Las partidas Express creadas en este dispositivo pasan a la cuenta al iniciar sesión.
   const claimDeviceRoundsOnce = async (userId: string) => {
-    const deviceId = getDeviceUserId();
-    if (!deviceId || claimedForUser.current === userId) return;
-    claimedForUser.current = userId;
+    const deviceId = readExpressCredential()?.ownerId;
+    const claimKey = `${userId}:${deviceId}`;
+    if (!deviceId || claimedForUser.current === claimKey) return;
+    claimedForUser.current = claimKey;
     try {
       const { userService } = await import('../services/userService');
       await userService.claimDeviceRounds(deviceId);

@@ -1,4 +1,5 @@
 import { safeStorage } from './safeStorage';
+import { readExpressCredential } from './expressCredential';
 
 const ANONYMOUS_USER_KEY = 'la_partideta_device_user_id';
 const AUTHENTICATED_USER_KEY = 'omiki_authenticated_user_id';
@@ -21,6 +22,9 @@ export const getDeviceUserId = (): string | null => {
   return deviceId && deviceId.startsWith('anon_') ? deviceId : null;
 };
 
+export const isVerifiedLocalRoundCreator = (ownerId: string): boolean =>
+  ownerId === getUserId() && (!ownerId.startsWith('anon_') || readExpressCredential()?.ownerId === ownerId);
+
 export const getUserId = (): string => {
   if (authenticatedUserId) return authenticatedUserId;
   try {
@@ -31,6 +35,8 @@ export const getUserId = (): string => {
   }
 
   // 1. Intentar obtener un ID previo guardado en el navegador
+  const ownerId = readExpressCredential()?.ownerId;
+  if (ownerId) return ownerId;
   let userId = safeStorage.getItem(ANONYMOUS_USER_KEY);
 
   // 2. Si no existe (primera vez que entra), creamos uno y lo guardamos

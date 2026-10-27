@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { persistentAuthStorage, authStorageKey, clearPersistentAuthSession } from './tabAuthStorage';
+import { expressCredentialFetch } from '../utils/expressCredential';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -16,6 +17,7 @@ let supabaseClient;
 
 try {
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    global: { fetch: expressCredentialFetch(supabaseUrl) },
     auth: {
       storage: persistentAuthStorage,
       autoRefreshToken: true,
@@ -27,6 +29,7 @@ try {
 } catch (error) {
   console.error('Error creating Supabase client:', error);
   supabaseClient = createClient(supabaseUrl, supabaseKey, {
+    global: { fetch: expressCredentialFetch(supabaseUrl) },
     auth: {
       storage: persistentAuthStorage,
       autoRefreshToken: false,

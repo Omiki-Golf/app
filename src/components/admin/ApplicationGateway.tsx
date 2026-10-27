@@ -1,5 +1,5 @@
 import { ReadOnlyProvider } from '../../context/ReadOnlyContext';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import App from '../../App';
 import Auth from '../Auth';
 import { useAuth } from '../../context/AuthContext';
@@ -7,7 +7,7 @@ import { supabase } from '../../services/supabaseClient';
 import { adminService, type AdminAccount } from '../../services/adminService';
 import { NavigationButton } from '../NavigationButton';
 import { AdminPasswordSetup } from './AdminPasswordSetup';
-import { AdminPortal } from './AdminPortal';
+const AdminPortal = lazy(() => import('./AdminPortal').then(module => ({ default: module.AdminPortal })));
 
 const initialUrl = new URL(window.location.href);
 const initialRecovery = initialUrl.searchParams.has('admin-action') || initialUrl.searchParams.get('auth-action') === 'recovery' || initialUrl.hash.includes('type=recovery');
@@ -76,7 +76,7 @@ export function ApplicationGateway() {
   );
   if (access?.account) {
     if (recovery || access.account.status === 'invited') return <AdminPasswordSetup account={access.account} onCancel={access.account.status === 'active' ? clearRecovery : undefined} onLogout={signOut} onDone={async () => { clearRecovery(); await refresh(); }} />;
-    return <AdminPortal account={access.account} onLogout={signOut} onAccessChanged={refresh} onChangePassword={() => setRecovery(true)} />;
+    return <Suspense fallback={<div className="min-h-screen bg-app text-ink grid place-items-center" role="status">Cargando administración…</div>}><AdminPortal account={access.account} onLogout={signOut} onAccessChanged={refresh} onChangePassword={() => setRecovery(true)} /></Suspense>;
   }
   if (recovery) return <Auth recoveryRequested onRecoveryComplete={clearRecovery} onAuthSuccess={clearRecovery} onBack={clearRecovery} backDestination="home" />;
   return <ReadOnlyProvider><App /></ReadOnlyProvider>;

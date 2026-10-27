@@ -33,11 +33,9 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
     }
 
     try {
-      await userService.ensureProfileFromMetadata(user.id, user.user_metadata || {});
-      const [p, plan] = await Promise.all([
-        userService.getProfile(user.id),
-        userService.getPlanType(user.id),
-      ]);
+      // ensureProfileFromMetadata already returns the existing or newly created profile.
+      const p = await userService.ensureProfileFromMetadata(user.id, user.user_metadata || {});
+      const plan = await userService.getPlanType(user.id);
       if (version !== refreshVersion.current) return;
       setProfile(p);
       setPlanType(plan);

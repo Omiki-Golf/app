@@ -25,3 +25,4 @@ dist-ssr
 # Estado local generado al vincular Supabase CLI
 supabase/.temp/
 .local/
+src/data/generated/

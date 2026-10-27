@@ -3,6 +3,7 @@ import { getReadOnly } from './userRestriction';
 import { supabase } from './supabaseClient';
 import { UserProfile, GroupMember, GroupInvitation, QuickRoundInvitation, PlanType } from '../types';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
+import { clearExpressCredential, readExpressCredential } from '../utils/expressCredential';
 
 export const userService = {
   async getProfile(userId: string): Promise<UserProfile | null> {
@@ -115,8 +116,11 @@ export const userService = {
 
   /** Pasa a la cuenta las partidas rápidas creadas en este dispositivo como Express. */
   async claimDeviceRounds(deviceId: string): Promise<number> {
-    const { data, error } = await supabase.rpc('claim_device_rounds', { p_device_id: deviceId });
-    if (error) throw error;
+    const credential = readExpressCredential();
+    if (!credential || credential.ownerId !== deviceId) throw new Error('Las partidas Express antiguas requieren recuperación revisada.');
+    const { data, error } = await supabase.rpc('claim_verified_express_rounds', { p_secret: credential.secret });
+    if (error) throw new Error('No se han podido recuperar las partidas Express. Inténtalo de nuevo al iniciar sesión.');
+    clearExpressCredential();
     return typeof data === 'number' ? data : 0;
   },
 
