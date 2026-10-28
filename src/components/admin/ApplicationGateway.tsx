@@ -1,3 +1,4 @@
+import { OmikiLoadingScreen } from '../OmikiSpinner';
 import { ReadOnlyProvider } from '../../context/ReadOnlyContext';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import App from '../../App';
@@ -60,7 +61,7 @@ export function ApplicationGateway() {
     window.history.replaceState(null, '', url.pathname + url.search + url.hash);
   };
   const signOut = async () => { await logout(); clearRecovery(); };
-  if (loading || (user && access?.id !== user.id)) return <div className="min-h-screen bg-app text-ink grid place-items-center" role="status">Comprobando acceso…</div>;
+  if (loading || (user && access?.id !== user.id)) return <OmikiLoadingScreen />;
   if (!user && recovery) return <>
     <p role="status" className="bg-card text-ink p-4 text-center">El enlace no ha iniciado una sesión. Solicita otro desde «¿Olvidaste tu contraseña?» usando tu correo o alias.</p>
     <Auth onAuthSuccess={() => {}} onBack={clearRecovery} backDestination="home" />
@@ -68,7 +69,7 @@ export function ApplicationGateway() {
   if (!user) return <ReadOnlyProvider><App /></ReadOnlyProvider>;
   if (access?.error || access?.account?.status === 'disabled') return (
     <main className="min-h-screen bg-app text-ink flex flex-col items-center justify-center gap-5 p-6">
-      <h1 className="text-xl font-bold">Acceso administrativo no disponible</h1>
+      <h1 className="text-xl font-bold">{access.error ? 'No se ha podido comprobar el acceso' : 'Acceso administrativo no disponible'}</h1>
       <p role="alert">{access.error || 'Esta cuenta administradora está desactivada.'}</p>
       <button onClick={() => void refresh()} className="bg-card border border-line rounded-xl px-4 py-2">Reintentar</button>
       <NavigationButton destination="logout" onClick={() => void signOut()} />

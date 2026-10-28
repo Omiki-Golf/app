@@ -101,7 +101,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={onShowProfile}
                 title={t('common.profile')}
                 aria-label={t('common.openProfile')}
-                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${avatarPlanClasses[planType]}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${profile ? avatarPlanClasses[planType] : 'border-line bg-card-2'}`}
               >
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />

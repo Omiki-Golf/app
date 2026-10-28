@@ -4,6 +4,7 @@ import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import { golfService } from '../services/golfService';
 import { computeCareerStats, type CareerAccount, type CareerStats } from '../utils/careerStats';
+import { scoreResultBar, scoreResultLabel } from '../utils/scoreColors';
 import type { GameMode } from '../types';
 
 interface CareerStatisticsProps {
@@ -51,11 +52,12 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, sho
   }, [userId, nick, displayName]);
 
   const distribution = stats ? [
-    { label: 'Eagle o mejor', value: stats.distribution.eagleOrBetter, color: 'bg-yellow-500' },
-    { label: 'Birdie', value: stats.distribution.birdie, color: 'bg-red-500' },
-    { label: 'Par', value: stats.distribution.par, color: 'bg-emerald-500' },
-    { label: 'Bogey', value: stats.distribution.bogey, color: 'bg-blue-500' },
-    { label: 'Doble o peor', value: stats.distribution.doubleOrWorse, color: 'bg-ink-4' },
+    // Mismos colores que la tarjeta: Eagle amarillo, Birdie rojo, Par blanco, Bogey azul, Doble o peor negro.
+    { label: scoreResultLabel.eagle, value: stats.distribution.eagleOrBetter, color: scoreResultBar.eagle },
+    { label: scoreResultLabel.birdie, value: stats.distribution.birdie, color: scoreResultBar.birdie },
+    { label: scoreResultLabel.par, value: stats.distribution.par, color: scoreResultBar.par },
+    { label: scoreResultLabel.bogey, value: stats.distribution.bogey, color: scoreResultBar.bogey },
+    { label: scoreResultLabel.double, value: stats.distribution.doubleOrWorse, color: scoreResultBar.double },
   ] : [];
   const maxBar = Math.max(1, ...distribution.map(item => item.value));
 

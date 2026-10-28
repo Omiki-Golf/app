@@ -14,6 +14,7 @@ import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthCo
 import { RoundSetup } from './components/RoundSetup';
 import { PlayerSetup } from './components/PlayerSetup';
 import { Scorecard } from './components/Scorecard';
+import { OmikiLoadingScreen } from './components/OmikiSpinner';
 import { Leaderboard } from './components/Leaderboard';
 import { ActiveRoundsViewer } from './components/ActiveRoundsViewer';
 import { HoleConfiguration } from './components/HoleConfiguration';
@@ -67,7 +68,7 @@ const GlobalThemeSwitch = () => (
 
 function App() {
   const readOnly = useReadOnly();
-  const { user, logout } = useAuth(); // 👈 Usar el contexto global
+  const { user, logout, loading: authLoading } = useAuth(); // 👈 Usar el contexto global
   const [isIncognito, setIsIncognito] = useState(false);
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
@@ -130,7 +131,27 @@ function App() {
   const [accessCodeError, setAccessCodeError] = useState('');
   const [sharedExpressStats, setSharedExpressStats] = useState<QuickPlayCompletedRound | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
-  const { planType, profile, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+  const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+
+  // Arranque: la app se muestra cuando ya se conocen la sesión, el perfil, el plan y sus imágenes
+  // principales; así no aparece primero el avatar genérico ni las imágenes cargándose.
+  // Solo ocurre una vez: los refrescos posteriores no vuelven a mostrar la pantalla de carga.
+  const [booted, setBooted] = useState(false);
+  const accountReady = !authLoading && (!user || !subscriptionLoading);
+  useEffect(() => {
+    if (booted || !accountReady) return;
+    let cancelled = false;
+    const urls = ['/images/Omiki_VerdeAmarillo_Trans_Optimizada.png', profile?.avatar_url].filter((url): url is string => !!url);
+    const decode = (url: string) => new Promise<void>((resolve) => {
+      const image = new Image();
+      image.src = url;
+      image.decode().then(() => resolve(), () => resolve());
+    });
+    // Si una imagen tarda o falla, la app se abre igualmente.
+    const timeout = new Promise<void>((resolve) => window.setTimeout(resolve, 1500));
+    void Promise.race([Promise.all(urls.map(decode)), timeout]).then(() => { if (!cancelled) setBooted(true); });
+    return () => { cancelled = true; };
+  }, [booted, accountReady, profile?.avatar_url]);
   const activityScope = currentGroup
     ? { groupId: currentGroup.id }
     : { roundId: roundState.round?.group_id ? null : roundState.round?.id, accessCode: roundState.round?.id ? accessCodeStorage.getAccessCode(roundState.round.id) : null };
@@ -1089,17 +1110,11 @@ function App() {
     );
   }
 
-  if (groupLoading) {
+  if (groupLoading || !booted) {
     return (
       <>
         <IncognitoWarning />
-        {!user && <GlobalThemeSwitch />}
-        <div className={`min-h-screen bg-app flex items-center justify-center ${isIncognito ? 'pt-10' : ''}`}>
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-accent mx-auto mb-4"></div>
-            <p className="text-ink-3">Cargando...</p>
-          </div>
-        </div>
+        <OmikiLoadingScreen className={`bg-app ${isIncognito ? 'pt-10' : ''}`} />
       </>
     );
   }

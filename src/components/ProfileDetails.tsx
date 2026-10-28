@@ -397,7 +397,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 </div>
                 <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
                   <span className="font-medium text-ink-2">{t('profile.appearance')}</span>
-                  <ThemeToggle />
+                  <ThemeToggle alwaysVisible />
                 </div>
               </div>
               <p className="mt-2 text-xs text-ink-3">{t('profile.preferencesHelp')}</p>

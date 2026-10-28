@@ -233,3 +233,39 @@ html.theme-transition * {
 .theme-static .statistics-table-total {
   background-color: rgb(6 78 59 / .5);
 }
+
+/* Spinner de Omiki (OmikiSpinner): la O del logo late y dos aros giran alrededor. */
+.omiki-spinner-ring {
+  position: absolute;
+  inset: 4% 8%;
+  border-radius: 9999px;
+  border: 4px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  animation: omiki-spin 1s linear infinite;
+}
+.omiki-spinner-ring--slow {
+  inset: 0 4%;
+  border-width: 2px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: #a3e635;
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+.omiki-spinner-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  animation: omiki-pulse 2s ease-in-out infinite;
+}
+@keyframes omiki-spin { to { transform: rotate(360deg); } }
+@keyframes omiki-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.07); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .omiki-spinner-ring, .omiki-spinner-logo { animation: none; }
+}

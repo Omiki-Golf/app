@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, Target, Zap, Award, BarChart3, Calendar } from 'lucide-react';
+import { OmikiSpinner } from './OmikiSpinner';
 import { SelectMenu } from './SelectMenu';
 import { RoundPlayer, RoundScore, GolfHole } from '../types';
 import { golfService } from '../services/golfService';
@@ -96,8 +97,8 @@ useEffect(() => {
   if (loading || holes.length === 0) {
     return (
       <div className="bg-card rounded-lg shadow-card p-8 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-        <p className="text-ink-3">Cargando estadísticas...</p>
+        <OmikiSpinner size={90} className="mx-auto mb-3" />
+        <p className="text-ink-3">Cargando estadísticas…</p>
       </div>
     );
   }

@@ -3,14 +3,20 @@ import React from 'react';
 import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
 
 interface ThemeToggleProps {
   className?: string;
+  /** Mostrar también con sesión iniciada (donde se elige la preferencia: perfil y administración). */
+  alwaysVisible?: boolean;
 }
 
-export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '' }) => {
+export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', alwaysVisible = false }) => {
   const { isDark, toggle } = useTheme();
   const { t } = useTranslation();
+  const { user } = useAuth();
+  // Con sesión iniciada, el modo claro u oscuro es una preferencia del perfil: no se repite en cada pantalla.
+  if (user && !alwaysVisible) return null;
   const label = isDark ? t('theme.light') : t('theme.dark');
 
   return (

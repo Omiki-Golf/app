@@ -1,7 +1,9 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { OmikiLoadingScreen, OmikiSpinner } from './OmikiSpinner';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
+import { scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
   Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
@@ -500,12 +502,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     link.remove();
   };
 
-  const handleOpenWhatsApp = () => {
-    if (!shareAsset) return;
-    const text = encodeURIComponent(`📊 Estadísticas de nuestra partida de golf (${shareAsset.date}). Adjuntaré la imagen.`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-  };
-
   const getModeLabel = (mode?: string) => {
     switch (mode) {
       case 'match': return 'Match';
@@ -517,12 +513,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-app p-4 md:p-8 flex items-center justify-center">
-        <div className="absolute right-4 top-4">{messagesButton}</div>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-ink font-medium">Cargando estadísticas...</p>
-        </div>
+      <div className="relative">
+        <div className="absolute right-4 top-4 z-10">{messagesButton}</div>
+        <OmikiLoadingScreen label="Cargando estadísticas…" />
       </div>
     );
   }
@@ -620,6 +613,20 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       rank: index,
     }));
   }
+
+  // En Parejas, los dos jugadores de cada pareja comparten color (azul y naranja, como en la tarjeta).
+  const teamOfPlayer = (playerId: string): 0 | 1 | null => {
+    if (!isParejasMode || !roundData.players) return null;
+    const position = roundData.players.findIndex((player) => player.id === playerId);
+    return position < 0 ? null : position < 2 ? 0 : 1;
+  };
+  const positionBadgeClass = (index: number, team: 0 | 1 | null) =>
+    team === 0 ? 'bg-blue-600 text-white' :
+    team === 1 ? 'bg-orange-700 text-white' :
+    index === 0 ? 'bg-yellow-400 text-yellow-950' :
+    index === 1 ? 'bg-slate-400 text-slate-900' :
+    index === 2 ? 'bg-orange-400 text-orange-950' :
+    'bg-gray-600 text-white';
 
   const renderPodiumGrid = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
@@ -730,12 +737,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     <tr key={h.playerId} className="statistics-table-line statistics-table-row border-b transition-colors">
                       <td className="statistics-table-text font-semibold p-3">
                         <div className="flex items-center gap-2">
-                          <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
-                            index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                            index === 1 ? 'bg-slate-400 text-slate-900' :
-                            index === 2 ? 'bg-orange-400 text-orange-900' :
-                            'bg-gray-600 text-white'
-                          }`}>
+                          <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(h.playerId))}`}>
                             {index + 1}
                           </span>
                           {h.playerName}
@@ -794,12 +796,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <tr key={row.key} className="statistics-table-line statistics-table-row border-b transition-colors">
                         <td className="statistics-table-text font-semibold p-2">
                           <span className="flex items-center gap-2">
-                            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
-                              row.rank === 0 ? 'bg-yellow-400 text-yellow-900' :
-                              row.rank === 1 ? 'bg-slate-400 text-slate-900' :
-                              row.rank === 2 ? 'bg-orange-400 text-orange-900' :
-                              'bg-gray-600 text-white'
-                            }`}>
+                            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(row.rank, isParejasMode ? (row.key === 'team0' ? 0 : 1) : null)}`}>
                               {row.rank + 1}
                             </span>
                             {row.name}
@@ -881,12 +878,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <tr key={entry.player.id} className="statistics-table-line statistics-table-row border-b transition-colors">
                         <td className="statistics-table-text font-semibold p-2">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
-                              index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                              index === 1 ? 'bg-slate-400 text-slate-900' :
-                              index === 2 ? 'bg-orange-400 text-orange-900' :
-                              'bg-gray-600 text-white'
-                            }`}>
+                            <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(entry.player.id))}`}>
                               {index + 1}
                             </span>
                             {entry.player.name}
@@ -895,9 +887,16 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                         {holes.map((hole) => {
                           const score = playerScores.find((s) => s.hole_number === hole.hole_number);
                           const value = getEffectiveGrossStrokes(score, hole);
+                          const result = scoreResultFromPoints(score?.stableford_points, score?.abandoned);
                           return (
-                            <td key={hole.hole_number} className="statistics-table-text text-center p-2 font-bold">
-                              {value}
+                            <td key={hole.hole_number} className="text-center p-1.5">
+                              {score ? (
+                                <span title={scoreResultLabel[result]} className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ring-1 ${scoreResultChip[result]}`}>
+                                  {value}
+                                </span>
+                              ) : (
+                                <span className="statistics-table-text font-bold">{value}</span>
+                              )}
                             </td>
                           );
                         })}
@@ -907,6 +906,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   })}
                 </tbody>
               </table>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs" aria-label="Colores de la tabla de golpes">
+              {(Object.keys(scoreResultChip) as Array<keyof typeof scoreResultChip>).map((result) => (
+                <span key={result} className="statistics-table-text inline-flex items-center gap-1.5">
+                  <span className={`h-3.5 w-3.5 rounded-full ring-1 ${scoreResultChip[result]}`} aria-hidden="true" />
+                  {scoreResultLabel[result]}
+                </span>
+              ))}
             </div>
           </div>
 
@@ -964,7 +971,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       {sharing && (
         <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/90 p-6" role="status" aria-live="polite">
           <div className="rounded-2xl border border-emerald-400/40 bg-slate-900 p-6 text-center text-white shadow-2xl">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-emerald-200 border-b-emerald-500" />
+            <OmikiSpinner size={90} className="mx-auto mb-4" />
             <p className="font-bold">Generando la imagen completa…</p>
             <p className="mt-1 text-sm text-slate-300">Puede tardar unos segundos en el móvil.</p>
           </div>
@@ -1057,9 +1064,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   </button>
                   <button type="button" onClick={handleDownloadShare} className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-bold hover:bg-slate-600">
                     <Download size={18} /> Descargar
-                  </button>
-                  <button type="button" onClick={handleOpenWhatsApp} className="inline-flex items-center gap-2 rounded-lg border border-green-500 px-3 py-2 text-sm font-bold text-green-300 hover:bg-green-950">
-                    <MessageCircle size={18} /> Abrir WhatsApp
                   </button>
                 </div>
               </div>

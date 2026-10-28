@@ -1,3 +1,4 @@
+import { OmikiLoadingScreen } from '../components/OmikiSpinner';
 import {
   createContext,
   useContext,
@@ -50,9 +51,7 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
   }, [userId]);
   if (!state || state.id !== userId)
     return (
-      <p role="status" className="p-6">
-        Comprobando acceso…
-      </p>
+      <OmikiLoadingScreen />
     );
   return (
     <ReadOnlyContext.Provider value={state.value}>

@@ -63,6 +63,7 @@ test('gateway downloads administration only after verifying an active administra
       window: { location: { href: 'https://example.test/' } }, URL,
       ReadOnlyProvider: ({ children }) => children,
       App: () => React.createElement('p', null, 'Player app'),
+      OmikiLoadingScreen: () => React.createElement('div', { role: 'status' }, 'Cargando…'),
       Auth: () => null, AdminPasswordSetup: () => null, NavigationButton: () => null,
     });
     const code = gateway.replace(/^import .*;\r?\n/gm, '').replace('export function ApplicationGateway', 'function ApplicationGateway').replace(/import\(/g, 'loadModule(') + '\nglobalThis.Gateway = ApplicationGateway;';
@@ -71,6 +72,6 @@ test('gateway downloads administration only after verifying an active administra
     assert.equal(loads, kind === 'active' ? 1 : 0, kind);
     if (kind === 'active') assert.match(html, /Cargando administración/);
     if (kind === 'disabled') assert.match(html, /desactivada/);
-    if (kind === 'checking') assert.match(html, /Comprobando acceso/);
+    if (kind === 'checking') assert.match(html, /role="status"/);
   }
 });

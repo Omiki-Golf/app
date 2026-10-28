@@ -1,5 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { OmikiLoadingScreen } from './OmikiSpinner';
 import { TopBar } from './TopBar';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive } from 'lucide-react';
@@ -176,12 +177,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-app p-4 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent mx-auto mb-4"></div>
-          <p className="text-ink-3">{t('groups.loading')}</p>
-        </div>
-      </div>
+      <OmikiLoadingScreen label={t('groups.loading')} />
     );
   }
 

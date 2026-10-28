@@ -570,7 +570,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               <div className="p-5 pb-4 flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-                    {currentGroup ? t('roundSetup.active') : t('roundSetup.myRound')}
+                    {activeRoundsCount > 1 ? t('roundSetup.myRounds') : t('roundSetup.myRound')}
                   </h2>
                   <div className="bg-amber-600 text-amber-950 font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
                     {activeRoundsCount}

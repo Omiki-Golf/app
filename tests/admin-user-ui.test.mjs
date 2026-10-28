@@ -94,6 +94,7 @@ test("write controls disable native buttons and forms while keeping cancellation
       react: { ...React, useContext: () => blocked },
       "../services/userRestriction": {},
       "./AuthContext": {},
+      "../components/OmikiSpinner": {},
     },
   );
   assert.match(
