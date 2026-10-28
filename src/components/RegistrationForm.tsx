@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Eye, EyeOff, Check, X, AlertCircle, Info } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
-import { registrationError, playerSignupMetadata, type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
+import { registrationError, playerSignupMetadata, isExistingAccountSignup, type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
+import { ExistingAccountNotice } from './ExistingAccountNotice';
 import { EmailSentModal } from './EmailSentModal';
 import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
 
@@ -38,6 +39,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
+  const [existingEmail, setExistingEmail] = useState('');
   const nickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -66,6 +68,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
     submitting.current = true;
     setLoading(true);
     setError('');
+    setExistingEmail('');
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
@@ -78,15 +81,15 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
           data: playerSignupMetadata({ id: checkoutId, period, plan }, { nick, displayName, avatarUrl, handicap, country, postalCode, age }),
         },
       });
+      if (isExistingAccountSignup(data.user, authError)) { setExistingEmail(email.trim()); return; }
       if (authError) throw authError;
       if (!data.user) throw new Error('No se ha podido crear la cuenta.');
-      if (data.user.identities?.length === 0) throw new Error('Este correo ya está registrado. Inicia sesión para continuar.');
       if (data.session && data.user.email_confirmed_at) { onRegistered(); return; }
       setPassword('');
       setConfirmationEmail(email.trim());
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'No se ha podido crear la cuenta. Reintenta.';
-      setError(message.includes('already registered') ? 'Este correo ya está registrado. Inicia sesión para continuar.' : message);
+      setError(message);
     } finally {
       submitting.current = false;
       setLoading(false);
@@ -113,6 +116,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
           <h1 className="text-2xl font-bold text-ink mb-1">Crear cuenta {plan === 'premium' ? 'Premium' : plan === 'team' ? 'Team' : 'Player'}</h1>
           <p className="text-sm text-ink-3 mb-6">Configura tu perfil de jugador</p>
 
+          {existingEmail && <ExistingAccountNotice email={existingEmail} onLogin={onLogin} />}
           {error && (
             <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl mb-4 flex items-center gap-2">
               <AlertCircle size={16} />

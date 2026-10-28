@@ -1,9 +1,11 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
+import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect } from 'react';
 import { Users, Trophy, TrendingUp, ChevronDown, ChevronUp, UserX, History, Edit2, Save, X, User } from 'lucide-react';
 import { golfService } from '../services/golfService';
-import { Player } from '../types';
+import { HandicapHistoryEntry, Player } from '../types';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
@@ -16,6 +18,7 @@ interface DailyStanding {
   totalPoints: number;
   roundId: string;
   noPasoRojasHoles?: number[];
+  isGuest?: boolean;
 }
 
 interface DailyRanking {
@@ -26,12 +29,13 @@ interface DailyRanking {
 interface GamePointsProps {
   onBack: () => void;
   groupId?: string | null;
+  messagesButton?: React.ReactNode;
 }
 
-export function GamePoints({ onBack, groupId }: GamePointsProps) {
+export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [dailyRankings, setDailyRankings] = useState<DailyRanking[]>([]);
-  const [handicapHistory, setHandicapHistory] = useState<any[]>([]);
+  const [handicapHistory, setHandicapHistory] = useState<HandicapHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPlayers, setShowPlayers] = useState(false);
   const [showHandicapHistory, setShowHandicapHistory] = useState(false);
@@ -264,7 +268,8 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
     if (dailyRankings.length === 0) return [];
 
     const latestRanking = dailyRankings[0];
-    const sortedStandings = sortStandings(latestRanking.standings);
+    // Los invitados no ajustan hándicap.
+    const sortedStandings = sortStandings(latestRanking.standings.filter((standing) => !standing.isGuest));
 
     return sortedStandings.map((standing, index) => {
       const currentHandicap = standing.playingHandicap;
@@ -288,26 +293,17 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
   const handicapAdjustments = getHandicapAdjustments();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-app p-4 md:p-8 flex items-center justify-center">
-        <div className="text-ink text-xl">Cargando...</div>
-      </div>
-    );
+    return <OmikiLoadingScreen />;
   }
 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          <div className="flex items-center mb-6">
-            <NavigationButton destination="home"
-              onClick={onBack}
-              className="flex items-center text-accent-ink hover:text-title transition-colors"
-            />
-          </div>
+      <div className="max-w-6xl mx-auto">
+        <div>
+          <TopBar className="mb-3" left={<NavigationButton destination="back" onClick={onBack} aria-label="Volver al grupo" title="Volver al grupo" />} center={messagesButton} />
 
           <h1 className="text-3xl md:text-4xl font-bold text-title mb-8 text-center">
-            Puntos de Juego
+            Clasificación y jugadores
           </h1>
 
           <div className="space-y-8">
@@ -348,6 +344,7 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
                 <div className="space-y-6">
                   {dailyRankings.map((ranking, rankingIndex) => {
                     const sortedStandings = sortStandings(ranking.standings);
+                    const memberStandings = sortedStandings.filter((standing) => !standing.isGuest);
                     return (
                       <div
                         key={rankingIndex}
@@ -358,10 +355,10 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
                         </h3>
                         <div className="space-y-2">
                           {sortedStandings.map((standing, index) => {
-                            const colorClass = getColorClass(
-                              index,
-                              sortedStandings.length
-                            );
+                            // El color indica el ajuste de hándicap: solo entre miembros.
+                            const colorClass = standing.isGuest
+                              ? 'bg-card border-line'
+                              : getColorClass(memberStandings.indexOf(standing), memberStandings.length);
                             return (
                               <div
                                 key={standing.playerId}
@@ -373,6 +370,7 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
                                   </span>
                                   <span className="font-medium text-ink">
                                     {standing.playerName}
+                                    {standing.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
                                   </span>
                                   <span className="text-sm text-ink-3">
                                     (HCP juego: {standing.playingHandicap})
@@ -420,31 +418,35 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
                     {handicapAdjustments.map((adjustment) => (
                       <div
                         key={adjustment.playerName}
-                        className={`${adjustment.colorClass} border-2 rounded-lg p-4 flex justify-between items-center`}
+                        className={`${adjustment.colorClass} border-2 rounded-lg p-4`}
                       >
-                        <span className="font-medium text-ink">
+                        {/* Nombre arriba; debajo, HCP actual y nuevo en dos columnas. */}
+                        <p className="font-semibold text-ink break-words mb-2">
                           {adjustment.playerName}
-                        </span>
-                        <div className="flex items-center gap-4">
-                          <span className="text-ink-2">
-                            HCP actual: {adjustment.currentHandicap}
-                          </span>
-                          <span className="text-ink-4">→</span>
-                          <span className="font-bold text-title">
-                            Nuevo HCP: {adjustment.newHandicap}
-                          </span>
-                          {adjustment.adjustment !== 0 && (
-                            <span
-                              className={`text-sm font-semibold ${
-                                adjustment.adjustment > 0
-                                  ? 'text-red-600'
-                                  : 'text-blue-600'
-                              }`}
-                            >
-                              ({adjustment.adjustment > 0 ? '+' : ''}
-                              {adjustment.adjustment})
-                            </span>
-                          )}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 text-center">
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-ink-3">HCP actual</p>
+                            <p className="text-2xl font-bold text-ink-2">{adjustment.currentHandicap}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs uppercase tracking-wide text-ink-3">HCP nuevo</p>
+                            <p className="text-2xl font-bold text-title">
+                              {adjustment.newHandicap}
+                              {adjustment.adjustment !== 0 && (
+                                <span
+                                  className={`ml-1 text-sm font-semibold ${
+                                    adjustment.adjustment > 0
+                                      ? 'text-red-600'
+                                      : 'text-blue-600'
+                                  }`}
+                                >
+                                  ({adjustment.adjustment > 0 ? '+' : ''}
+                                  {adjustment.adjustment})
+                                </span>
+                              )}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     ))}

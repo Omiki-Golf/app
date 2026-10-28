@@ -13,9 +13,63 @@ export interface AppRelease {
   changes: ReleaseChange[];
 }
 
-export const APP_VERSION = '1.5.4';
+export const APP_VERSION = '1.6.1';
 
 export const RELEASES: AppRelease[] = [
+  {
+    version: '1.6.1',
+    date: '2026-10-19',
+    title: 'Parejas, grupos Team y mejoras de las pruebas',
+    summary: 'Nuevo reparto de puntos en Parejas, grupos más fáciles de crear y gestionar, y correcciones detectadas en las pruebas del plan Team.',
+    changes: [
+      { type: 'improved', text: 'Parejas: en cada hoyo la mejor bola neta gana 1 punto y la peor 0,5; los empates no puntúan.' },
+      { type: 'new', text: 'Mis grupos muestra también los grupos de los que eres miembro, con un apartado de Jugadores y administradores.' },
+      { type: 'new', text: 'El creador del grupo puede nombrar administradores, que también pueden crear partidas.' },
+      { type: 'improved', text: 'El botón de Team de la pantalla principal muestra el nombre de tu grupo y entra directamente en él.' },
+      { type: 'improved', text: 'En los grupos, Comenzar partida abre la tarjeta y al finalizar se vuelve a las partidas del grupo.' },
+      { type: 'improved', text: 'No pasó de rojas y las cervezas funcionan en todos los grupos con la gamificación Hoyo 19.' },
+      { type: 'improved', text: 'Los invitados aparecen en la clasificación del día, sin afectar al hándicap del grupo.' },
+      { type: 'improved', text: 'Puntos de juego pasa a llamarse Clasificación y jugadores, con el nuevo hándicap más fácil de leer en el móvil.' },
+      { type: 'new', text: 'Las estadísticas del jugador incluyen sus Spanish Hands.' },
+      { type: 'fixed', text: 'Crear un grupo eligiendo Más tarde ya lo crea, y volver atrás tras crearlo no da error.' },
+      { type: 'fixed', text: 'Spanish Hands ya no se queda marcado en los hoyos siguientes.' },
+      { type: 'fixed', text: 'Archivar una partida pide confirmación.' },
+    ],
+  },
+  {
+    version: '1.6.0',
+    date: '2026-10-15',
+    title: 'Mis estadísticas, nuevos planes y resultados finales',
+    summary: 'Estadísticas acumuladas para jugadores registrados, planes actualizados con Omiki Weekend y una tarjeta más clara de principio a fin.',
+    changes: [
+      { type: 'new', text: 'Mis estadísticas reúne los resultados acumulados de todas tus partidas: victorias, Stableford medio, mejor partida, campos y modalidades.' },
+      { type: 'new', text: 'Al registrarte, las partidas rápidas creadas en tu dispositivo como Express pasan a tu cuenta.' },
+      { type: 'new', text: 'Botón «Añadirme a la partida» para vincular tu jugador con tu cuenta.' },
+      { type: 'new', text: 'Nuevo plan Omiki Weekend y precios mensuales y anuales iguales a los de la web.' },
+      { type: 'new', text: 'Los jugadores Player pueden elegir entre la prueba gratuita de 30 días de Team o suscribirse.' },
+      { type: 'new', text: 'Ventana de resultado final en Match, Sindicato y Parejas cuando la partida se decide en el último hoyo; el empate lo gana el hándicap más bajo.' },
+      { type: 'improved', text: 'Solo el creador puede finalizar la partida; el resto ve «Pendiente de finalizar» o «Finalizada».' },
+      { type: 'improved', text: 'En Parejas la clasificación muestra una sola ficha por pareja.' },
+      { type: 'improved', text: 'Cabeceras alineadas en la tarjeta, la clasificación y la ficha del jugador, con idioma y modo claro/oscuro en la ficha.' },
+      { type: 'improved', text: 'Mis datos de registro muestra y permite editar todos los datos pedidos al registrarse.' },
+      { type: 'improved', text: 'Icono de la app para instalarla o crear un acceso directo.' },
+      { type: 'fixed', text: 'Al registrarse con un correo ya existente se avisa y se ofrece recuperar la contraseña.' },
+    ],
+  },
+  {
+    version: '1.5.5',
+    date: '2026-10-12',
+    title: 'Estadísticas y tarjeta más fiables',
+    summary: 'Mejoras de legibilidad, cálculos y controles para completar y compartir las partidas con seguridad.',
+    changes: [
+      { type: 'fixed', text: 'Las tablas de estadísticas conservan el contraste correcto en los modos claro y oscuro.' },
+      { type: 'fixed', text: 'La imagen para compartir se valida y reintenta automáticamente en móviles antes de marcarla como preparada.' },
+      { type: 'fixed', text: 'El resumen Stableford suma únicamente los hoyos de la tarjeta actual.' },
+      { type: 'improved', text: 'La tarjeta avisa mediante una ventana cuando quedan resultados pendientes al completar el último hoyo.' },
+      { type: 'improved', text: 'Los controles para añadir jugadores y eliminar partidas quedan mejor alineados en móvil.' },
+      { type: 'improved', text: 'La pantalla de acceso identifica con claridad la cuenta Omiki.' },
+    ],
+  },
   {
     version: '1.5.4',
     date: '2026-10-07',

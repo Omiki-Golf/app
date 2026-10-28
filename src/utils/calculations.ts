@@ -139,6 +139,10 @@ export const calculateSindicatoPoints = (playerId: string, allScores: ModeScoreI
   return 0;
 };
 
+export const PAREJAS_BEST_BALL_POINTS = 1;
+export const PAREJAS_WORST_BALL_POINTS = 0.5;
+export const PAREJAS_MAX_POINTS_PER_HOLE = PAREJAS_BEST_BALL_POINTS + PAREJAS_WORST_BALL_POINTS;
+
 export const calculateParejasPoints = (
   playerId: string,
   allScores: ModeScoreInput[],
@@ -157,21 +161,17 @@ export const calculateParejasPoints = (
 
   if (teamScores.length < 2 || oppScores.length < 2) return 0;
 
-  // Si los cuatro jugadores marcan raya, el hoyo se empata como una sola
-  // unidad: cada pareja recibe medio punto (no se comparan las dos bolas).
-  if (processedScores.every(s => s.abandoned)) return 0.5;
-
+  // Se comparan las mejores bolas netas (1 punto) y las peores (0,5 puntos).
+  // Un empate en cualquiera de las dos comparaciones no reparte nada; eso
+  // incluye el hoyo en el que los cuatro marcan raya.
   const teamBest = Math.min(...teamScores.map(s => s.netStrokes));
   const teamWorst = Math.max(...teamScores.map(s => s.netStrokes));
   const oppBest = Math.min(...oppScores.map(s => s.netStrokes));
   const oppWorst = Math.max(...oppScores.map(s => s.netStrokes));
 
   let points = 0;
-  if (teamBest < oppBest) points += 1;
-  else if (teamBest === oppBest && teamBest < 999) points += 0.5;
-
-  if (teamWorst < oppWorst) points += 1;
-  else if (teamWorst === oppWorst && teamWorst < 999) points += 0.5;
+  if (teamBest < oppBest) points += PAREJAS_BEST_BALL_POINTS;
+  if (teamWorst < oppWorst) points += PAREJAS_WORST_BALL_POINTS;
 
   return points;
 };
@@ -196,6 +196,7 @@ export const calculateModePoints = (
 
 interface RoundScoreLike {
   mode_points?: number;
+  gross_strokes?: number;
 }
 
 export const getTotalModePoints = (scores: Record<number, RoundScoreLike>): number => {
@@ -205,8 +206,7 @@ export const getTotalModePoints = (scores: Record<number, RoundScoreLike>): numb
 export const calculateScoreToPar = (
   totalGrossStrokes: number,
   coursePar: number,
-  playerHandicap: number,
-  numHoles: number
+  playerHandicap: number
 ): { value: number; display: string } => {
   const personalPar = coursePar + playerHandicap;
   const scoreToPar = totalGrossStrokes - personalPar;
@@ -232,7 +232,7 @@ export interface MatchStatusResult {
 }
 
 export const checkMatchPlayStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string; playing_handicap: number }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -278,7 +278,7 @@ export const checkMatchPlayStatus = (
 };
 
 export const checkParejasStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -306,14 +306,13 @@ export const checkParejasStatus = (
 
     if (isHoleComplete) {
       playedHolesCount++;
-      const allRaya = [s0, s1, s2, s3].every(s => s?.abandoned);
-      t0Points += allRaya ? 0.5 : (s0?.mode_points ?? 0);
-      t1Points += allRaya ? 0.5 : (s2?.mode_points ?? 0);
+      t0Points += s0?.mode_points ?? 0;
+      t1Points += s2?.mode_points ?? 0;
     }
   }
 
   const remainingHoles = playableHoles.length - playedHolesCount;
-  const maxPossiblePointsLeft = remainingHoles * 2;
+  const maxPossiblePointsLeft = remainingHoles * PAREJAS_MAX_POINTS_PER_HOLE;
   const lead = Math.abs(t0Points - t1Points);
   const isFinished = lead > maxPossiblePointsLeft && remainingHoles >= 0;
 
@@ -329,7 +328,7 @@ export const checkParejasStatus = (
 };
 
 export const checkSindicatoStatus = (
-  roundsMap: Map<string, { scores: Record<number, any> }>,
+  roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string; playing_handicap: number }[],
   playableHoles: { hole_number: number }[]
 ): MatchStatusResult => {
@@ -347,7 +346,7 @@ export const checkSindicatoStatus = (
     if (isHoleComplete) {
       playedHolesCount++;
       holeScores.forEach((score, index) => {
-        totals[index].points += score.mode_points ?? 0;
+        totals[index].points += score?.mode_points ?? 0;
       });
     }
   }

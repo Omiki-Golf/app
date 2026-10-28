@@ -1,9 +1,9 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { lazy, Suspense, useState, useEffect } from 'react';
-import { GolfCourse, GolfHole, Group, GameMode } from '../types';
+import React, { lazy, Suspense, useCallback, useState, useEffect, useRef } from 'react';
+import { GolfCourse, Group, GameMode } from '../types';
 import { golfService } from '../services/golfService';
-import { ChevronRight, Copy, Check, LogOut, Info, Lock, Sparkles } from 'lucide-react';
+import { ChevronRight, Copy, Check, Info, Lock, Sparkles } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
@@ -12,13 +12,34 @@ import { safeStorage } from '../utils/safeStorage';
 import { MAX_EXPRESS_GAMES } from '../services/expressTierGuard';
 import { ParTeeUpgradeModal } from './ParTeeUpgradeModal';
 import { trackExpressGameCreated } from '../services/expressTierGuard';
-import { supabase } from '../services/supabaseClient';
 import { getUserId } from '../utils/userId';
 import { CourseCatalogPicker } from './CourseCatalogPicker';
 import { LOCAL_AI_ENABLED } from '../experimental/local-ai/config';
 import type { AiRoundSetupValue } from '../experimental/local-ai/LocalVoiceRoundSetup';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const LocalVoiceRoundSetup = lazy(() => import('../experimental/local-ai/LocalVoiceRoundSetup'));
+
+// Borrador de la última configuración elegida (campo y recorrido, hoyos, tramo y modalidad).
+// Se guarda en este dispositivo al cambiar cualquier opción, también si la partida no llega a crearse.
+// Cada grupo tiene el suyo, para que todas sus partidas salgan con los mismos criterios; las partidas
+// rápidas, uno por cuenta (o por dispositivo en Express).
+interface RoundSetupDraft {
+  courseId?: string;
+  numHoles?: 9 | 18;
+  holesRange?: '1-9' | '10-18';
+  gameMode?: GameMode;
+}
+const GAME_MODES: GameMode[] = ['stableford', 'match', 'sindicato', 'parejas'];
+const draftKey = (groupId?: string) => `roundSetupDraft:${groupId ? `group:${groupId}` : `quick:${getUserId()}`}`;
+const readDraft = (key: string): RoundSetupDraft => {
+  try {
+    const value = JSON.parse(safeStorage.getItem(key) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch {
+    return {};
+  }
+};
 
 interface RoundSetupProps {
   onRoundCreated: (roundId: string, courseId: string, numHoles: 9 | 18, useSlope: boolean, startImmediately?: boolean) => void;
@@ -32,7 +53,7 @@ interface RoundSetupProps {
   isGroupCreator?: boolean;
   hasLimitedAccess?: boolean;
   planType?: 'express' | 'player' | 'team' | 'premium';
-  onShowPlans?: (context?: 'express-limit') => void;
+  onShowPlans?: (context?: 'express-limit' | 'express-modes') => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -41,7 +62,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   onViewActiveRounds,
   onViewGamePoints,
   onViewStatistics,
-  onJoinWithCode,
   onLeaveGroup,
   onBack,
   currentGroup,
@@ -53,9 +73,11 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
+  const isArchivedGroup = Boolean(currentGroup?.archived_at);
   const handleGameModeClick = (mode: GameMode) => {
     if (isExpress && mode !== 'stableford') {
-      setShowUpgradeModal(true);
+      if (onShowPlans) onShowPlans('express-modes');
+      else setShowUpgradeModal(true);
       return;
     }
     setGameMode(mode);
@@ -75,29 +97,17 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [pendingNumHoles, setPendingNumHoles] = useState<9 | 18 | null>(null);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pinError, setPinError] = useState('');
-  const [completedRounds, setCompletedRounds] = useState<any[]>([]);
+  const [completedRounds, setCompletedRounds] = useState<Array<{ id: string; created_at: string; status: string }>>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showLocalAiSetup, setShowLocalAiSetup] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('stableford');
-  const [completedRoundsCount, setCompletedRoundsCount] = useState<number>(0);
 
   const [quickPlayRoundsCount, setQuickPlayRoundsCount] = useState<number | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftModeApplied = useRef(false);
+  const currentDraftKey = draftKey(currentGroup?.id);
 
-  useEffect(() => {
-    loadCourses();
-    loadActiveRoundsCount();
-    loadCompletedRounds();
-    loadQuickPlayRoundsCount();
-  }, []);
-
-  useEffect(() => {
-    const refreshCount = () => { void loadQuickPlayRoundsCount(); };
-    const timer = window.setInterval(refreshCount, 30000);
-    window.addEventListener('focus', refreshCount);
-    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshCount); };
-  }, [currentGroup]);
-
-  const loadQuickPlayRoundsCount = async () => {
+  const loadQuickPlayRoundsCount = useCallback(async () => {
     if (!currentGroup) {
       try {
         const count = await golfService.countQuickRounds();
@@ -106,7 +116,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         console.error('Error al contar partidas rápidas:', err);
       }
     }
-  };
+  }, [currentGroup]);
 
   useEffect(() => {
     const loadCourseDetails = async () => {
@@ -133,34 +143,60 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     loadCourseDetails();
   }, [selectedCourse, courses]);
 
-  const loadCourses = async () => {
+  // La modalidad se recupera cuando se conoce el plan: Express solo permite Stableford.
+  useEffect(() => {
+    if (!draftReady || draftModeApplied.current || isExpress) return;
+    draftModeApplied.current = true;
+    const mode = readDraft(currentDraftKey).gameMode;
+    if (mode && GAME_MODES.includes(mode)) setGameMode(mode);
+  }, [draftReady, isExpress, currentDraftKey]);
+
+  useEffect(() => {
+    if (!draftReady || !selectedCourse) return;
+    const previous = readDraft(currentDraftKey);
+    const draft: RoundSetupDraft = {
+      courseId: selectedCourse,
+      numHoles,
+      holesRange,
+      // Con el plan aún sin cargar (Express por defecto) no se pisa la modalidad guardada.
+      gameMode: isExpress && !draftModeApplied.current ? previous.gameMode ?? gameMode : gameMode,
+    };
+    safeStorage.setItem(currentDraftKey, JSON.stringify(draft));
+  }, [draftReady, selectedCourse, numHoles, holesRange, gameMode, isExpress, currentDraftKey]);
+
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
       const data = await golfService.getCourses();
       setCourses(data);
       if (data.length > 0) {
-        const lastCourseId = safeStorage.getItem('lastSelectedCourse');
+        const draft = readDraft(currentDraftKey);
+        const lastCourseId = draft.courseId || safeStorage.getItem('lastSelectedCourse');
         const courseExists = lastCourseId && data.some(c => c.id === lastCourseId);
         setSelectedCourse(courseExists ? lastCourseId : data[0].id);
+        // Los hoyos se recuperan antes de cargar el campo: si el campo es de 9, después se fuerzan 9.
+        if (draft.numHoles === 9 || draft.numHoles === 18) setNumHoles(draft.numHoles);
+        if (draft.holesRange === '1-9' || draft.holesRange === '10-18') setHolesRange(draft.holesRange);
       }
+      setDraftReady(true);
     } catch (err) {
       setError(t('roundSetup.errors.courses'));
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentDraftKey, t]);
 
-  const loadActiveRoundsCount = async () => {
+  const loadActiveRoundsCount = useCallback(async () => {
     try {
-      const activeRounds = await golfService.getActiveRounds();
+      const activeRounds = await golfService.getActiveRounds(currentGroup?.id ?? null);
       setActiveRoundsCount(activeRounds.length);
     } catch (err) {
       console.error('Error cargando contador de partidas:', err);
     }
-  };
+  }, [currentGroup?.id]);
 
-  const loadCompletedRounds = async () => {
+  const loadCompletedRounds = useCallback(async () => {
     try {
       if (!currentGroup) {
         const availableRounds = await golfService.getAvailableRoundsForStats(4);
@@ -170,9 +206,27 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     } catch (err) {
       console.error('Error cargando partidas para estadísticas:', err);
     }
-  };
+  }, [currentGroup]);
+
+  useEffect(() => {
+    void loadCourses();
+    void loadActiveRoundsCount();
+    void loadCompletedRounds();
+    void loadQuickPlayRoundsCount();
+  }, [loadCourses, loadActiveRoundsCount, loadCompletedRounds, loadQuickPlayRoundsCount]);
+
+  useEffect(() => {
+    const refreshCount = () => { void loadQuickPlayRoundsCount(); };
+    const timer = window.setInterval(refreshCount, 30000);
+    window.addEventListener('focus', refreshCount);
+    return () => { window.clearInterval(timer); window.removeEventListener('focus', refreshCount); };
+  }, [loadQuickPlayRoundsCount]);
 
   const handleCreateRound = async () => {
+    if (isArchivedGroup) {
+      setError('Este grupo está archivado y no admite nuevas partidas.');
+      return;
+    }
     const isGroupRound = Boolean(currentGroup?.id || currentGroup?.group_code);
 
     if (!isGroupRound) {
@@ -240,7 +294,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         useSlope,
         numHoles === 9 ? holesRange : undefined,
         undefined,
-        gameMode
+        gameMode,
+        currentGroup?.id ?? null
       );
 
       if (isExpress && !currentGroup) {
@@ -249,9 +304,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
       safeStorage.setItem('lastSelectedCourse', selectedCourse);
       onRoundCreated(round.id, round.course_id, round.num_holes, round.use_slope);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al crear la partida:', err);
-      setError(err.message || t('roundSetup.errors.create'));
+      setError(getErrorMessage(err, t('roundSetup.errors.create')));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
@@ -356,9 +411,14 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header */}
-        {((!currentGroup && onBack) || messagesButton) && (
+        {(currentGroup || onBack || messagesButton) && (
           <div className="grid grid-cols-3 items-center">
-            <div>{!currentGroup && onBack && <NavigationButton destination="home" onClick={onBack} />}</div>
+            <div>
+              {/* Dentro de un grupo, la casita sale del grupo y vuelve al inicio, como en el resto de pantallas. */}
+              {currentGroup && !isArchivedGroup
+                ? <NavigationButton destination="home" onClick={onLeaveGroup} aria-label={t('roundSetup.leaveGroup')} title={t('roundSetup.leaveGroup')} />
+                : onBack && <NavigationButton destination={isArchivedGroup ? "back" : "home"} onClick={onBack} />}
+            </div>
             <div className="flex justify-center">{messagesButton}</div>
             <div />
           </div>
@@ -368,36 +428,27 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             <h1 className="text-4xl md:text-5xl font-bold text-title">
               {currentGroup?.group_code === 'DIVEND'
                 ? 'Partideta dels divendres'
-                : (currentGroup?.name || 'OmkiGolf')}
+                : currentGroup?.name || (
+                  <img src="/images/omiki-badge.png" alt="Omiki Golf" width={550} height={192} decoding="async" className="h-16 w-auto md:h-20" />
+                )}
             </h1>
           </div>
-          <p className="text-accent-ink text-lg">
-            {currentGroup ? t('roundSetup.manager') : t('roundSetup.quick')}
-          </p>
+          {currentGroup && (
+            <p className="text-accent-ink text-lg">{t('roundSetup.manager')}</p>
+          )}
         </div>
 
-        {/* Express tiene cupo; Player y Team muestran solo el total. */}
-        {!currentGroup && quickPlayRoundsCount !== null && !isExpress && (
-          <div className="bg-card border border-line rounded-xl p-4 text-ink-2 flex items-center gap-3 shadow-card">
-            <Info className="text-accent-ink flex-shrink-0" size={24} />
-            <p className="text-sm">{t('roundSetup.played', { count: quickPlayRoundsCount })}</p>
+        {isArchivedGroup && (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-center text-amber-900">
+            <p className="font-bold">Grupo archivado</p>
+            <p className="text-sm">Está disponible en modo consulta. Puedes ver clasificación, jugadores y estadísticas.</p>
           </div>
         )}
 
         {/* Código de Grupo */}
-        {currentGroup && !hasLimitedAccess && (
+        {currentGroup && !hasLimitedAccess && !isArchivedGroup && (
           <div className="bg-card rounded-lg shadow-card p-6">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="text-lg font-semibold text-ink">{t('roundSetup.groupCode')}</h3>
-              <button
-                onClick={onLeaveGroup}
-                className="text-red-600 hover:text-red-700 flex items-center gap-1 text-sm font-medium transition-colors"
-                title={t('roundSetup.leaveGroup')}
-              >
-                <LogOut size={16} />
-                {t('roundSetup.leave')}
-              </button>
-            </div>
+            <h3 className="text-lg font-semibold text-ink mb-3">{t('roundSetup.groupCode')}</h3>
             <p className="text-sm text-ink-3 mb-3">
               {t('roundSetup.shareCode')}
             </p>
@@ -421,39 +472,9 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </div>
         )}
 
-        {/* Unirse con Código */}
-        {currentGroup && !hasLimitedAccess && (
-          <div
-            onClick={onJoinWithCode}
-            className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
-          >
-            <h2 className="text-2xl font-bold text-purple-900 mb-4">{t('roundSetup.joinTitle')}</h2>
-            <p className="text-ink-2 mb-6">
-              {t('roundSetup.joinDescription')}
-            </p>
-            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-              {t('roundSetup.enterCode')}
-              <ChevronRight size={20} />
-            </button>
-          </div>
-        )}
-
-        {/* Salir del Grupo */}
-        {currentGroup && hasLimitedAccess && (
-          <button
-            onClick={onLeaveGroup}
-            className="w-full text-left bg-card hover:bg-card-2 border border-line rounded-lg p-3 flex items-center justify-between text-sm text-ink-3 hover:text-red-600 transition-colors"
-          >
-            <span className="flex items-center gap-2">
-              <LogOut size={16} />
-              {t('roundSetup.leaveGroup')}
-            </span>
-          </button>
-        )}
-
-        <div className={`grid grid-cols-1 ${(isGroupCreator && !hasLimitedAccess) ? 'md:grid-cols-2 md:items-stretch' : ''} gap-4`}>
+        <div className={`grid grid-cols-1 ${(isGroupCreator && !hasLimitedAccess && !isArchivedGroup) ? 'md:grid-cols-2 md:items-stretch' : ''} gap-4`}>
           {/* Nueva Partida */}
-          {isGroupCreator && !hasLimitedAccess && (
+          {isGroupCreator && !hasLimitedAccess && !isArchivedGroup && (
             <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
               <h2 className="text-2xl font-bold text-title mb-6">{t('roundSetup.newRound')}</h2>
 
@@ -583,16 +604,16 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           {/* Columna derecha: Mi Partida y Estadísticas */}
           <div className="flex flex-col gap-4 h-full">
             {/* Ver Partida Activa */}
-            <div
+            {!isArchivedGroup && <div
               onClick={onViewActiveRounds}
               className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-2 border-amber-300 dark:border-amber-700 rounded-lg shadow-card cursor-pointer hover:shadow-2xl transition-shadow flex-[2] flex flex-col"
             >
               <div className="p-5 pb-4 flex-1">
                 <div className="flex items-start justify-between mb-3">
                   <h2 className="text-2xl font-bold text-amber-900 dark:text-amber-100">
-                    {currentGroup ? t('roundSetup.active') : t('roundSetup.myRound')}
+                    {activeRoundsCount > 1 ? t('roundSetup.myRounds') : t('roundSetup.myRound')}
                   </h2>
-                  <div className="bg-amber-600 text-white font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
+                  <div className="bg-amber-600 text-amber-950 font-bold rounded-full w-8 h-8 flex items-center justify-center text-base">
                     {activeRoundsCount}
                   </div>
                 </div>
@@ -602,11 +623,11 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     : t('roundSetup.myRoundDescription')}
                 </p>
               </div>
-              <button className="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
+              <button className="w-full bg-amber-600 hover:bg-amber-700 text-amber-950 font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
                 {t('roundSetup.viewRound')}
                 <ChevronRight size={20} />
               </button>
-            </div>
+            </div>}
 
             {/* Sección de Estadísticas para Partida Rápida */}
             {!currentGroup && onViewStatistics && (
@@ -650,7 +671,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
             {!currentGroup && isExpress && quickPlayRoundsCount !== null && (
               <div className="bg-amber-100 dark:bg-amber-950 border-2 border-amber-300 dark:border-amber-700 rounded-xl p-4 text-amber-950 dark:text-amber-100 flex items-center gap-3 shadow-card">
-                <Info className="text-amber-600 dark:text-amber-300 flex-shrink-0" size={24} />
+                <Info className="text-amber-700 dark:text-amber-300 flex-shrink-0" size={24} />
                 <div className="text-sm">
                   <p className="font-semibold">{t('roundSetup.express')}</p>
                   <p className="text-amber-800 dark:text-amber-200">
@@ -662,7 +683,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </div>
         </div>
 
-        {/* Puntos de juego */}
+        {/* Clasificación y jugadores */}
         {currentGroup && (
           <div
             onClick={onViewGamePoints}

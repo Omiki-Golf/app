@@ -16,3 +16,7 @@ verify_jwt = false
 
 [functions.stripe-setup]
 verify_jwt = false
+
+# Comprueba el token de la cuenta que se da de baja dentro de la función.
+[functions.delete-account]
+verify_jwt = false

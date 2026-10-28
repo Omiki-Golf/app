@@ -23,7 +23,7 @@ export const CourseChangeConfirmModal: React.FC<CourseChangeConfirmModalProps> =
       <div className="bg-card rounded-lg shadow-card max-w-md w-full p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="bg-amber-100 p-2 rounded-full">
-            <AlertTriangle className="text-amber-600" size={24} />
+            <AlertTriangle className="text-amber-700" size={24} />
           </div>
           <h2 className="text-xl font-bold text-ink">¿Confirmar cambio de campo?</h2>
         </div>

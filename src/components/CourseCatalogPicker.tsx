@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
+import { MapPin, Route, Search, SlidersHorizontal, X } from 'lucide-react';
+import { SelectMenu } from './SelectMenu';
 import type { GolfCourse } from '../types';
-import catalogUrl from '../data/recorridos-golf-espana.json?url';
+import catalogUrl from '../data/generated/course-search.json?url';
 
-interface CatalogRoute { recorrido: string; variante?: number; hoyos: unknown[] }
+interface CatalogRoute { recorrido: string; variante?: number }
 interface CatalogClub { codigo: string; campo: string; comunidad_autonoma: string; provincia: string; recorridos: CatalogRoute[] }
 interface Catalog { campos: CatalogClub[] }
 interface Result { key: string; label: string; club: CatalogClub; route: CatalogRoute; routeIndex: number }
@@ -44,13 +45,15 @@ export function CourseCatalogPicker({ courses, selectedCourseId, onSelect, onUna
     key: `${club.codigo}:${index}`,
     label: `${club.campo} — ${route.recorrido}${route.variante ? ` (variante ${route.variante})` : ''}`,
     club, route, routeIndex: index,
+    searchText: normalize(`${club.campo} — ${route.recorrido}${route.variante ? ` (variante ${route.variante})` : ''} ${club.provincia} ${club.comunidad_autonoma}`),
   }))) ?? [], [catalog]);
-  const normalizedQuery = normalize(query.trim());
-  const results = normalizedQuery.length >= 2 ? allResults.filter(result => normalize(`${result.label} ${result.club.provincia} ${result.club.comunidad_autonoma}`).includes(normalizedQuery)).slice(0, 12) : [];
-  const legacyResults = normalizedQuery.length >= 2 ? courses.filter(course => !course.catalog_key && normalize(course.name).includes(normalizedQuery)).slice(0, 5) : [];
-  const regions = [...new Set((catalog?.campos ?? []).map(club => club.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es'));
-  const provinces = [...new Set((catalog?.campos ?? []).filter(club => !region || club.comunidad_autonoma === region).map(club => club.provincia))].sort((a, b) => a.localeCompare(b, 'es'));
-  const clubs = (catalog?.campos ?? []).filter(club => (!region || club.comunidad_autonoma === region) && (!province || club.provincia === province));
+  const legacyIndex = useMemo(() => courses.filter(course => !course.catalog_key).map(course => ({ course, searchText: normalize(course.name) })), [courses]);
+  const normalizedQuery = useMemo(() => normalize(query.trim()), [query]);
+  const results = useMemo(() => normalizedQuery.length >= 2 ? allResults.filter(result => result.searchText.includes(normalizedQuery)).slice(0, 12) : [], [allResults, normalizedQuery]);
+  const legacyResults = useMemo(() => normalizedQuery.length >= 2 ? legacyIndex.filter(item => item.searchText.includes(normalizedQuery)).slice(0, 5).map(item => item.course) : [], [legacyIndex, normalizedQuery]);
+  const regions = useMemo(() => [...new Set((catalog?.campos ?? []).map(club => club.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es')), [catalog]);
+  const provinces = useMemo(() => [...new Set((catalog?.campos ?? []).filter(club => !region || club.comunidad_autonoma === region).map(club => club.provincia))].sort((a, b) => a.localeCompare(b, 'es')), [catalog, region]);
+  const clubs = useMemo(() => (catalog?.campos ?? []).filter(club => (!region || club.comunidad_autonoma === region) && (!province || club.provincia === province)), [catalog, region, province]);
   const club = clubs.find(item => item.codigo === clubCode);
 
   const choose = (result: Result) => {
@@ -96,10 +99,10 @@ export function CourseCatalogPicker({ courses, selectedCourseId, onSelect, onUna
     {advanced && <div className="fixed inset-0 z-50 bg-black/60 p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="advanced-course-title">
       <div className="bg-card border border-line rounded-2xl shadow-xl w-full max-w-lg p-5 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between"><h2 id="advanced-course-title" className="text-xl font-bold">Búsqueda avanzada</h2><button type="button" onClick={() => setAdvanced(false)} className="p-2" aria-label="Cerrar"><X /></button></div>
-        <label className="block text-sm font-semibold">Comunidad autónoma<select className={`${inputClass} mt-2`} value={region} onChange={event => { setRegion(event.target.value); setProvince(''); setClubCode(''); setRouteIndex(''); }}><option value="">Todas</option>{regions.map(item => <option key={item}>{item}</option>)}</select></label>
-        <label className="block text-sm font-semibold">Provincia<select className={`${inputClass} mt-2`} value={province} onChange={event => { setProvince(event.target.value); setClubCode(''); setRouteIndex(''); }}><option value="">Todas</option>{provinces.map(item => <option key={item}>{item}</option>)}</select></label>
-        <label className="block text-sm font-semibold">Campo<select className={`${inputClass} mt-2`} value={clubCode} onChange={event => { setClubCode(event.target.value); setRouteIndex(''); }}><option value="">Selecciona un campo</option>{clubs.map(item => <option key={item.codigo} value={item.codigo}>{item.campo}</option>)}</select></label>
-        <label className="block text-sm font-semibold">Recorrido<select disabled={!club} className={`${inputClass} mt-2 disabled:opacity-50`} value={routeIndex} onChange={event => setRouteIndex(event.target.value)}><option value="">Selecciona un recorrido</option>{club?.recorridos.map((route, index) => <option key={index} value={index}>{route.recorrido}{route.variante ? ` · variante ${route.variante}` : ''}</option>)}</select></label>
+        <div className="space-y-2"><p className="text-sm font-semibold">Comunidad autónoma</p><SelectMenu inline ariaLabel="Comunidad autónoma" icon={<MapPin size={19} />} value={region} onChange={value => { setRegion(value); setProvince(''); setClubCode(''); setRouteIndex(''); }} options={[{ value: '', label: 'Todas' }, ...regions.map(item => ({ value: item, label: item }))]} /></div>
+        <div className="space-y-2"><p className="text-sm font-semibold">Provincia</p><SelectMenu inline ariaLabel="Provincia" icon={<MapPin size={19} />} value={province} onChange={value => { setProvince(value); setClubCode(''); setRouteIndex(''); }} options={[{ value: '', label: 'Todas' }, ...provinces.map(item => ({ value: item, label: item }))]} /></div>
+        <div className="space-y-2"><p className="text-sm font-semibold">Campo</p><SelectMenu inline ariaLabel="Campo" placeholder="Selecciona un campo" icon={<MapPin size={19} />} value={clubCode} onChange={value => { setClubCode(value); setRouteIndex(''); }} options={clubs.map(item => ({ value: item.codigo, label: item.campo }))} /></div>
+        <div className="space-y-2"><p className="text-sm font-semibold">Recorrido</p><SelectMenu inline ariaLabel="Recorrido" placeholder="Selecciona un recorrido" icon={<Route size={19} />} disabled={!club} value={routeIndex} onChange={setRouteIndex} options={(club?.recorridos ?? []).map((route, index) => ({ value: String(index), label: `${route.recorrido}${route.variante ? ` · variante ${route.variante}` : ''}` }))} /></div>
         <button type="button" disabled={!club || routeIndex === ''} onClick={() => club && choose({ key: `${club.codigo}:${routeIndex}`, label: '', club, route: club.recorridos[Number(routeIndex)], routeIndex: Number(routeIndex) })} className="w-full bg-accent text-on-accent rounded-xl py-3 font-bold disabled:opacity-50">Seleccionar recorrido</button>
       </div>
     </div>}

@@ -1,6 +1,6 @@
 # Trabajar en local — entorno principal
 
-Desde el 16/09/2026 el ordenador local Windows es el entorno principal. Proyecto: `C:\Users\VORPC\OneDrive\Escritorio\Fede\00-LaPartideta_Test\project`; terminal PowerShell. Codespaces queda como alternativa, descrita en [CODESPACE_SETUP.md](CODESPACE_SETUP.md). La aplicación publicada y Supabase siguen siendo los mismos.
+Desde el 16/09/2026 el ordenador local Windows es el entorno principal. Proyecto: `C:\Users\user\Desktop\Trabajo\La Partideta KF\project`; terminal PowerShell. Codespaces queda como alternativa, descrita en [CODESPACE_SETUP.md](CODESPACE_SETUP.md). La aplicación publicada y Supabase siguen siendo los mismos.
 
 Estado del 30/09/2026: la integración está en `main` (`ceb08de`), subida a GitHub y
 desplegada en el VPS. Trabajar en `main`. El respaldo original se conserva en

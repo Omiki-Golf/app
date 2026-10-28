@@ -1,11 +1,12 @@
 import { WriteButton, WriteForm } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect, useRef } from 'react';
-import { RoundPlayer, Player, GameMode } from '../types';
-import { calculatePlayingHandicap } from '../utils/calculations';
+import { TopBar } from './TopBar';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { RoundPlayer, Player, GameMode, UserProfile, Group, GolfHole } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { golfService } from '../services/golfService';
-import { Trash2, Plus, Settings, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
+import { userService } from '../services/userService';
+import { Trash2, Plus, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
@@ -19,16 +20,25 @@ interface PlayerSetupProps {
   courseId: string;
   accessCode?: string;
   hasEditAccess?: boolean;
-  currentGroup?: any;
+  currentGroup?: Group | null;
   gameMode?: GameMode;
   onPlayersUpdated: (players: RoundPlayer[]) => void;
   onStartRound: () => void;
+  /** En grupos: guardar la partida y volver al inicio del grupo para preparar otra salida. */
+  onSaveAndReturn?: () => void;
+  /** Campana de avisos en la cabecera (no flotante), como en el resto de pantallas. */
+  messagesButton?: React.ReactNode;
   onOpenHoleConfig: () => void;
-  onHolesChanged?: (numHoles: 9 | 18, holes: any[]) => void;
+  onHolesChanged?: (numHoles: 9 | 18, holes: GolfHole[]) => void;
   onBack?: () => void;
   backDestination?: 'back' | 'home';
   loading?: boolean;
+  /** Cuenta con sesión iniciada: su jugador queda vinculado para las estadísticas acumuladas. */
+  account?: { userId: string; nick: string; displayName?: string | null; handicap: number } | null;
 }
+
+const normalizeName = (value: string | null | undefined) =>
+  (value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   roundId,
@@ -42,27 +52,46 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   gameMode = 'stableford',
   onPlayersUpdated,
   onStartRound,
+  onSaveAndReturn,
+  messagesButton,
   onOpenHoleConfig,
   onHolesChanged,
   onBack, backDestination = 'back',
   loading = false,
+  account = null,
 }) => {
   const { user } = useAuth();
+  // El jugador de la cuenta: vinculado por id o, si aún no lo está, por coincidir con el nick o el nombre.
+  const isAccountName = (name: string) => !!account && [account.nick, account.displayName]
+    .some(candidate => normalizeName(candidate) !== '' && normalizeName(candidate) === normalizeName(name));
+  const accountInRound = !!account && players.some(player => player.user_id === account.userId);
+  const canAddSelf = !!account && !currentGroup && !accountInRound && !players.some(player => isAccountName(player.name));
+  const prefillSelf = () => {
+    if (!account) return;
+    setSelectedPlayer(null);
+    setCreatingUnlinked(false);
+    setSearchTerm(account.nick);
+    // El hándicap del perfil es el exacto; el campo pide el de los hoyos de la partida.
+    const forHoles = numHoles === 18 ? account.handicap : account.handicap / 2;
+    setHandicap(String(Math.round(forHoles * 10) / 10));
+    setShowDropdown(false);
+  };
   const playerLoadVersion = useRef(0);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [playersInActiveRounds, setPlayersInActiveRounds] = useState<string[]>([]);
+  const [playerNamesInActiveRounds, setPlayerNamesInActiveRounds] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [creatingUnlinked, setCreatingUnlinked] = useState(false);
-  const [isGuest, setIsGuest] = useState(false);
-  const [canManage, setCanManage] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+  // Partida rápida con sesión: compañeros registrados encontrados por nick y el elegido.
+  const [registeredResults, setRegisteredResults] = useState<UserProfile[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<UserProfile | null>(null);
   const [handicap, setHandicap] = useState('');
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  const [changingHoles, setChangingHoles] = useState(false);
-  const [courseHoleCount, setCourseHoleCount] = useState<number>(18);
+  const [, setChangingHoles] = useState(false);
   const [showHolesRangeModal, setShowHolesRangeModal] = useState(false);
   const [pendingNumHoles, setPendingNumHoles] = useState<9 | 18 | null>(null);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
@@ -76,6 +105,45 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [showEditPlayerModal, setShowEditPlayerModal] = useState(false);
   const [localAiSuggestions, setLocalAiSuggestions] = useState<string[]>([]);
 
+  const loadPlayers = useCallback(async () => {
+    const request = ++playerLoadVersion.current;
+    try {
+      let allPlayersData: Player[] = [];
+
+      if (currentGroup || user) {
+        allPlayersData = await golfService.getAllPlayers(currentGroup?.id);
+      } else {
+        const localPlayers = localStorage.getItem('quickPlayPlayers');
+        if (localPlayers) {
+          allPlayersData = JSON.parse(localPlayers);
+        }
+      }
+
+      const [playersInRounds, namesInRounds] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, currentGroup?.id)]);
+      if (request !== playerLoadVersion.current) return;
+      setAllPlayers(allPlayersData);
+      setPlayersInActiveRounds(playersInRounds);
+      setPlayerNamesInActiveRounds(namesInRounds);
+    } catch (err) {
+      console.error('Error loading players:', err);
+    }
+  }, [currentGroup, roundId, user]);
+
+  const loadSlope = useCallback(async () => {
+    if (!useSlope) return;
+
+    try {
+      const slopeInfo = await golfService.getRoundSlope(roundId);
+      if (slopeInfo) {
+        setCurrentSlope(slopeInfo.slope);
+        setIsManualSlope(slopeInfo.isManual);
+        setTeeName(slopeInfo.teeName || '');
+      }
+    } catch (err) {
+      console.error('Error loading slope:', err);
+    }
+  }, [roundId, useSlope]);
+
   useEffect(() => {
     let active = true;
     const refresh = () => { if (active) void loadPlayers(); };
@@ -83,8 +151,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     void loadSlope();
     const timer = window.setInterval(refresh, 30000);
     window.addEventListener('focus', refresh);
-    return () => { active = false; playerLoadVersion.current++; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
-  }, [roundId, currentGroup?.id, user?.id]);
+    const loadVersionRef = playerLoadVersion;
+    return () => { active = false; loadVersionRef.current++; window.clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [loadPlayers, loadSlope]);
 
   useEffect(() => {
     try {
@@ -95,21 +164,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   }, [roundId]);
 
   useEffect(() => {
-    const loadCourseDetails = async () => {
-      try {
-        const holeCount = await golfService.getCourseHoleCount(courseId);
-        setCourseHoleCount(holeCount);
-      } catch (err) {
-        console.error('Error loading course details:', err);
-      }
-    };
-
-    loadCourseDetails();
-  }, [courseId]);
-
-  useEffect(() => {
-    loadSlope();
-  }, [roundId, numHoles]);
+    void loadSlope();
+  }, [loadSlope, numHoles]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -125,43 +181,28 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     };
   }, []);
 
-  const loadPlayers = async () => {
-    const request = ++playerLoadVersion.current;
-    try {
-      let allPlayersData: Player[] = [];
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!user || currentGroup || term.length < 2 || selectedAccount) { setRegisteredResults([]); return; }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await userService.searchByNick(term);
+        if (active) setRegisteredResults(results.filter(result => result.user_id !== account?.userId));
+      } catch { if (active) setRegisteredResults([]); }
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [searchTerm, user, currentGroup, selectedAccount, account?.userId]);
 
-      if (currentGroup) {
-        allPlayersData = await golfService.getAllPlayers(currentGroup.id);
-      } else {
-        const localPlayers = localStorage.getItem('quickPlayPlayers');
-        if (localPlayers) {
-          allPlayersData = JSON.parse(localPlayers);
-        }
-      }
-
-      const playersInRounds = await golfService.getPlayersInActiveRounds(roundId);
-      if (request !== playerLoadVersion.current) return;
-      setAllPlayers(allPlayersData);
-      setCanManage(allPlayersData.some(player => player.can_manage));
-      setPlayersInActiveRounds(playersInRounds);
-    } catch (err) {
-      console.error('Error loading players:', err);
-    }
-  };
-
-  const loadSlope = async () => {
-    if (!useSlope) return;
-
-    try {
-      const slopeInfo = await golfService.getRoundSlope(roundId);
-      if (slopeInfo) {
-        setCurrentSlope(slopeInfo.slope);
-        setIsManualSlope(slopeInfo.isManual);
-        setTeeName(slopeInfo.teeName || '');
-      }
-    } catch (err) {
-      console.error('Error loading slope:', err);
-    }
+  const handleSelectAccount = (profile: UserProfile) => {
+    setCreatingUnlinked(false);
+    setSelectedPlayer(null);
+    setSelectedAccount(profile);
+    setSearchTerm(profile.nick);
+    // El hándicap del perfil es el exacto de 18 hoyos; el campo pide el de los hoyos de la partida.
+    const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
+    setHandicap(String(Math.round(forHoles * 10) / 10));
+    setShowDropdown(false);
   };
 
   const handleEditSlope = () => {
@@ -208,17 +249,16 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
   const playersInThisRound = players.map(p => p.player_id).filter(Boolean);
 
-  const filteredPlayers = allPlayers.filter((player) => {
-    const matchesSearch = player.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const isInThisRound = playersInThisRound.includes(player.id);
-    const isInOtherRound = playersInActiveRounds.includes(player.id);
-    return matchesSearch && !isInThisRound && !isInOtherRound;
-  });
+  const filteredPlayers = allPlayers.filter((player) => normalizeName(player.name).includes(normalizeName(searchTerm)));
+  const playerAvailability = (player: Player) => {
+    if (playersInThisRound.includes(player.id) || players.some(item => normalizeName(item.name) === normalizeName(player.name))) return 'Ya está en esta partida';
+    if (playersInActiveRounds.includes(player.id) || playerNamesInActiveRounds.some(name => normalizeName(name) === normalizeName(player.name))) return 'Está en otra partida activa';
+    return '';
+  };
 
   const handleSelectPlayer = (player: Player) => {
     setCreatingUnlinked(false);
     setSelectedPlayer(player);
-    setIsGuest(!!player.is_guest);
     setSearchTerm(player.name);
     const baseHandicap = player.exact_handicap_18 ?? player.exact_handicap;
     const displayHandicap = numHoles === 18 ? baseHandicap * 2 : baseHandicap;
@@ -227,8 +267,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   };
 
   const handleSearchChange = (value: string) => {
-    setIsGuest(false);
     setCreatingUnlinked(false);
+    setSelectedAccount(null);
     setSearchTerm(value);
     setSelectedPlayer(null);
     setShowDropdown(true);
@@ -259,10 +299,22 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       const handicapFor9Holes = numHoles === 18 ? handicapNum / 2 : handicapNum;
       const playerName = searchTerm.trim();
+      const pickedAccount = selectedAccount && normalizeName(selectedAccount.nick) === normalizeName(playerName) ? selectedAccount : null;
+      if (pickedAccount && players.some(player => player.user_id === pickedAccount.user_id)) {
+        setError(`${pickedAccount.nick} ya está en esta partida`);
+        return;
+      }
+      const linkedUserId = pickedAccount ? pickedAccount.user_id : isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
 
       let newPlayer: RoundPlayer;
       if (currentGroup) {
-        newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, isGuest, selectedPlayer?.id);
+        newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, false, selectedPlayer?.id);
+      } else if (user && pickedAccount) {
+        // La cuenta invitada decide si incorpora esta partida a su historial y estadísticas.
+        newPlayer = await golfService.addRegisteredQuickRoundPlayer(roundId, pickedAccount.user_id);
+      } else if (user) {
+        const suggestion = await golfService.saveQuickPlayerSuggestion(playerName, handicapNum * (numHoles === 9 ? 2 : 1));
+        newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, suggestion.exact_handicap, useSlope, undefined, linkedUserId);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         const playersArray: Player[] = localPlayers ? JSON.parse(localPlayers) : [];
@@ -283,7 +335,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         }
 
         localStorage.setItem('quickPlayPlayers', JSON.stringify(playersArray));
-        newPlayer = await golfService.addPlayerToRound(roundId, playerName, handicapFor9Holes, useSlope);
+        newPlayer = await golfService.addPlayerToRound(roundId, playerName, handicapFor9Holes, useSlope, undefined, linkedUserId);
       }
 
       onPlayersUpdated([...players, newPlayer]);
@@ -292,9 +344,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
       setSearchTerm('');
       setCreatingUnlinked(false);
-      setIsGuest(false);
       setHandicap('');
       setSelectedPlayer(null);
+      setSelectedAccount(null);
       setShowDropdown(false);
     } catch (err) {
       setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'Error añadiendo jugador');
@@ -319,6 +371,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     try {
       if (currentGroup) {
         await golfService.deletePlayer(playerId);
+      } else if (user) {
+        await golfService.hideQuickPlayerSuggestion(playerId);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         if (localPlayers) {
@@ -331,17 +385,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     } catch (err) {
       console.error('Error deleting player:', err);
       setError('Error eliminando jugador de la memoria');
-    }
-  };
-
-  const handleChangeHoles = async (newNumHoles: 9 | 18) => {
-    if (!onHolesChanged) return;
-
-    if (newNumHoles === 9 && courseHoleCount === 18) {
-      setPendingNumHoles(newNumHoles);
-      setShowHolesRangeModal(true);
-    } else {
-      await executeHolesChange(newNumHoles, null);
     }
   };
 
@@ -375,11 +418,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const handleHolesRangeCancel = () => {
     setPendingNumHoles(null);
     setShowHolesRangeModal(false);
-  };
-
-  const handleOpenHoleConfigClick = () => {
-    setShowAdminPinModal(true);
-    setPinError('');
   };
 
   const handlePinSubmit = (pin: string) => {
@@ -436,22 +474,23 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       : `Jugador ${nextPlayerNumber}`;
 
   const isNewPlayer = searchTerm && !allPlayers.find(
-    (p) => !p.auth_user_id && p.name.toLowerCase() === searchTerm.toLowerCase()
+    (p) => !p.auth_user_id && normalizeName(p.name) === normalizeName(searchTerm)
   );
 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
-            {onBack && (
+          <TopBar
+            className="mb-6"
+            left={onBack && (
               <NavigationButton destination={backDestination}
                 onClick={onBack}
                 className="text-accent-ink hover:text-title font-semibold flex items-center gap-2 transition-colors"
               />
             )}
-            <div className="flex-1"></div>
-          </div>
+            center={messagesButton}
+          />
           <h1 className="text-3xl md:text-4xl font-bold text-title mb-2 text-center">
             Configuración de Partida
           </h1>
@@ -467,12 +506,8 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           {!canAddMorePlayers && (
             <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded mb-6">
               <p className="text-amber-800 font-semibold">
-                {gameMode === 'match'
-                  ? 'Match requiere exactamente 2 jugadores'
-                  : gameMode === 'sindicato'
-                  ? 'Sindicato requiere exactamente 3 jugadores'
-                  : gameMode === 'parejas'
-                  ? 'Parejas requiere exactamente 4 jugadores (2 parejas)'
+                {gameMode === 'match' || gameMode === 'sindicato' || gameMode === 'parejas'
+                  ? `Partida completa, ya hay ${maxPlayers} jugadores`
                   : 'Límite alcanzado: Máximo 4 jugadores por partida'}
               </p>
             </div>
@@ -487,6 +522,15 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
           )}
 
           <WriteForm onSubmit={handleAddPlayer} className="space-y-4 mb-8">
+            {canAddSelf && account && (
+              <button
+                type="button"
+                onClick={prefillSelf}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-ring bg-accent-soft px-4 py-3 font-semibold text-accent-ink transition-colors hover:bg-card-2"
+              >
+                <Plus size={18} /> Añadirme a la partida ({account.nick})
+              </button>
+            )}
             <div className="relative player-search-container">
               <label className="block text-sm font-semibold text-ink-2 mb-2">
                 {playerNameLabel}
@@ -508,7 +552,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                   onFocus={() => setShowDropdown(true)}
                   placeholder="Buscar o crear jugador..."
                   disabled={adding || loading || !canAddMorePlayers}
-                  className="w-full px-4 py-3 pr-10 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent transition-colors disabled:bg-gray-100"
+                  className="min-h-12 w-full rounded-2xl border border-line bg-card px-4 py-3 pr-10 text-sm font-semibold text-ink shadow-card transition focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent disabled:opacity-50"
                   autoComplete="off"
                 />
                 <ChevronDown
@@ -518,30 +562,33 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               </div>
 
               {showDropdown && (
-                <div className="absolute z-10 w-full mt-1 bg-card border-2 border-line-2 rounded-lg shadow-card max-h-60 overflow-y-auto">
+                <div className="absolute z-50 mt-2 w-full max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain rounded-2xl border border-line bg-card p-2 shadow-2xl">
                   {filteredPlayers.length > 0 ? (
                     <div>
-                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
                         JUGADORES EXISTENTES
                       </div>
-                      {filteredPlayers.map((player) => (
+                      {filteredPlayers.map((player) => {
+                        const unavailable = playerAvailability(player);
+                        return (
                         <div
                           key={player.id}
-                          className="flex items-center hover:bg-accent-soft border-b border-line transition-colors"
+                          className="flex items-center rounded-xl transition hover:bg-card-2 active:bg-accent-soft"
                         >
                           <button
                             type="button"
                             onClick={() => handleSelectPlayer(player)}
-                            disabled={player.handicap_pending}
-                            className="flex-1 px-4 py-3 text-left"
+                            disabled={player.handicap_pending || Boolean(unavailable)}
+                            className="flex-1 px-4 py-3 text-left disabled:opacity-60"
                           >
                             <p className="font-semibold text-ink">{player.name}</p>
-                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
+                            <p className="text-xs text-ink-3">{player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
+                            {unavailable && <p className="text-xs font-medium text-amber-700">{unavailable}</p>}
                             <p className="text-sm text-ink-3">
                               Hándicap ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
                             </p>
                           </button>
-                          <WriteButton
+                          {!player.quick_suggestion && <WriteButton
                             type="button"
                             disabled={!!player.auth_user_id}
                             onClick={(e) => handleEditPlayerClick(player, e)}
@@ -549,26 +596,66 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             title="Editar nombre"
                           >
                             <Edit2 size={18} />
-                          </WriteButton>
+                          </WriteButton>}
+                          {!currentGroup && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeletePlayerFromMemory(player.id, e)}
+                              className="px-3 py-3 text-ink-3 hover:text-red-600 transition-colors"
+                              title="Quitar de las sugerencias"
+                              aria-label={`Quitar a ${player.name} de las sugerencias`}
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
                         </div>
-                      ))}
+                      )})}
                     </div>
-                  ) : searchTerm ? (
+                  ) : searchTerm && registeredResults.length === 0 ? (
                     <div className="px-4 py-3 text-center text-ink-3">
                       No se encontraron jugadores
                     </div>
                   ) : null}
 
-                  {isNewPlayer && searchTerm && !selectedPlayer && (
+                  {registeredResults.length > 0 && (
+                    <div>
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
+                        JUGADORES REGISTRADOS
+                      </div>
+                      {registeredResults.map((profile) => {
+                        const linkedInRound = players.some(player => player.user_id === profile.user_id);
+                        const pendingInRound = players.some(player => !player.user_id && normalizeName(player.name) === normalizeName(profile.nick));
+                        const inRound = linkedInRound || pendingInRound;
+                        return (
+                          <button
+                            key={profile.user_id}
+                            type="button"
+                            onClick={() => handleSelectAccount(profile)}
+                            disabled={inRound}
+                            className="w-full rounded-xl px-3 py-3 text-left transition hover:bg-card-2 active:bg-accent-soft disabled:opacity-60"
+                          >
+                            <p className="font-semibold text-ink">{profile.nick}</p>
+                            <p className="text-xs text-ink-3">Cuenta registrada · recibirá una invitación para guardar los resultados</p>
+                            {inRound && <p className="text-xs font-medium text-amber-700">{pendingInRound ? 'Invitación pendiente' : 'Ya está en esta partida'}</p>}
+                            <p className="text-sm text-ink-3">
+                              Hándicap ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {isNewPlayer && searchTerm && !selectedPlayer && !selectedAccount && (
                     <button
                       type="button"
                       onClick={() => { setCreatingUnlinked(true); setSelectedPlayer(null); setShowDropdown(false); }}
                       className="w-full"
                     >
-                      <div className="px-3 py-2 text-xs font-semibold text-ink-3 bg-card-2 border-b">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
                         CREAR FICHA SIN CUENTA VINCULADA
                       </div>
-                      <div className="px-4 py-3 bg-accent-soft hover:bg-accent-soft transition-colors">
+                      <div className="rounded-xl bg-accent-soft px-3 py-3 text-left transition hover:brightness-95">
                         <p className="font-semibold text-accent-ink">
                           Crear: {searchTerm}
                         </p>
@@ -581,26 +668,6 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                 </div>
               )}
             </div>
-
-            {currentGroup && !selectedPlayer?.auth_user_id && (
-              <div className="rounded-lg border border-line p-3">
-                <label className="flex items-center gap-2 text-sm font-semibold text-ink-2">
-                  <input type="checkbox" checked={isGuest}
-                    disabled={adding || loading || !canAddMorePlayers || !!selectedPlayer}
-                    onChange={event => setIsGuest(event.target.checked)} />
-                  Invitado: solo juega esta partida
-                </label>
-                <p className="text-xs text-ink-3 mt-2">
-                  {isGuest || !selectedPlayer ? 'No contará en las estadísticas ni en los ajustes automáticos del grupo si marcas Invitado.' : 'Cuenta como miembro del grupo en estadísticas, cervezas y ajustes de hándicap.'}
-                </p>
-                {selectedPlayer?.is_guest && canManage && <div className="mt-2">
-                  <WriteButton type="button" disabled={adding} onClick={() => setIsGuest(!isGuest)} className="text-sm text-accent-ink underline">
-                    {isGuest ? 'Incorporar al grupo' : 'Mantener como invitado'}
-                  </WriteButton>
-                  {!isGuest && <p className="text-xs text-ink-3 mt-1">Se incorporará al añadirlo. Las partidas anteriores conservan su condición de invitado.</p>}
-                </div>}
-              </div>
-            )}
 
             <div>
               <label className="block text-sm font-semibold text-ink-2 mb-2">
@@ -625,7 +692,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                       <div className="flex-1">
                         <p className="text-xs font-semibold text-ink-2">
                           Slope: {currentSlope}
-                          {isManualSlope && <span className="text-amber-600 ml-1">(Manual)</span>}
+                          {isManualSlope && <span className="text-amber-700 ml-1">(Manual)</span>}
                           {!isManualSlope && teeName && <span className="text-ink-3 ml-1">({teeName})</span>}
                         </p>
                         <p className="text-xs text-ink-3 mt-0.5">
@@ -707,7 +774,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
           <div className="border-t pt-6 mb-6">
             <h2 className="text-lg font-semibold text-ink mb-4">
-              Jugadores Agregados ({players.length} de {maxPlayers})
+              Jugadores de la partida ({players.length}/{maxPlayers})
             </h2>
 
             {players.length === 0 ? (
@@ -733,7 +800,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-ink">{player.name}</p>
-                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
+                            <p className="text-xs text-ink-3">{player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
                         {teamIdx >= 0 && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${teamIdx === 0 ? 'bg-blue-200 text-blue-800' : 'bg-orange-200 text-orange-800'}`}>
                             P{teamIdx + 1}
@@ -789,16 +856,20 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               </div>
             )}
 
-            {currentGroup ? (
-              <NavigationButton
-                destination="home"
-                aria-label="Guardar y volver al inicio"
-                title="Guardar y volver al inicio"
-                onClick={onStartRound}
-                disabled={!canStartRound || loading || !canStartWithMode}
-                className="bg-accent hover:bg-accent-hover text-on-accent py-3 px-3 disabled:bg-neutral-hover disabled:text-ink-3 disabled:cursor-not-allowed transition-colors"
-              />
-            ) : <WriteButton
+            {currentGroup && onSaveAndReturn && (
+              <div className="flex items-center gap-3">
+                <NavigationButton
+                  destination="home"
+                  aria-label="Guardar y volver al inicio del grupo"
+                  title="Guardar y volver al inicio del grupo"
+                  onClick={onSaveAndReturn}
+                  disabled={!canStartRound || loading || !canStartWithMode}
+                  className="shrink-0 bg-card border border-line text-ink-2 py-3 px-3 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                />
+                <p className="text-xs text-ink-3">Guarda la partida y vuelve al grupo para preparar otra salida.</p>
+              </div>
+            )}
+            <WriteButton
               onClick={onStartRound}
               disabled={!canStartRound || loading || !canStartWithMode}
               className={`w-full py-3 rounded-lg font-bold text-lg transition-all ${
@@ -808,7 +879,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               }`
             }>
               Comenzar Partida
-            </WriteButton>}
+            </WriteButton>
           </div>
         </div>
       </div>

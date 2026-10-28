@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { SelectMenu } from "../SelectMenu";
 import {
   adminService,
   type ManagedUser,
@@ -114,34 +115,31 @@ export function AdminUsers({
         </label>
         <label>
           Plan
-          <select
-            className={input}
+          <SelectMenu
+            ariaLabel="Plan"
             value={plan}
-            onChange={(e) => {
-              setPlan(e.target.value);
+            onChange={(value) => {
+              setPlan(value);
               setPage(0);
             }}
-          >
-            <option value="">Todos</option>
-            {["express", "player", "team", "premium"].map((p) => (
-              <option key={p}>{p}</option>
-            ))}
-          </select>
+            options={[{ value: "", label: "Todos" }, ...["express", "player", "team", "premium"].map((p) => ({ value: p, label: p }))]}
+          />
         </label>
         <label>
           Estado
-          <select
-            className={input}
+          <SelectMenu
+            ariaLabel="Bloqueo"
             value={blocked}
-            onChange={(e) => {
-              setBlocked(e.target.value);
+            onChange={(value) => {
+              setBlocked(value);
               setPage(0);
             }}
-          >
-            <option value="">Todos</option>
-            <option value="yes">Solo lectura</option>
-            <option value="no">Sin bloqueo</option>
-          </select>
+            options={[
+              { value: "", label: "Todos" },
+              { value: "yes", label: "Solo lectura" },
+              { value: "no", label: "Sin bloqueo" },
+            ]}
+          />
         </label>
       </div>
       {error && (
@@ -434,19 +432,12 @@ function UserDetail({
                 </label>
                 <label className="grid grid-cols-[minmax(6rem,0.4fr)_minmax(0,1fr)] gap-4 items-center">
                   Avatar
-                  <select
-                    className={input}
+                  <SelectMenu
+                    ariaLabel="Avatar"
                     value={profile.avatar_url || DEFAULT_AVATAR_URL}
-                    onChange={(e) =>
-                      setProfile({ ...profile, avatar_url: e.target.value })
-                    }
-                  >
-                    {AVATAR_OPTIONS.map((a) => (
-                      <option key={a.id} value={a.url}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setProfile({ ...profile, avatar_url: value })}
+                    options={AVATAR_OPTIONS.map((a) => ({ value: a.url, label: a.name }))}
+                  />
                 </label>
                 <label className="grid grid-cols-[minmax(6rem,0.4fr)_minmax(0,1fr)] gap-4 items-center">
                   Hándicap
@@ -466,17 +457,12 @@ function UserDetail({
                 </label>
                 <label className="grid grid-cols-[minmax(6rem,0.4fr)_minmax(0,1fr)] gap-4 items-center">
                   Barras
-                  <select
-                    className={input}
+                  <SelectMenu
+                    ariaLabel="Barras por defecto"
                     value={profile.default_tee}
-                    onChange={(e) =>
-                      setProfile({ ...profile, default_tee: e.target.value })
-                    }
-                  >
-                    {["amarillo", "rojo", "blanco", "azul"].map((t) => (
-                      <option key={t}>{t}</option>
-                    ))}
-                  </select>
+                    onChange={(value) => setProfile({ ...profile, default_tee: value })}
+                    options={["amarillo", "rojo", "blanco", "azul"].map((t) => ({ value: t, label: t }))}
+                  />
                 </label>
               </>
             )}
@@ -484,15 +470,12 @@ function UserDetail({
               <>
                 <label className="grid grid-cols-[minmax(6rem,0.4fr)_minmax(0,1fr)] gap-4 items-center">
                   Plan
-                  <select
-                    className={input}
+                  <SelectMenu
+                    ariaLabel="Plan"
                     value={plan}
-                    onChange={(e) => setPlan(e.target.value as typeof plan)}
-                  >
-                    {["express", "player", "team", "premium"].map((p) => (
-                      <option key={p}>{p}</option>
-                    ))}
-                  </select>
+                    onChange={(value) => setPlan(value as typeof plan)}
+                    options={["express", "player", "team", "premium"].map((p) => ({ value: p, label: p }))}
+                  />
                 </label>
                 {plan !== "express" && (
                   <>

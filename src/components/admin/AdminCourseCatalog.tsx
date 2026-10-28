@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SelectMenu } from '../SelectMenu';
 import catalogUrl from '../../data/recorridos-golf-espana.json?url';
 
 interface CatalogRoute {
@@ -75,10 +76,10 @@ export default function AdminCourseCatalog() {
     </div>
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <label>Buscar campo o código<input type="search" value={search} onChange={event => { setSearch(event.target.value); resetSelection(); }} className={inputClass} /></label>
-      <label>Comunidad autónoma<select value={region} onChange={event => { setRegion(event.target.value); setProvince(''); resetSelection(); }} className={inputClass}><option value="">Todas las comunidades</option>{[...new Set(data.campos.map(item => item.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es')).map(item => <option key={item}>{item}</option>)}</select></label>
-      <label>Provincia<select value={province} onChange={event => { setProvince(event.target.value); resetSelection(); }} className={inputClass}><option value="">Todas las provincias</option>{[...new Set(availableProvinces)].sort((a, b) => a.localeCompare(b, 'es')).map(item => <option key={item}>{item}</option>)}</select></label>
-      <label>Campo<select disabled={!club} value={club?.codigo ?? ''} onChange={event => { setCode(event.target.value); setRouteIndex(0); }} className={inputClass}>{!club && <option value="">Sin resultados</option>}{groupedClubs.map(group => <optgroup key={group} label={group}>{filtered.filter(item => item.comunidad_autonoma === group).map(item => <option key={item.codigo} value={item.codigo}>{item.campo} ({item.provincia}){item.recorridos.length ? '' : ' — sin recorrido'}</option>)}</optgroup>)}</select></label>
-      <label>Recorrido<select disabled={!route} value={route ? club.recorridos.indexOf(route) : ''} onChange={event => setRouteIndex(Number(event.target.value))} className={inputClass}>{!route && <option value="">Sin recorrido</option>}{club?.recorridos.map((item, index) => <option key={index} value={index}>{item.recorrido}{item.variante ? ` · variante ${item.variante}` : ''}</option>)}</select></label>
+      <label>Comunidad autónoma<SelectMenu ariaLabel="Comunidad autónoma" value={region} onChange={value => { setRegion(value); setProvince(''); resetSelection(); }} options={[{ value: '', label: 'Todas las comunidades' }, ...[...new Set(data.campos.map(item => item.comunidad_autonoma))].sort((a, b) => a.localeCompare(b, 'es')).map(item => ({ value: item, label: item }))]} /></label>
+      <label>Provincia<SelectMenu ariaLabel="Provincia" value={province} onChange={value => { setProvince(value); resetSelection(); }} options={[{ value: '', label: 'Todas las provincias' }, ...[...new Set(availableProvinces)].sort((a, b) => a.localeCompare(b, 'es')).map(item => ({ value: item, label: item }))]} /></label>
+      <label>Campo<SelectMenu ariaLabel="Campo" placeholder="Sin resultados" disabled={!club} value={club?.codigo ?? ''} onChange={value => { setCode(value); setRouteIndex(0); }} options={groupedClubs.flatMap(group => filtered.filter(item => item.comunidad_autonoma === group).map(item => ({ value: item.codigo, label: `${item.campo} (${item.provincia})${item.recorridos.length ? '' : ' — sin recorrido'}` })))} /></label>
+      <label>Recorrido<SelectMenu ariaLabel="Recorrido" placeholder="Sin recorrido" disabled={!route} value={route ? String(club.recorridos.indexOf(route)) : ''} onChange={value => setRouteIndex(Number(value))} options={(club?.recorridos ?? []).map((item, index) => ({ value: String(index), label: `${item.recorrido}${item.variante ? ` · variante ${item.variante}` : ''}` }))} /></label>
     </div>
     {!club ? <p role="status">No hay campos que coincidan con la búsqueda.</p> : <article className="bg-card border border-line rounded-2xl p-4 space-y-4">
       <div><h3 className="text-xl font-semibold">{club.campo}</h3><p className="text-ink-3">{club.codigo} · {club.comunidad_autonoma} · {club.provincia} · {club.estado}</p></div>

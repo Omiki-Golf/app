@@ -4,6 +4,7 @@ import { X, Zap, CheckCircle2, Copy, Check } from 'lucide-react';
 import { createInvoice, checkPayment, LightningInvoice } from '../services/lightningService';
 import { supabase } from '../services/supabaseClient';
 import { UserTier } from '../types';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface PremiumModalProps {
   isOpen: boolean;
@@ -70,9 +71,9 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
         }
       }, 3000);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error al generar la factura:', err);
-      setError(err.message || 'Error al conectar con la pasarela BTCPay');
+      setError(getErrorMessage(err, 'Error al conectar con la pasarela BTCPay'));
       setLoading(false);
     }
   };
@@ -121,7 +122,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
             <button
               onClick={handleGenerateInvoice}
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-amber-950 font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {loading ? 'Generando factura...' : 'Pagar con Lightning'}
             </button>
@@ -153,7 +154,7 @@ export const PremiumModal: React.FC<PremiumModalProps> = ({ isOpen, onClose, use
                 </p>
                 <button
                   onClick={handleCopy}
-                  className="text-xs text-amber-600 hover:underline font-medium flex items-center gap-1"
+                  className="text-xs text-amber-700 hover:underline font-medium flex items-center gap-1"
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
                   {copied ? '¡Copiado!' : 'Copiar texto de la factura'}

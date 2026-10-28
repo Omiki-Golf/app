@@ -145,7 +145,7 @@ export const adminService = {
       // Deploy the frontend before the additive migration without breaking players.
       // Known administrative identities must NEVER fall through into the player app.
       if (error.code === 'PGRST202' && user.app_metadata?.app_account_type !== 'administrator') return null;
-      throw new Error('No se han podido comprobar los permisos de esta cuenta.');
+      throw new Error('No se han podido comprobar los permisos de esta cuenta. Revisa la conexión y pulsa «Reintentar».');
     }
     if (!data && user.app_metadata?.app_account_type === 'administrator') {
       throw new Error('La cuenta administrativa necesita completar su configuración.');

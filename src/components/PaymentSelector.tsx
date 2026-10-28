@@ -4,9 +4,9 @@ import React, { useState } from 'react';
 import { X, CreditCard, Zap, Check, ArrowLeft, AlertCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { createInvoice, checkPayment, LightningInvoice } from '../services/lightningService';
-import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { PlanType } from '../types';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface PaymentSelectorProps {
   isOpen: boolean;
@@ -64,8 +64,8 @@ export const PaymentSelector: React.FC<PaymentSelectorProps> = ({
           console.warn('Error polling:', err);
         }
       }, 3000);
-    } catch (err: any) {
-      setError(err.message || 'Error al generar la factura Lightning');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al generar la factura Lightning'));
       setState('select');
     }
   };
@@ -154,7 +154,7 @@ export const PaymentSelector: React.FC<PaymentSelectorProps> = ({
             </p>
             <button
               onClick={handleCopy}
-              className="text-xs text-amber-600 hover:underline font-medium flex items-center gap-1"
+              className="text-xs text-amber-700 hover:underline font-medium flex items-center gap-1"
             >
               {copied ? <Check size={14} /> : <ArrowLeft size={14} />}
               {copied ? 'Copiado' : 'Copiar factura'}

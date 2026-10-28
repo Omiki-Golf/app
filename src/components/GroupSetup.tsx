@@ -1,14 +1,14 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
-//import { Users, LogIn, Plus, Zap, User, Flag, UserCheck, RefreshCw, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
-// 1. Añade Share2 al import de lucide-react
-import { Users, LogIn, Plus, Zap, User, Flag, UserCheck, RefreshCw, Mail, Lock, Eye, EyeOff, AlertCircle, Share2} from 'lucide-react';
-import { Group, UserTier } from '../types';
+import { LogIn, Plus, Zap, Flag, UserCheck, RefreshCw, Mail, Lock, Eye, EyeOff, Share2} from 'lucide-react';
+import { Group } from '../types';
 import { supabase } from '../services/supabaseClient';
 import ComingSoonModal from './ComingSoonModal';
 import CreateGroupComingSoonModal from './CreateGroupComingSoonModal';
 import ShareModal from './ShareModal';
+import type { User } from '@supabase/supabase-js';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface GroupSetupProps {
   onGroupCreated: (group: Group) => void;
@@ -17,7 +17,7 @@ interface GroupSetupProps {
   onJoinQuickPlay: () => void;
   onShowAuth?: () => void;
   onJoinRound?: (roundId: string) => void;
-  authUser?: any;
+  authUser?: User | null;
   onLogout?: () => void;
 }
 
@@ -49,8 +49,6 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showProfileDetails, setShowProfileDetails] = useState(false);
-  const userTier = ((authUser?.user_metadata?.user_tier || authUser?.user_metadata?.tier || 'Express') as UserTier) || 'Express';
 
   useEffect(() => {
     if (mode === 'create') {
@@ -110,13 +108,14 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
       const codeToUse = useCustomCode ? customCode : autoCode;
       const group = await golfService.createGroup(groupName.trim(), codeToUse);
       onGroupCreated(group);
-    } catch (err: any) {
-      if (err.message?.includes('duplicate') || err.message?.includes('already exists')) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, '');
+      if (message.includes('duplicate') || message.includes('already exists')) {
         setError('Este código ya está en uso. Por favor elige otro.');
-      } else if (err.message?.includes('User already registered')) {
+      } else if (message.includes('User already registered')) {
         setError('Este email ya está registrado. Inicia sesión en su lugar.');
       } else {
-        setError(err.message || 'Error al crear el grupo');
+        setError(message || 'Error al crear el grupo');
       }
     } finally {
       setLoading(false);
@@ -143,7 +142,7 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
         const group = await golfService.joinGroup(joinCode);
         onGroupJoined(group);
         return;
-      } catch (groupErr: any) {
+      } catch {
         console.log('No se encontró grupo, buscando partida...');
       }
 
@@ -183,8 +182,8 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
       }
 
       setError('Código no válido. No se encontró ningún grupo o partida.');
-    } catch (err: any) {
-      setError(err.message || 'Error al buscar el código');
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'Error al buscar el código'));
     } finally {
       setLoading(false);
     }
@@ -233,16 +232,6 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
                       Mis Datos
                     </button>
 
-                    {showProfileDetails && (
-                      <div className="border-t border-line bg-card-2 px-4 py-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-3">Perfil</p>
-                        <p className="mt-1 text-sm text-ink font-medium truncate">{authUser.email}</p>
-                        <div className="mt-2 inline-flex items-center rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent-ink">
-                          Tier: {userTier}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Separator */}
                     <div className="border-t border-line"></div>
 
@@ -273,7 +262,7 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
             <div className="inline-flex items-center justify-center w-16 h-16 bg-accent-soft rounded-full mb-4">
               <Flag className="w-8 h-8 text-accent-ink" />
             </div>
-            <h1 className="text-3xl font-bold text-ink mb-2">La Partideta Golf</h1>
+            <h1 className="text-3xl font-bold text-ink mb-2">Omiki Golf</h1>
             <p className="text-ink-3">Tu compañero de golf</p>
           </div>
 

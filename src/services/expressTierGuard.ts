@@ -21,7 +21,7 @@ export const expressTierGuard = {
     let uuid = localStorage.getItem(DEVICE_UUID_KEY);
     if (!uuid) {
       uuid = 'dev_' + crypto.randomUUID();
-      localStorage.getItem(DEVICE_UUID_KEY) || localStorage.setItem(DEVICE_UUID_KEY, uuid);
+      localStorage.setItem(DEVICE_UUID_KEY, uuid);
     }
     return uuid;
   },

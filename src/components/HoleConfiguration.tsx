@@ -162,7 +162,7 @@ export const HoleConfiguration: React.FC<HoleConfigurationProps> = ({
                     </div>
 
                     {editingPars[hole.id] !== hole.par && (
-                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                      <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
                         <AlertCircle size={14} />
                         Cambio pendiente
                       </p>
@@ -205,7 +205,7 @@ export const HoleConfiguration: React.FC<HoleConfigurationProps> = ({
                     </div>
 
                     {editingHoles[hole.id] !== hole.stroke_index && (
-                      <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                      <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
                         <AlertCircle size={14} />
                         Cambio pendiente
                       </p>

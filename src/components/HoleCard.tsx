@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ScoreChangeInput } from '../types';
 import { GolfHole, RoundPlayer, RoundScore, GameMode } from '../types';
 import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput } from '../utils/calculations';
 import { ChevronDown, Minus } from 'lucide-react';
@@ -14,15 +15,18 @@ interface HoleCardProps {
   allHoleScores?: Record<string, Record<number, RoundScore | undefined>>;
   readonly?: boolean;
   groupCode?: string | null;
+  /** Gamificación Hoyo 19 del grupo (No pasó de rojas). */
+  hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   teamAssignments?: Record<string, 0 | 1>;
-  onScoreChange: (playerId: string, score: any) => void;
+  onScoreChange: (playerId: string, score: ScoreChangeInput | null) => void;
 }
 
 const markerColors = [
-  'bg-blue-500 border-blue-700',
-  'bg-orange-500 border-orange-700',
-  'bg-violet-500 border-violet-700',
+  // Tonos con contraste suficiente para las iniciales en blanco (≥ 5:1).
+  'bg-blue-600 border-blue-800',
+  'bg-orange-700 border-orange-900',
+  'bg-violet-600 border-violet-800',
 ] as const;
 
 const playerInitials = (name: string) => name
@@ -60,12 +64,13 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   allHoles,
   readonly = false,
   groupCode = null,
+  hoyo19Enabled,
   gameMode = 'stableford',
   teamAssignments = {},
   allHoleScores = {},
   onScoreChange,
 }) => {
-  const isDivend = groupCode === 'DIVEND';
+  const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isModeScoring = gameMode !== 'stableford';
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [firstDigit, setFirstDigit] = useState<number | null>(null);
@@ -154,6 +159,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   };
 
   const matchStatus = getMatchStatus();
+  const allPlayersEntered = players.length > 0 && players.every(p => !!scores[p.id]);
 
   const handleToggleExpanded = (playerId: string, isCurrentlyExpanded: boolean) => {
     if (readonly) return;
@@ -170,6 +176,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
       setFirstDigit(null);
       setPendingPlayerId(null);
       setPendingNoPasoRojas(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
+      setPendingSpanishHands(prev => {
         const newState = { ...prev };
         delete newState[playerId];
         return newState;
@@ -204,6 +215,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         delete newState[playerId];
         return newState;
       });
+      setPendingSpanishHands(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
     } else if (num === 1) {
       // Marcando el 1, esperar segundo dígito
       setFirstDigit(1);
@@ -225,6 +241,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
       setFirstDigit(null);
       setPendingPlayerId(null);
       setPendingNoPasoRojas(prev => {
+        const newState = { ...prev };
+        delete newState[playerId];
+        return newState;
+      });
+      setPendingSpanishHands(prev => {
         const newState = { ...prev };
         delete newState[playerId];
         return newState;
@@ -256,6 +277,11 @@ export const HoleCard: React.FC<HoleCardProps> = ({
     setFirstDigit(null);
     setPendingPlayerId(null);
     setPendingNoPasoRojas(prev => {
+      const newState = { ...prev };
+      if (pendingPlayerId) delete newState[pendingPlayerId];
+      return newState;
+    });
+    setPendingSpanishHands(prev => {
       const newState = { ...prev };
       if (pendingPlayerId) delete newState[pendingPlayerId];
       return newState;
@@ -322,8 +348,27 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
             ? 'border-blue-400 ring-1 ring-blue-100'
             : 'border-orange-400 ring-1 ring-orange-100';
 
+          // En Parejas los puntos son de la pareja: se muestran una sola vez, en la cabecera de cada pareja.
+          const startsTeam = isParejas && (playerIndex === 0 || (teamAssignments[players[playerIndex - 1].id] ?? (playerIndex - 1 < 2 ? 0 : 1)) !== team);
+          const teamMembers = isParejas ? players.filter((member, memberIndex) => (teamAssignments[member.id] ?? (memberIndex < 2 ? 0 : 1)) === team) : [];
+          const teamHolePoints = scores[teamMembers[0]?.id]?.mode_points ?? 0;
+
           return (
-            <div key={player.id} className={`border-2 rounded-lg overflow-hidden ${isParejas ? teamClasses : 'border-line'}`}>
+            <React.Fragment key={player.id}>
+            {startsTeam && (
+              <div className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${playerIndex > 0 ? 'mt-2' : ''} ${team === 0 ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100' : 'bg-orange-50 text-orange-900 dark:bg-orange-950/40 dark:text-orange-100'}`}>
+                <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+                  <ColorMarker colorIndex={team} />
+                  <span className="truncate">Pareja {team + 1} · {teamMembers.map((member) => member.name).join(' / ')}</span>
+                </span>
+                {allPlayersEntered && (
+                  <span className="shrink-0 rounded-lg border-2 border-accent-ring bg-card px-3 py-1 text-base font-bold text-accent-ink" title="Puntos de la pareja en el hoyo">
+                    {teamHolePoints.toLocaleString('es-ES')} pts
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={`border-2 rounded-lg overflow-hidden ${isParejas ? teamClasses : 'border-line'}`}>
               <button
                 onClick={() => handleToggleExpanded(player.id, isExpanded)}
                 disabled={readonly}
@@ -354,30 +399,36 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   (() => {
                     // Es raya si está marcado como abandonado
                     const isRaya = score.abandoned === true;
-                    const isParejas = gameMode === 'parejas';
-                
-                    const displayPoints = isModeScoring ? (score.mode_points ?? 0) : score.stableford_points;
-                    const modeText = isRaya
+
+                    // En modalidades se muestra siempre el resultado (golpes); los puntos
+                    // dependen del resto de jugadores y solo aparecen cuando todos han informado
+                    const modeText = isRaya || isModeScoring
                       ? `${score.gross_strokes}` // Mostrar el gross_strokes (PAR + 2) cuando es raya
-                      : isParejas
-                      ? `${score.gross_strokes}`
-                      : isModeScoring
-                      ? `${displayPoints} pts`
                       : getPointsText(score.stableford_points, isRaya);
                     return (
-                      <div
-                        className={`px-4 py-2 rounded-lg border-2 font-bold text-lg flex items-center justify-center min-w-[75px] relative ${getScoreColor(
-                          isParejas ? score.stableford_points : (isModeScoring ? displayPoints : score.stableford_points),
-                          isRaya
-                        )}`}
-                      >
-                        {modeText}
-                        {isRaya && (
-                          <div 
-                            className="absolute w-full h-0.5 bg-white/90 opacity-90"
-                            style={{ width: '60px', transform: 'rotate(45deg)' }}
-                          />
+                      <div className="flex items-center gap-2">
+                        {isModeScoring && !isParejas && allPlayersEntered && (
+                          <div
+                            className="px-3 py-2 rounded-lg border-2 border-accent-ring bg-accent-soft text-accent-ink font-bold text-lg flex items-center justify-center min-w-[64px]"
+                            title="Puntos asignados en el hoyo"
+                          >
+                            {(score.mode_points ?? 0).toLocaleString('es-ES')} pts
+                          </div>
                         )}
+                        <div
+                          className={`px-4 py-2 rounded-lg border-2 font-bold text-lg flex items-center justify-center min-w-[75px] relative ${getScoreColor(
+                            score.stableford_points,
+                            isRaya
+                          )}`}
+                        >
+                          {modeText}
+                          {isRaya && (
+                            <div
+                              className="absolute w-full h-0.5 bg-white/90 opacity-90"
+                              style={{ width: '60px', transform: 'rotate(45deg)' }}
+                            />
+                          )}
+                        </div>
                       </div>
                     );
                   })()
@@ -423,7 +474,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                             onClick={() => handleNumberClick(player.id, num, player)}
                             className={`h-11 rounded-lg font-bold text-lg transition-colors shadow-soft active:scale-95 ${
                               firstDigit === 1 && pendingPlayerId === player.id
-                                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                ? 'bg-yellow-500 hover:bg-yellow-600 text-amber-950'
                                 : 'bg-accent hover:bg-accent-hover text-on-accent'
                             }`}
                           >
@@ -449,6 +500,11 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                             setFirstDigit(null);
                             setPendingPlayerId(null);
                             setPendingNoPasoRojas(prev => {
+                              const newState = { ...prev };
+                              delete newState[player.id];
+                              return newState;
+                            });
+                            setPendingSpanishHands(prev => {
                               const newState = { ...prev };
                               delete newState[player.id];
                               return newState;
@@ -483,6 +539,11 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                               delete newState[player.id];
                               return newState;
                             });
+                            setPendingSpanishHands(prev => {
+                              const newState = { ...prev };
+                              delete newState[player.id];
+                              return newState;
+                            });
                           }}
                           className="h-11 bg-black hover:bg-gray-800 text-white rounded-lg font-bold transition-colors shadow-soft active:scale-95 flex items-center justify-center"
                         >
@@ -510,7 +571,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                         </div>
                         <div>
                           <p className="text-ink-3">{isModeScoring ? 'Modal' : 'Puntos'}</p>
-                          <p className="font-bold text-accent-ink">{isModeScoring ? (score?.mode_points ?? 0) : (score?.stableford_points || 0)}</p>
+                          <p className="font-bold text-accent-ink">{isModeScoring ? (allPlayersEntered ? (score?.mode_points ?? 0) : '-') : (score?.stableford_points || 0)}</p>
                         </div>
                       </div>
                     </div>
@@ -582,6 +643,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                 );
               })()}
             </div>
+            </React.Fragment>
           );
         })}
       </div>

@@ -1,6 +1,9 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { lazy, Suspense, useState, useEffect, useRef } from 'react';
+import { OmikiLoadingScreen, OmikiSpinner } from './OmikiSpinner';
+import React, { lazy, Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import { SelectMenu } from './SelectMenu';
+import { scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
 import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
   Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
@@ -8,7 +11,7 @@ import { golfService } from '../services/golfService';
 import { ConfirmModal } from './ConfirmModal';
 import { calculateScoreToPar } from '../utils/calculations';
 import { safeStorage } from '../utils/safeStorage';
-import { GameMode } from '../types';
+import { GameMode, GolfHole, RoundPlayer, RoundScore, QuickPlayCompletedRound, QuickPlayAwardsSummary } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { LOCAL_AI_ENABLED } from '../experimental/local-ai/config';
 
@@ -17,7 +20,7 @@ const LocalRoundAnalysis = lazy(() => import('../experimental/local-ai/LocalRoun
 interface QuickPlayStatisticsProps {
   onBack: () => void;
   roundId?: string;
-  sharedRoundData?: any | null;
+  sharedRoundData?: QuickPlayCompletedRound | null;
   messagesButton?: React.ReactNode;
 }
 
@@ -44,13 +47,117 @@ interface AvailableRound {
   game_mode?: string;
 }
 
+const waitForNextPaint = () => new Promise<void>((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+});
+
+const canvasToPngBlob = (canvas: HTMLCanvasElement) => new Promise<Blob>((resolve, reject) => {
+  const timeout = window.setTimeout(() => reject(new Error('La conversión de la imagen ha tardado demasiado.')), 15000);
+  canvas.toBlob((result) => {
+    window.clearTimeout(timeout);
+    if (result && result.size >= 10_000) resolve(result);
+    else reject(new Error('El navegador ha generado una imagen vacía o incompleta.'));
+  }, 'image/png');
+});
+
+const validatePngBlob = (blob: Blob, minimumWidth: number, minimumHeight: number) => new Promise<void>((resolve, reject) => {
+  const url = URL.createObjectURL(blob);
+  const image = new Image();
+  const finish = (error?: Error) => {
+    URL.revokeObjectURL(url);
+    window.clearTimeout(timeout);
+    if (error) reject(error);
+    else resolve();
+  };
+  const timeout = window.setTimeout(
+    () => finish(new Error('El navegador no ha podido verificar la imagen generada.')),
+    15000
+  );
+  image.onload = () => {
+    if (image.naturalWidth < minimumWidth || image.naturalHeight < minimumHeight) {
+      finish(new Error('La imagen generada tiene dimensiones incompletas.'));
+      return;
+    }
+    finish();
+  };
+  image.onerror = () => finish(new Error('El archivo de imagen generado no se puede abrir.'));
+  image.src = url;
+});
+
+const getEffectiveGrossStrokes = (score: RoundScore | undefined, hole?: GolfHole) => {
+  if (!score) return 0;
+  if (score.gross_strokes > 0) return score.gross_strokes;
+  if (score.abandoned && hole) return hole.par + (score.strokes_received || 0) + 2;
+  return 0;
+};
+
+const calculatePlayerHighlights = (
+  players: RoundPlayer[],
+  scores: RoundScore[],
+  holes: GolfHole[],
+): PlayerHighlights[] => {
+  const coursePar = holes.reduce((sum, hole) => sum + hole.par, 0);
+  return players.map(player => {
+    const playerScores = scores.filter(score => score.player_id === player.id);
+
+    let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doubleBogeyPlus = 0;
+    let bestHole = { holeNumber: 0, points: -999 };
+    let worstHole = { holeNumber: 0, points: 999 };
+    let totalPoints = 0;
+    let totalGrossStrokes = 0;
+
+    playerScores.forEach(score => {
+      const hole = holes.find(item => item.hole_number === score.hole_number);
+      totalGrossStrokes += getEffectiveGrossStrokes(score, hole);
+
+      if (score.abandoned) {
+        doubleBogeyPlus++;
+        return;
+      }
+      const diff = score.net_strokes - (hole?.par || 0);
+      const points = score.stableford_points || 0;
+
+      totalPoints += points;
+
+      if (points > bestHole.points) bestHole = { holeNumber: score.hole_number, points };
+      if (points < worstHole.points) worstHole = { holeNumber: score.hole_number, points };
+
+      if (diff <= -2) eagles++;
+      else if (diff === -1) birdies++;
+      else if (diff === 0) pares++;
+      else if (diff === 1) bogeys++;
+      else if (diff >= 2) doubleBogeyPlus++;
+    });
+
+    const scoreToPar = totalGrossStrokes === 0
+      ? { value: 0, display: '-' }
+      : calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap);
+
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      totalPoints,
+      totalGrossStrokes,
+      scoreToPar,
+      eagles,
+      birdies,
+      pares,
+      bogeys,
+      doubleBogeyPlus,
+      bestHole,
+      worstHole,
+      variability: bestHole.points - worstHole.points,
+    };
+  });
+};
+
 export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, sharedRoundData = null, messagesButton }) => {
   const isSharedView = !!sharedRoundData;
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
-  const [roundData, setRoundData] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
+  const [roundData, setRoundData] = useState<QuickPlayCompletedRound | null>(null);
+  const [stats, setStats] = useState<QuickPlayAwardsSummary | null>(null);
   const [highlights, setHighlights] = useState<PlayerHighlights[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -61,49 +168,10 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const statsContainerRef = useRef<HTMLDivElement>(null);
   const desktopExportRef = useRef<HTMLDivElement>(null);
 
+
   useEffect(() => () => {
     if (shareAsset) URL.revokeObjectURL(shareAsset.url);
   }, [shareAsset]);
-
-  // Un solo useEffect inicial para cargar las rondas y la primera partida de forma directa
-  useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        if (sharedRoundData) {
-          setAvailableRounds([]);
-          setSelectedRoundId(sharedRoundData.round?.id || null);
-          setRoundData(sharedRoundData);
-          setStats(golfService.calculateQuickPlayAwards(
-            sharedRoundData.players,
-            sharedRoundData.scores,
-            sharedRoundData.holes,
-            sharedRoundData.round?.game_mode || 'stableford',
-            sharedRoundData.round?.decided_result || null
-          ));
-          setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
-          setLoading(false);
-          window.setTimeout(() => setAnimateIn(true), 150);
-          return;
-        }
-        const rounds = await golfService.getAvailableRoundsForStats();
-        setAvailableRounds(rounds);
-
-        if (rounds && rounds.length > 0) {
-          const firstRoundId = rounds[0].id;
-          setSelectedRoundId(firstRoundId);
-          await loadRoundData(firstRoundId);
-        } else {
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Error inicializando lista de partidas:', err);
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, [sharedRoundData]);
 
   const handleSelectRound = async (roundId: string) => {
     setShareAsset(null);
@@ -112,7 +180,16 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     await loadRoundData(roundId);
   };
 
-  const loadRoundData = async (roundId: string) => {
+  const formatRoundLabel = (round: AvailableRound) => `${new Date(round.created_at).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  })} - ${new Date(round.created_at).toLocaleTimeString('es-ES', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })} · ${getModeLabel(round.game_mode)}`;
+
+  const loadRoundData = useCallback(async (roundId: string) => {
     try {
       setLoading(true);
       setAnimateIn(false);
@@ -144,85 +221,46 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const getEffectiveGrossStrokes = (score: any, hole: any) => {
-    if (!score) return 0;
-    if (typeof score.gross_strokes === 'number' && score.gross_strokes > 0) {
-      return score.gross_strokes;
-    }
-    if (score.abandoned && hole) {
-      return hole.par + (score.strokes_received || 0) + 2;
-    }
-    return 0;
-  };
-
-  const calculatePlayerHighlights = (players: any[], scores: any[], holes: any[]): PlayerHighlights[] => {
-    const coursePar = holes.reduce((sum, h) => sum + h.par, 0);
-    const numHoles = holes.length;
-
-    return players.map(player => {
-      const playerScores = scores.filter(s => s.player_id === player.id);
-
-      let eagles = 0, birdies = 0, pares = 0, bogeys = 0, doubleBogeyPlus = 0;
-      let bestHole = { holeNumber: 0, points: -999 };
-      let worstHole = { holeNumber: 0, points: 999 };
-      let totalPoints = 0;
-      let totalGrossStrokes = 0;
-
-      playerScores.forEach(score => {
-        const hole = holes.find(h => h.hole_number === score.hole_number);
-        totalGrossStrokes += getEffectiveGrossStrokes(score, hole);
-
-        if (score.abandoned) {
-          doubleBogeyPlus++;
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setLoading(true);
+        if (sharedRoundData) {
+          setAvailableRounds([]);
+          setSelectedRoundId(sharedRoundData.round.id || null);
+          setRoundData(sharedRoundData);
+          setStats(golfService.calculateQuickPlayAwards(
+            sharedRoundData.players,
+            sharedRoundData.scores,
+            sharedRoundData.holes,
+            sharedRoundData.round.game_mode || 'stableford',
+            sharedRoundData.round.decided_result || null
+          ));
+          setHighlights(calculatePlayerHighlights(sharedRoundData.players, sharedRoundData.scores, sharedRoundData.holes));
+          setLoading(false);
+          window.setTimeout(() => setAnimateIn(true), 150);
           return;
         }
-        const diff = score.net_strokes - (hole?.par || 0);
-        const points = score.stableford_points || 0;
+        const rounds = await golfService.getAvailableRoundsForStats();
+        setAvailableRounds(rounds);
 
-        totalPoints += points;
-
-        if (points > bestHole.points) {
-          bestHole = { holeNumber: score.hole_number, points };
+        if (rounds.length > 0) {
+          const firstRoundId = rounds[0].id;
+          setSelectedRoundId(firstRoundId);
+          await loadRoundData(firstRoundId);
+        } else {
+          setLoading(false);
         }
-        if (points < worstHole.points) {
-          worstHole = { holeNumber: score.hole_number, points };
-        }
+      } catch (err) {
+        console.error('Error inicializando lista de partidas:', err);
+        setLoading(false);
+      }
+    };
 
-        if (diff <= -2) eagles++;
-        else if (diff === -1) birdies++;
-        else if (diff === 0) pares++;
-        else if (diff === 1) bogeys++;
-        else if (diff >= 2) doubleBogeyPlus++;
-      });
-
-      const scoreToPar = totalGrossStrokes === 0
-        ? { value: 0, display: '-' }
-        : calculateScoreToPar(
-            totalGrossStrokes,
-            coursePar,
-            player.playing_handicap,
-            numHoles as 9 | 18
-          );
-
-      return {
-        playerId: player.id,
-        playerName: player.name,
-        totalPoints,
-        totalGrossStrokes,
-        scoreToPar,
-        eagles,
-        birdies,
-        pares,
-        bogeys,
-        doubleBogeyPlus,
-        bestHole,
-        worstHole,
-        variability: bestHole.points - worstHole.points
-      };
-    });
-  };
+    void init();
+  }, [sharedRoundData, loadRoundData]);
 
   const handleDelete = async () => {
     if (!selectedRoundId) return;
@@ -255,6 +293,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     try {
       setSharing(true);
       setShareError('');
+      setShareAsset(null);
 
       // html2canvas es inestable en algunos navegadores móviles cuando el nodo
       // fuente está miles de píxeles fuera del viewport. Se hace renderizable
@@ -296,23 +335,58 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         })
       );
 
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
+      await waitForNextPaint();
 
       const exportWidth = Math.ceil(Math.max(1200, exportElement.scrollWidth));
       const exportHeight = Math.ceil(exportElement.scrollHeight);
-      const maxCanvasSide = 8192;
-      const maxCanvasPixels = 16_000_000;
-      const scale = Math.max(0.1, Math.min(
-        2,
-        maxCanvasSide / exportWidth,
-        maxCanvasSide / exportHeight,
-        Math.sqrt(maxCanvasPixels / (exportWidth * exportHeight))
-      ));
-
       const { default: html2canvas } = await import('html2canvas-pro');
-      const canvas = await html2canvas(exportElement, {
+      const maxCanvasSide = 4096;
+      const scaleLimits = [8_000_000, 5_000_000, 3_000_000];
+      let blob: Blob | null = null;
+      let lastCaptureError: unknown = null;
+
+      const prepareClonedExport = (clonedDocument: Document) => {
+        const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
+        const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
+
+        if (clonedWrapper) {
+          clonedWrapper.style.position = 'absolute';
+          clonedWrapper.style.inset = '0 auto auto 0';
+          clonedWrapper.style.width = `${exportWidth}px`;
+          clonedWrapper.style.height = `${exportHeight}px`;
+          clonedWrapper.style.overflow = 'visible';
+        }
+
+        if (clonedExport) {
+          clonedExport.style.width = `${exportWidth}px`;
+          clonedExport.style.height = 'auto';
+          clonedExport.style.maxWidth = 'none';
+          clonedExport.style.overflow = 'visible';
+
+          let ancestor = clonedExport.parentElement;
+          while (ancestor) {
+            ancestor.style.overflow = 'visible';
+            ancestor.style.maxHeight = 'none';
+            ancestor = ancestor.parentElement;
+          }
+
+          clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
+            element.style.animation = 'none';
+            element.style.transition = 'none';
+            if (
+              element.classList.contains('overflow-x-auto') ||
+              element.classList.contains('overflow-hidden')
+            ) {
+              element.style.overflow = 'visible';
+            }
+            if (element.classList.contains('sticky')) {
+              element.style.position = 'static';
+            }
+          });
+        }
+      };
+
+      const captureStatistics = (scale: number) => html2canvas(exportElement, {
         scale,
         useCORS: true,
         backgroundColor: '#0f172a',
@@ -323,55 +397,65 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         height: exportHeight,
         windowWidth: exportWidth,
         windowHeight: exportHeight,
-        onclone: (clonedDocument) => {
-          const clonedExport = clonedDocument.querySelector<HTMLElement>('[data-statistics-export]');
-          const clonedWrapper = clonedDocument.querySelector<HTMLElement>('[data-statistics-export-wrapper]');
-
-          if (clonedWrapper) {
-            clonedWrapper.style.position = 'absolute';
-            clonedWrapper.style.inset = '0 auto auto 0';
-            clonedWrapper.style.width = `${exportWidth}px`;
-            clonedWrapper.style.height = `${exportHeight}px`;
-            clonedWrapper.style.overflow = 'visible';
-          }
-
-          if (clonedExport) {
-            clonedExport.style.width = `${exportWidth}px`;
-            clonedExport.style.height = 'auto';
-            clonedExport.style.maxWidth = 'none';
-            clonedExport.style.overflow = 'visible';
-
-            // Evita que los contenedores de la pantalla recorten el informe completo.
-            let ancestor = clonedExport.parentElement;
-            while (ancestor) {
-              ancestor.style.overflow = 'visible';
-              ancestor.style.maxHeight = 'none';
-              ancestor = ancestor.parentElement;
-            }
-
-            clonedExport.querySelectorAll<HTMLElement>('*').forEach((element) => {
-              element.style.animation = 'none';
-              element.style.transition = 'none';
-              if (
-                element.classList.contains('overflow-x-auto') ||
-                element.classList.contains('overflow-hidden')
-              ) {
-                element.style.overflow = 'visible';
-              }
-              if (element.classList.contains('sticky')) {
-                element.style.position = 'static';
-              }
-            });
-          }
-        },
+        onclone: prepareClonedExport,
       });
 
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((result) => {
-          if (result) resolve(result);
-          else reject(new Error('No se pudo convertir la captura en imagen.'));
-        }, 'image/png');
-      });
+      // Algunos navegadores móviles devuelven incompleta la primera captura aunque
+      // el canvas tenga dimensiones válidas. La generamos y descartamos para que la
+      // captura que recibe el usuario se haga con fuentes y estilos ya renderizados.
+      try {
+        await waitForNextPaint();
+        const warmupScale = Math.max(0.35, Math.min(
+          0.5,
+          maxCanvasSide / exportWidth,
+          maxCanvasSide / exportHeight,
+          Math.sqrt(2_000_000 / (exportWidth * exportHeight))
+        ));
+        const warmupCanvas = await captureStatistics(warmupScale);
+        await canvasToPngBlob(warmupCanvas);
+        warmupCanvas.width = 1;
+        warmupCanvas.height = 1;
+      } catch (warmupError) {
+        console.warn('La captura de preparación de estadísticas no se completó:', warmupError);
+      }
+
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+      await waitForNextPaint();
+
+      for (const maxCanvasPixels of scaleLimits) {
+        try {
+          const scale = Math.max(0.5, Math.min(
+            1.5,
+            maxCanvasSide / exportWidth,
+            maxCanvasSide / exportHeight,
+            Math.sqrt(maxCanvasPixels / (exportWidth * exportHeight))
+          ));
+
+          await waitForNextPaint();
+          const canvas = await captureStatistics(scale);
+
+          if (canvas.width < 600 || canvas.height < 600) {
+            throw new Error('La captura devuelta por el navegador está incompleta.');
+          }
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+          const candidate = await canvasToPngBlob(canvas);
+          canvas.width = 1;
+          canvas.height = 1;
+          await validatePngBlob(candidate, canvasWidth, canvasHeight);
+          blob = candidate;
+          break;
+        } catch (captureError) {
+          lastCaptureError = captureError;
+          console.warn('Reintentando la captura de estadísticas con menor resolución:', captureError);
+        }
+      }
+
+      if (!blob) {
+        throw lastCaptureError instanceof Error
+          ? lastCaptureError
+          : new Error('No se pudo generar una imagen válida.');
+      }
 
       const dateStr = new Date(roundData?.round?.created_at || Date.now()).toLocaleDateString('es-ES');
       const fileName = `Estadisticas_Golf_${dateStr.replace(/\//g, '-')}.png`;
@@ -421,12 +505,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     link.remove();
   };
 
-  const handleOpenWhatsApp = () => {
-    if (!shareAsset) return;
-    const text = encodeURIComponent(`📊 Estadísticas de nuestra partida de golf (${shareAsset.date}). Adjuntaré la imagen.`);
-    window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
-  };
-
   const getModeLabel = (mode?: string) => {
     switch (mode) {
       case 'match': return 'Match';
@@ -438,12 +516,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-app p-4 md:p-8 flex items-center justify-center">
-        <div className="absolute right-4 top-4">{messagesButton}</div>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <p className="text-ink font-medium">Cargando estadísticas...</p>
-        </div>
+      <div className="relative">
+        <div className="absolute right-4 top-4 z-10">{messagesButton}</div>
+        <OmikiLoadingScreen label="Cargando estadísticas…" />
       </div>
     );
   }
@@ -499,7 +574,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     name: string;
     totalPoints: number;
     handicap?: number;
-    scores: any[];
+    scores: RoundScore[];
     rank: number;
   }[] = [];
 
@@ -507,20 +582,20 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     const team0Players = roundData.players.slice(0, 2);
     const team1Players = roundData.players.slice(2, 4);
 
-    const buildTeamRow = (players: any[], label: string) => {
+    const buildTeamRow = (players: RoundPlayer[], label: string) => {
       const rep = players[0];
       const playerScores = rep
-        ? roundData.scores.filter((s: any) => s.player_id === rep.id)
+        ? roundData.scores.filter((s) => s.player_id === rep.id)
         : [];
       const totalPoints = rep
         ? playerScores
-            .reduce((sum: number, s: any) => sum + (s.mode_points || 0), 0)
+            .reduce((sum, s) => sum + (s.mode_points || 0), 0)
         : 0;
       return {
         key: label,
-        name: players.map((p: any) => p.name).join(' / '),
+        name: players.map((p) => p.name).join(' / '),
         totalPoints,
-        handicap: players.reduce((sum: number, player: any) => sum + player.playing_handicap, 0),
+        handicap: players.reduce((sum, player) => sum + player.playing_handicap, 0),
         scores: playerScores,
         rank: 0,
       };
@@ -533,14 +608,28 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
     holeTableRows.forEach((row, idx) => { row.rank = idx; });
   } else {
-    holeTableRows = ranking.map((entry: any, index: number) => ({
+    holeTableRows = ranking.map((entry, index) => ({
       key: entry.player.id,
       name: entry.player.name,
       totalPoints: entry.totalPoints,
-      scores: roundData.scores.filter((s: any) => s.player_id === entry.player.id),
+      scores: roundData.scores.filter((s) => s.player_id === entry.player.id),
       rank: index,
     }));
   }
+
+  // En Parejas, los dos jugadores de cada pareja comparten color (azul y naranja, como en la tarjeta).
+  const teamOfPlayer = (playerId: string): 0 | 1 | null => {
+    if (!isParejasMode || !roundData.players) return null;
+    const position = roundData.players.findIndex((player) => player.id === playerId);
+    return position < 0 ? null : position < 2 ? 0 : 1;
+  };
+  const positionBadgeClass = (index: number, team: 0 | 1 | null) =>
+    team === 0 ? 'bg-blue-600 text-white' :
+    team === 1 ? 'bg-orange-700 text-white' :
+    index === 0 ? 'bg-yellow-400 text-yellow-950' :
+    index === 1 ? 'bg-slate-400 text-slate-900' :
+    index === 2 ? 'bg-orange-400 text-orange-950' :
+    'bg-gray-600 text-white';
 
   const renderPodiumGrid = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
@@ -627,54 +716,49 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     <>
           {/* TABLA COMPLETA */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-500 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-500 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">Detalle contra Par</h3>
+            <h3 className="statistics-table-title text-2xl font-black mb-6">Detalle contra Par</h3>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-3">Jugador</th>
-                    <th className="text-center text-white font-bold p-3">Puntos</th>
-                    <th className="text-center text-white font-bold p-3">vs Par</th>
-                    <th className="text-center text-white font-bold p-3">Eagles+</th>
-                    <th className="text-center text-white font-bold p-3">Birdies</th>
-                    <th className="text-center text-white font-bold p-3">Pares</th>
-                    <th className="text-center text-white font-bold p-3">Bogeys</th>
-                    <th className="text-center text-white font-bold p-3">Doble+</th>
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-3">Jugador</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Puntos</th>
+                    <th className="statistics-table-text text-center font-bold p-3">vs Par</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Eagles+</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Birdies</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Pares</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Bogeys</th>
+                    <th className="statistics-table-text text-center font-bold p-3">Doble+</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...highlights].sort((a, b) => b.totalPoints - a.totalPoints).map((h, index) => (
-                    <tr key={h.playerId} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                      <td className="text-white font-semibold p-3">
+                    <tr key={h.playerId} className="statistics-table-line statistics-table-row border-b transition-colors">
+                      <td className="statistics-table-text font-semibold p-3">
                         <div className="flex items-center gap-2">
-                          <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
-                            index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                            index === 1 ? 'bg-slate-400 text-slate-900' :
-                            index === 2 ? 'bg-orange-400 text-orange-900' :
-                            'bg-gray-600 text-white'
-                          }`}>
+                          <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(h.playerId))}`}>
                             {index + 1}
                           </span>
                           {h.playerName}
                         </div>
                       </td>
-                      <td className="text-center text-emerald-300 font-bold p-3 text-lg">{h.totalPoints}</td>
+                      <td className="statistics-table-accent text-center font-bold p-3 text-lg">{h.totalPoints}</td>
                       <td className={`text-center font-bold p-3 text-lg ${
-                        h.scoreToPar.value === 0 ? 'text-white' :
-                        h.scoreToPar.value < 0 ? 'text-green-300' :
-                        'text-red-300'
+                        h.scoreToPar.value === 0 ? 'statistics-table-text' :
+                        h.scoreToPar.value < 0 ? 'statistics-table-positive' :
+                        'statistics-table-negative'
                       }`}>
                         {h.scoreToPar.display}
                       </td>
-                      <td className="text-center text-white p-3">{h.eagles}</td>
-                      <td className="text-center text-white p-3">{h.birdies}</td>
-                      <td className="text-center text-white p-3">{h.pares}</td>
-                      <td className="text-center text-white p-3">{h.bogeys}</td>
-                      <td className="text-center text-white p-3">{h.doubleBogeyPlus}</td>
+                      <td className="statistics-table-text text-center p-3">{h.eagles}</td>
+                      <td className="statistics-table-text text-center p-3">{h.birdies}</td>
+                      <td className="statistics-table-text text-center p-3">{h.pares}</td>
+                      <td className="statistics-table-text text-center p-3">{h.bogeys}</td>
+                      <td className="statistics-table-text text-center p-3">{h.doubleBogeyPlus}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -684,11 +768,11 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
           {/* PUNTOS POR HOYO */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-700 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-700 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">
+            <h3 className="statistics-table-title text-2xl font-black mb-6">
               {isMatchMode ? 'Puntos por Hoyo (Match)' :
                isSindicatoMode ? 'Puntos por Hoyo (Sindicato)' :
                isParejasMode ? 'Puntos por Hoyo (Parejas)' :
@@ -697,37 +781,32 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-2">
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-2">
                       {isParejasMode ? 'Pareja' : 'Jugador'}
                     </th>
-                    {holes.map((hole: any) => (
-                      <th key={hole.hole_number} className="text-center text-white font-bold p-2 min-w-[40px]">
+                    {holes.map((hole) => (
+                      <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
                     ))}
-                    <th className="text-center text-white font-bold p-2 bg-emerald-900/50">Total</th>
+                    <th className="statistics-table-text statistics-table-total text-center font-bold p-2">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {holeTableRows.map((row) => {
                     return (
-                      <tr key={row.key} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="text-white font-semibold p-2">
+                      <tr key={row.key} className="statistics-table-line statistics-table-row border-b transition-colors">
+                        <td className="statistics-table-text font-semibold p-2">
                           <span className="flex items-center gap-2">
-                            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${
-                              row.rank === 0 ? 'bg-yellow-400 text-yellow-900' :
-                              row.rank === 1 ? 'bg-slate-400 text-slate-900' :
-                              row.rank === 2 ? 'bg-orange-400 text-orange-900' :
-                              'bg-gray-600 text-white'
-                            }`}>
+                            <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(row.rank, isParejasMode ? (row.key === 'team0' ? 0 : 1) : null)}`}>
                               {row.rank + 1}
                             </span>
                             {row.name}
                           </span>
                         </td>
-                        {holes.map((hole: any) => {
-                          const score = row.scores.find((s: any) => s.hole_number === hole.hole_number);
+                        {holes.map((hole) => {
+                          const score = row.scores.find((s) => s.hole_number === hole.hole_number);
                           const isAbandoned = score?.abandoned;
                           const points = isMatchMode || isSindicatoMode || isParejasMode
                             ? (score?.mode_points || 0)
@@ -735,7 +814,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                           if (isAbandoned) {
                             return (
-                              <td key={hole.hole_number} className="text-center p-2 font-bold text-white">
+                              <td key={hole.hole_number} className="statistics-table-text text-center p-2 font-bold">
                                 0
                               </td>
                             );
@@ -744,22 +823,22 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           return (
                             <td key={hole.hole_number} className={`text-center p-2 font-bold ${
                               isMatchMode || isSindicatoMode || isParejasMode ? (
-                                points > 0 ? 'text-emerald-300' :
-                                points === 0 ? 'text-red-300' :
-                                'text-white'
+                                points > 0 ? 'statistics-table-accent' :
+                                points === 0 ? 'statistics-table-negative' :
+                                'statistics-table-text'
                               ) : (
-                                points >= 4 ? 'text-green-300' :
-                                points === 3 ? 'text-emerald-300' :
-                                points === 2 ? 'text-white' :
-                                points === 1 ? 'text-orange-300' :
-                                'text-red-300'
+                                points >= 4 ? 'statistics-table-positive' :
+                                points === 3 ? 'statistics-table-accent' :
+                                points === 2 ? 'statistics-table-text' :
+                                points === 1 ? 'statistics-table-warning' :
+                                'statistics-table-negative'
                               )
                             }`}>
                               {points}
                             </td>
                           );
                         })}
-                        <td className="text-center text-emerald-300 font-black p-2 text-lg bg-emerald-900/50">
+                        <td className="statistics-table-accent statistics-table-total text-center font-black p-2 text-lg">
                           {row.totalPoints}
                         </td>
                       </tr>
@@ -772,73 +851,83 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
           {/* TABLA DE GOLPES */}
           <div
-            className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl mb-8 transition-all duration-1000 delay-600 ${
+            className={`statistics-panel backdrop-blur-md rounded-2xl p-6 mb-8 transition-all duration-1000 delay-600 ${
               exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <h3 className="text-2xl font-black text-white mb-6">Tabla de Golpes</h3>
+            <h3 className="statistics-table-title text-2xl font-black mb-6">Tabla de Golpes</h3>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b-2 border-white/20">
-                    <th className="text-left text-white font-bold p-2">Jugador</th>
-                    {holes.map((hole: any) => (
-                      <th key={hole.hole_number} className="text-center text-white font-bold p-2 min-w-[40px]">
+                  <tr className="statistics-table-line border-b-2">
+                    <th className="statistics-table-text text-left font-bold p-2">Jugador</th>
+                    {holes.map((hole) => (
+                      <th key={hole.hole_number} className="statistics-table-text text-center font-bold p-2 min-w-[40px]">
                         {hole.hole_number}
                       </th>
                     ))}
-                    <th className="text-center text-white font-bold p-2 bg-emerald-900/50">Total</th>
+                    <th className="statistics-table-text statistics-table-total text-center font-bold p-2">Total</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {ranking.map((entry: any, index: number) => {
-                    const playerScores = roundData.scores.filter((s: any) => s.player_id === entry.player.id);
-                    const totalGross = playerScores.reduce((sum: number, score: any) => {
-                      const hole = holes.find((h: any) => h.hole_number === score.hole_number);
+                  {ranking.map((entry, index) => {
+                    const playerScores = roundData.scores.filter((s) => s.player_id === entry.player.id);
+                    const totalGross = playerScores.reduce((sum, score) => {
+                      const hole = holes.find((h) => h.hole_number === score.hole_number);
                       return sum + getEffectiveGrossStrokes(score, hole);
                     }, 0);
 
                     return (
-                      <tr key={entry.player.id} className="border-b border-white/10 hover:bg-white/5 transition-colors">
-                        <td className="text-white font-semibold p-2">
+                      <tr key={entry.player.id} className="statistics-table-line statistics-table-row border-b transition-colors">
+                        <td className="statistics-table-text font-semibold p-2">
                           <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${
-                              index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                              index === 1 ? 'bg-slate-400 text-slate-900' :
-                              index === 2 ? 'bg-orange-400 text-orange-900' :
-                              'bg-gray-600 text-white'
-                            }`}>
+                            <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(entry.player.id))}`}>
                               {index + 1}
                             </span>
                             {entry.player.name}
                           </div>
                         </td>
-                        {holes.map((hole: any) => {
-                          const score = playerScores.find((s: any) => s.hole_number === hole.hole_number);
+                        {holes.map((hole) => {
+                          const score = playerScores.find((s) => s.hole_number === hole.hole_number);
                           const value = getEffectiveGrossStrokes(score, hole);
+                          const result = scoreResultFromPoints(score?.stableford_points, score?.abandoned);
                           return (
-                            <td key={hole.hole_number} className="text-center text-white p-2 font-bold">
-                              {value}
+                            <td key={hole.hole_number} className="text-center p-1.5">
+                              {score ? (
+                                <span title={scoreResultLabel[result]} className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ring-1 ${scoreResultChip[result]}`}>
+                                  {value}
+                                </span>
+                              ) : (
+                                <span className="statistics-table-text font-bold">{value}</span>
+                              )}
                             </td>
                           );
                         })}
-                        <td className="text-center text-emerald-300 font-black p-2 text-lg bg-emerald-900/50">{totalGross}</td>
+                        <td className="statistics-table-accent statistics-table-total text-center font-black p-2 text-lg">{totalGross}</td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs" aria-label="Colores de la tabla de golpes">
+              {(Object.keys(scoreResultChip) as Array<keyof typeof scoreResultChip>).map((result) => (
+                <span key={result} className="statistics-table-text inline-flex items-center gap-1.5">
+                  <span className={`h-3.5 w-3.5 rounded-full ring-1 ${scoreResultChip[result]}`} aria-hidden="true" />
+                  {scoreResultLabel[result]}
+                </span>
+              ))}
+            </div>
           </div>
 
           {/* PREMIOS ESPECIALES */}
           {(awards.reyDelBosque || awards.noPasoRojas || awards.holeInOne || awards.hoyoMuerte || awards.hoyoGloria) && (
             <div
-              className={`bg-white/10 backdrop-blur-md rounded-2xl p-6 shadow-2xl transition-all duration-1000 ${
+              className={`statistics-panel backdrop-blur-md rounded-2xl p-6 transition-all duration-1000 ${
                 exporting || animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              <h3 className="text-2xl font-black text-white mb-6">Premios Especiales</h3>
+              <h3 className="statistics-table-title text-2xl font-black mb-6">Premios Especiales</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" style={exporting ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
                 {awards.reyDelBosque && (
                   <div className="bg-gradient-to-br from-rose-500/20 to-rose-600/20 border-2 border-rose-400 rounded-xl p-4">
@@ -846,7 +935,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <TrendingDown size={20} className="text-rose-400" />
                       <p className="text-rose-300 font-bold text-sm">Rey del Bosque</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.reyDelBosque.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.reyDelBosque.player.name}</p>
                     <p className="text-rose-300 text-sm">Mayor número de dobles bogeys o peor</p>
                   </div>
                 )}
@@ -857,7 +946,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Flag size={20} className="text-amber-400" />
                       <p className="text-amber-300 font-bold text-sm">No Pasó Rojas</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.noPasoRojas.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.noPasoRojas.player.name}</p>
                     <p className="text-amber-300 text-sm">Premio a la salida más corta</p>
                   </div>
                 )}
@@ -868,7 +957,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Zap size={20} className="text-yellow-400" />
                       <p className="text-yellow-300 font-bold text-sm">Hole in One</p>
                     </div>
-                    <p className="text-white font-bold text-lg">{awards.holeInOne.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">
+                      {awards.holeInOne.players.map(({ player }) => player.name).join(' / ')}
+                    </p>
                     <p className="text-yellow-300 text-sm">¡Hoyo en uno increíble!</p>
                   </div>
                 )}
@@ -883,7 +974,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       {sharing && (
         <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/90 p-6" role="status" aria-live="polite">
           <div className="rounded-2xl border border-emerald-400/40 bg-slate-900 p-6 text-center text-white shadow-2xl">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-emerald-200 border-b-emerald-500" />
+            <OmikiSpinner size={90} className="mx-auto mb-4" />
             <p className="font-bold">Generando la imagen completa…</p>
             <p className="mt-1 text-sm text-slate-300">Puede tardar unos segundos en el móvil.</p>
           </div>
@@ -913,27 +1004,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
 
             {availableRounds.length > 0 && (
-              <div className="relative flex items-center mt-1">
-                <Calendar size={18} className="absolute left-3 text-emerald-300 pointer-events-none z-10" />
-                <select
-                  value={selectedRoundId || ''}
-                  onChange={(e) => handleSelectRound(e.target.value)}
-                  className="bg-card text-ink font-semibold pl-9 pr-8 py-2 rounded-lg border border-line-2 focus:outline-none focus:ring-2 focus:ring-accent appearance-none cursor-pointer text-sm shadow-card"
-                >
-                  {availableRounds.map((r) => (
-                    <option key={r.id} value={r.id} className="bg-slate-900 text-white">
-                      {new Date(r.created_at).toLocaleDateString('es-ES', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric'
-                      })} - {new Date(r.created_at).toLocaleTimeString('es-ES', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })} · {getModeLabel(r.game_mode)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <SelectMenu
+                className="mt-2 max-w-md"
+                value={selectedRoundId || availableRounds[0].id}
+                onChange={(roundId) => void handleSelectRound(roundId)}
+                ariaLabel="Partida a mostrar"
+                icon={<Calendar size={19} />}
+                options={availableRounds.map((round) => ({ value: round.id, label: formatRoundLabel(round) }))}
+              />
             )}
 
             <p className="text-accent-ink font-semibold text-xs md:text-sm mt-1">
@@ -951,7 +1029,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <span>{sharing ? 'Generando...' : 'Compartir'}</span>
             </button>
 
-            {!isSharedView && (
+            {/* Solo quien creó la partida puede eliminarla; los jugadores vinculados solo la ven. */}
+            {!isSharedView && roundData?.isCreator !== false && (
               <WriteButton
                 onClick={() => setShowDeleteConfirm(true)}
                 className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
@@ -994,9 +1073,6 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   </button>
                   <button type="button" onClick={handleDownloadShare} className="inline-flex items-center gap-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-bold hover:bg-slate-600">
                     <Download size={18} /> Descargar
-                  </button>
-                  <button type="button" onClick={handleOpenWhatsApp} className="inline-flex items-center gap-2 rounded-lg border border-green-500 px-3 py-2 text-sm font-bold text-green-300 hover:bg-green-950">
-                    <MessageCircle size={18} /> Abrir WhatsApp
                   </button>
                 </div>
               </div>
@@ -1107,8 +1183,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Trophy size={32} className="mx-auto text-yellow-900 mb-2" />
                       <p className="text-yellow-900 font-black text-lg">
                         {teamResult.isTie
-                          ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                          : teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                          ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </p>
                       <p className="text-5xl font-black text-yellow-900 mt-2">{teamResult.winningTeam?.totalPoints ?? 0}</p>
                       <p className="text-yellow-800 text-sm font-semibold mt-1">puntos</p>
@@ -1135,8 +1211,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <TrendingDown size={32} className="mx-auto text-slate-300 mb-2" />
                       <p className="text-white font-black text-lg">
                         {teamResult.isTie
-                          ? `${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                          : teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                          ? `${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </p>
                       <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? 0}</p>
                       <p className="text-slate-300 text-sm font-semibold mt-1">puntos</p>
@@ -1301,8 +1377,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <span className="text-amber-300 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Ganadora'}</span>
                   <h2 className="text-2xl font-black text-white mt-1">
                     {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                      : teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                      : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                   </h2>
                   <p className="text-5xl font-black text-amber-400 mt-2">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
@@ -1316,8 +1392,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <span className="text-slate-400 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Perdedora'}</span>
                   <h2 className="text-2xl font-black text-white mt-1">
                     {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p: any) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}`
-                      : teamResult.losingTeam?.players.map((p: any) => p.name).join(' / ') || '—'}
+                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                      : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                   </h2>
                   <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
@@ -1326,7 +1402,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
             {(isStablefordMode || isSindicatoMode) && (
               <div className="grid grid-cols-3 gap-6 mb-8">
-                {ranking.slice(0, 3).map((entry: any, index: number) => (
+                {ranking.slice(0, 3).map((entry, index) => (
                   <div 
                     key={entry.player.id} 
                     className={`p-6 rounded-2xl border-2 text-center ${

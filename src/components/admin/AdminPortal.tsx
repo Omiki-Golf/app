@@ -131,7 +131,7 @@ export function AdminPortal({ account, onLogout, onAccessChanged, onChangePasswo
           </div>
           <div className="flex gap-2 items-center">
             <button onClick={onChangePassword} className="text-sm text-accent-ink px-3 py-3">Mi contraseña</button>
-            <ThemeToggle />
+            <ThemeToggle alwaysVisible />
             <NavigationButton destination="logout" onClick={() => void onLogout()} />
           </div>
         </header>

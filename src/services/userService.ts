@@ -1,8 +1,9 @@
 import { effectivePlan } from '../utils/effectivePlan';
 import { getReadOnly } from './userRestriction';
 import { supabase } from './supabaseClient';
-import { UserProfile, GroupMember, GroupInvitation, PlanType } from '../types';
+import { UserProfile, GroupMember, GroupInvitation, QuickRoundInvitation, PlanType } from '../types';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
+import { clearExpressCredential, readExpressCredential } from '../utils/expressCredential';
 
 export const userService = {
   async getProfile(userId: string): Promise<UserProfile | null> {
@@ -71,12 +72,35 @@ export const userService = {
     return data as UserProfile;
   },
 
+  async renameMyNick(nick: string): Promise<UserProfile> {
+    const { data, error } = await supabase.rpc('rename_my_nick', { p_nick: nick });
+    if (error) throw error;
+    return data as UserProfile;
+  },
+
   async searchByNick(nick: string): Promise<UserProfile[]> {
     const { data, error } = await supabase.rpc('search_user_profiles', {
       search_term: nick,
     });
     if (error) throw error;
     return (data || []) as UserProfile[];
+  },
+
+  async getQuickRoundInvitations(): Promise<QuickRoundInvitation[]> {
+    const { data, error } = await supabase.rpc('list_my_quick_round_invitations');
+    if (error) throw error;
+    return (data || []) as QuickRoundInvitation[];
+  },
+
+  async getQuickRoundInvitationCount(): Promise<number> {
+    const { data, error } = await supabase.rpc('count_my_quick_round_invitations');
+    if (error) throw error;
+    return Number(data || 0);
+  },
+
+  async respondToQuickRoundInvitation(id: string, status: 'accepted' | 'rejected'): Promise<void> {
+    const { error } = await supabase.rpc('respond_quick_round_invitation', { p_invitation: id, p_status: status });
+    if (error) throw error;
   },
 
   async getPlanType(userId: string): Promise<PlanType> {
@@ -88,6 +112,16 @@ export const userService = {
       .maybeSingle();
     if (error) throw error;
     return effectivePlan(data);
+  },
+
+  /** Pasa a la cuenta las partidas rápidas creadas en este dispositivo como Express. */
+  async claimDeviceRounds(deviceId: string): Promise<number> {
+    const credential = readExpressCredential();
+    if (!credential || credential.ownerId !== deviceId) throw new Error('Las partidas Express antiguas requieren recuperación revisada.');
+    const { data, error } = await supabase.rpc('claim_verified_express_rounds', { p_secret: credential.secret });
+    if (error) throw new Error('No se han podido recuperar las partidas Express. Inténtalo de nuevo al iniciar sesión.');
+    clearExpressCredential();
+    return typeof data === 'number' ? data : 0;
   },
 
   async startTeamTrial(): Promise<string> {
@@ -122,6 +156,17 @@ export const userService = {
   },
 
   async manageGroupMember(member: GroupMember, action: 'handicap' | 'remove', handicap18?: number): Promise<void> {
+    if (!member.user_id) {
+      const { error } = await supabase.rpc('manage_group_guest_player', {
+        p_group: member.group_id,
+        p_player: member.player_id,
+        p_player_revision: member.player_revision,
+        p_action: action,
+        p_handicap_18: handicap18 ?? null,
+      });
+      if (error) throw error;
+      return;
+    }
     const { error } = await supabase.rpc('manage_group_member', {
       p_group: member.group_id, p_user: member.user_id,
       p_member_revision: member.member_revision, p_player_revision: member.player_revision,
@@ -165,13 +210,13 @@ export const userService = {
       .from('group_invitations')
       .select(`
         *,
-        group:groups!group_id(*)
+        group:groups!inner(*)
       `)
       .eq('invited_user_id', userId)
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
     if (error) throw error;
-    const invitations = (data || []) as unknown as GroupInvitation[];
+    const invitations = ((data || []) as unknown as GroupInvitation[]).filter(invitation => !invitation.group?.archived_at);
     if (!invitations.length) return invitations;
     // invited_by references Auth, not user_profiles. Fetch optional display
     // details separately so a missing/inaccessible profile cannot hide an invite.
@@ -186,16 +231,48 @@ export const userService = {
     })) as GroupInvitation[];
   },
 
-  async sendInvitation(groupId: string, invitedUserId: string, invitedBy: string, message?: string): Promise<void> {
-    const { error } = await supabase
-      .from('group_invitations')
-      .insert({
-        group_id: groupId,
-        invited_user_id: invitedUserId,
-        invited_by: invitedBy,
-        status: 'pending',
-        message,
-      });
+  async sendInvitation(groupId: string, invitedUserId: string, _invitedBy: string, message?: string): Promise<'pending' | 'accepted' | 'rejected'> {
+    const { data, error } = await supabase.rpc('invite_group_user_once', {
+      p_group: groupId,
+      p_user: invitedUserId,
+      p_message: message ?? null,
+    });
+    if (error) throw error;
+    return data as 'pending' | 'accepted' | 'rejected';
+  },
+
+  async deleteRejectedInvitation(groupId: string, invitedUserId: string): Promise<void> {
+    const { error } = await supabase.rpc('delete_rejected_group_invitation', {
+      p_group: groupId,
+      p_user: invitedUserId,
+    });
+    if (error) throw error;
+  },
+
+  async getGroupInvitationStatuses(groupId: string): Promise<Array<{ userId: string; status: 'pending' | 'accepted' | 'rejected'; profile?: UserProfile }>> {
+    // user_profiles solo deja leer el perfil propio: el nick y el avatar de los invitados
+    // llegan por la función, que solo responde a quien gestiona el grupo.
+    const { data, error } = await supabase.rpc('list_group_invitations', { p_group: groupId });
+    if (error) throw error;
+    return ((data || []) as Array<{ invited_user_id: string; status: string; nick: string | null; display_name: string | null; avatar_url: string | null; exact_handicap: number | null }>).map(row => ({
+      userId: row.invited_user_id,
+      status: row.status as 'pending' | 'accepted' | 'rejected',
+      profile: row.nick ? {
+        user_id: row.invited_user_id,
+        nick: row.nick,
+        display_name: row.display_name,
+        avatar_url: row.avatar_url ?? undefined,
+        exact_handicap: Number(row.exact_handicap ?? 0),
+      } as UserProfile : undefined,
+    }));
+  },
+
+  async addGroupGuest(groupId: string, name: string, handicap18: number): Promise<void> {
+    const { error } = await supabase.rpc('add_group_guest_player', {
+      p_group: groupId,
+      p_name: name,
+      p_handicap_18: handicap18,
+    });
     if (error) throw error;
   },
 

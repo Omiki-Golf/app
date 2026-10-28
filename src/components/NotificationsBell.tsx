@@ -2,10 +2,10 @@ import { MessageInbox } from './MessageInbox';
 import { GroupMessages } from './messages/GroupMessages';
 import { messageService } from '../services/messageService';
 import { WriteButton } from '../context/ReadOnlyContext';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Bell, Check, X, Users, Clock, Trophy, Flag, Hand } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Bell, Check, X, Trophy, Flag, Hand } from 'lucide-react';
 import { userService } from '../services/userService';
-import { GroupInvitation } from '../types';
+import { GroupInvitation, QuickRoundInvitation } from '../types';
 import type { ActivityEvent, ActivityScope } from '../services/messageService';
 import { useTranslation } from 'react-i18next';
 
@@ -13,12 +13,14 @@ interface NotificationsBellProps {
   userId: string | null;
   onBack: () => void;
   onInvitationResolved: () => void;
+  onInvitationAccepted: () => void;
   activityScope: ActivityScope;
 }
 
-export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, activityScope }) => {
+export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, onInvitationAccepted, activityScope }) => {
   const { t } = useTranslation();
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
+  const [quickRoundInvitations, setQuickRoundInvitations] = useState<QuickRoundInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [responding, setResponding] = useState<string | null>(null);
   const [managesGroups, setManagesGroups] = useState(false);
@@ -29,6 +31,14 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   const [activityError, setActivityError] = useState('');
   const invitationRequest = useRef(0);
   const responseRunning = useRef(false);
+  const invalidateInvitationRequests = useCallback(() => {
+    invitationRequest.current++;
+  }, []);
+  const stableActivityScope = useMemo(() => ({
+    roundId: activityScope.roundId,
+    groupId: activityScope.groupId,
+    accessCode: activityScope.accessCode,
+  }), [activityScope.roundId, activityScope.groupId, activityScope.accessCode]);
 
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === 'Escape') onBack(); };
@@ -40,14 +50,14 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
     let live = true;
     const loadActivity = async () => {
       try {
-        const data = await messageService.activity(activityScope, userId, true);
+        const data = await messageService.activity(stableActivityScope, userId, true);
         if (live) { setActivity(data.events); setActivityError(''); onInvitationResolved(); }
       } catch { if (live) setActivityError(t('activity.loadError')); }
     };
     void loadActivity();
     const timer = window.setInterval(() => void loadActivity(), 30000);
     return () => { live = false; window.clearInterval(timer); };
-  }, [activityScope.roundId, activityScope.groupId, activityScope.accessCode, userId, onInvitationResolved, t]);
+  }, [stableActivityScope, userId, onInvitationResolved, t]);
 
   useEffect(() => {
     if (!userId) return;
@@ -63,8 +73,10 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   const load = useCallback(async () => {
     const request = ++invitationRequest.current;
     try {
-      const data = userId ? await userService.getPendingInvitations(userId) : [];
-      if (request === invitationRequest.current) { setInvitations(data); setInvitationError(''); }
+      const [groups, quickRounds] = userId ? await Promise.all([
+        userService.getPendingInvitations(userId), userService.getQuickRoundInvitations(),
+      ]) : [[], []];
+      if (request === invitationRequest.current) { setInvitations(groups); setQuickRoundInvitations(quickRounds); setInvitationError(''); }
     } catch {
       if (request === invitationRequest.current) setInvitationError('No se pudieron cargar las invitaciones. Pulsa Actualizar invitaciones para reintentarlo.');
     } finally {
@@ -73,14 +85,12 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
   }, [userId]);
 
   useEffect(() => {
-    void load(); const tick = () => void load(); const timer = window.setInterval(tick, 30000); window.addEventListener('focus', tick);
+    void load(); const tick = () => void load(); const timer = window.setInterval(tick, 30000);     window.addEventListener('focus', tick);
     return () => {
-      // A request generation counter, not a DOM ref.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      invitationRequest.current++;
+      invalidateInvitationRequests();
       window.clearInterval(timer); window.removeEventListener('focus', tick);
     };
-  }, [load]);
+  }, [load, invalidateInvitationRequests]);
 
   const handleRespond = async (invitationId: string, status: 'accepted' | 'rejected') => {
     if (responseRunning.current) return;
@@ -92,6 +102,24 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
       invitationRequest.current++;
       setLoading(false);
       setInvitations(current => current.filter(i => i.id !== invitationId));
+      onInvitationResolved();
+      if (status === 'accepted') onInvitationAccepted();
+    } catch {
+      setResponseError('No se pudo guardar la respuesta. Actualiza las invitaciones y vuelve a intentarlo.');
+    } finally {
+      responseRunning.current = false;
+      setResponding(null);
+    }
+  };
+
+  const handleQuickRoundRespond = async (invitationId: string, status: 'accepted' | 'rejected') => {
+    if (responseRunning.current) return;
+    responseRunning.current = true;
+    setResponding(invitationId);
+    setResponseError('');
+    try {
+      await userService.respondToQuickRoundInvitation(invitationId, status);
+      setQuickRoundInvitations(current => current.filter(invitation => invitation.id !== invitationId));
       onInvitationResolved();
     } catch {
       setResponseError('No se pudo guardar la respuesta. Actualiza las invitaciones y vuelve a intentarlo.');
@@ -127,7 +155,18 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
         {showGroupMessages && userId ? <GroupMessages onBack={() => setShowGroupMessages(false)} /> : <>
         {managesGroups && <button className="w-full bg-card border border-line rounded-xl p-3 text-ink mb-5" onClick={() => setShowGroupMessages(true)}>Mensajes de mis grupos</button>}
         <MessageInbox key={userId || 'express'} userId={userId} onRead={onInvitationResolved} />
-        {userId && <h2 className="font-bold text-lg text-ink mb-3">Invitaciones a grupos</h2>}
+        {quickRoundInvitations.length > 0 && <div className="mb-5 space-y-3">
+          {quickRoundInvitations.map(invitation => <div key={invitation.id} className="rounded-2xl bg-card p-5 shadow-card">
+            <p className="mb-1 text-base font-semibold text-ink">
+              {invitation.inviter_nick} te ha añadido a una partida en <strong>{invitation.course_name}</strong>.
+            </p>
+            <p className="mb-4 text-sm text-ink-3">¿Quieres guardar los resultados en Mis partidas y Mis estadísticas?</p>
+            <div className="flex gap-2">
+              <WriteButton onClick={() => void handleQuickRoundRespond(invitation.id, 'accepted')} disabled={responding !== null} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-accent py-2.5 font-semibold text-on-accent disabled:opacity-50"><Check size={16} />Aceptar</WriteButton>
+              <WriteButton onClick={() => void handleQuickRoundRespond(invitation.id, 'rejected')} disabled={responding !== null} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-card-2 py-2.5 font-semibold text-ink-2 disabled:opacity-50"><X size={16} />Rechazar</WriteButton>
+            </div>
+          </div>)}
+        </div>}
         {userId && <button disabled={responding !== null} className="border border-line rounded-xl p-2 text-ink mb-3" onClick={() => { void load(); onInvitationResolved(); }}>Actualizar invitaciones</button>}
         {invitationError && <p role="alert" className="text-red-600 mb-3">{invitationError}</p>}
         {responseError && <p role="alert" className="text-red-600 mb-3">{responseError}</p>}
@@ -136,7 +175,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
             <div className="w-8 h-8 border-2 border-line-2 border-t-accent rounded-full animate-spin mx-auto mb-3" />
             <p className="text-ink-3 text-sm">Cargando...</p>
           </div>
-        ) : invitations.length === 0 ? (invitationError ? null : (
+        ) : invitations.length === 0 && quickRoundInvitations.length === 0 ? (invitationError ? null : (
           <div className="bg-card rounded-2xl shadow-card p-8 text-center">
             <Bell size={32} className="text-ink-4 mx-auto mb-3" />
             <p className="text-ink-3">No tienes invitaciones pendientes</p>
@@ -145,23 +184,9 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
           <div className="space-y-3">
             {invitations.map(inv => (
               <div key={inv.id} className="bg-card rounded-2xl shadow-card p-5">
-                <div className="flex items-start gap-3 mb-4">
-                  <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
-                    <Users size={18} className="text-amber-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-ink text-sm">
-                      {inv.inviter_profile?.nick || 'Alguien'} te ha invitado
-                    </p>
-                    <p className="text-sm text-ink-3 mt-0.5">
-                      Quieres meterte en el grupo <strong>{inv.group?.name}</strong> donde te han invitado?
-                    </p>
-                    <p className="text-xs text-ink-4 mt-1 flex items-center gap-1">
-                      <Clock size={12} />
-                      {new Date(inv.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
+                <p className="mb-4 text-base font-semibold text-ink">
+                  ¿Quieres aceptar la invitación de {inv.inviter_profile?.nick || 'alguien'} al grupo <strong>{inv.group?.name}</strong>?
+                </p>
 
                 <div className="flex gap-2">
                   <WriteButton

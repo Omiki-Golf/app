@@ -160,3 +160,112 @@ html.theme-transition * {
 .dark .theme-static .text-yellow-900 { color: #713f12; }
 .dark .theme-static .text-orange-900 { color: #7c2d12; }
 .dark .theme-static .text-red-700 { color: #b91c1c; }
+
+/* Tablas de estadisticas: legibles en ambos temas y estables al exportar. */
+.statistics-panel {
+  background-color: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+.statistics-table-title,
+.statistics-table-text {
+  color: var(--ink);
+}
+.statistics-table-line {
+  border-color: var(--line);
+}
+.statistics-table-row:hover {
+  background-color: var(--card-2);
+}
+.statistics-table-accent {
+  color: #047857;
+}
+.statistics-table-positive {
+  color: #15803d;
+}
+.statistics-table-warning {
+  color: #c2410c;
+}
+.statistics-table-negative {
+  color: #dc2626;
+}
+.statistics-table-total {
+  background-color: #d1fae5;
+}
+
+.dark .statistics-panel,
+.theme-static .statistics-panel {
+  background-color: rgb(255 255 255 / .1);
+  border-color: rgb(255 255 255 / .1);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / .25);
+}
+.dark .statistics-table-title,
+.dark .statistics-table-text,
+.theme-static .statistics-table-title,
+.theme-static .statistics-table-text {
+  color: #fff;
+}
+.dark .statistics-table-line,
+.theme-static .statistics-table-line {
+  border-color: rgb(255 255 255 / .15);
+}
+.dark .statistics-table-row:hover,
+.theme-static .statistics-table-row:hover {
+  background-color: rgb(255 255 255 / .05);
+}
+.dark .statistics-table-accent,
+.theme-static .statistics-table-accent {
+  color: #6ee7b7;
+}
+.dark .statistics-table-positive,
+.theme-static .statistics-table-positive {
+  color: #86efac;
+}
+.dark .statistics-table-warning,
+.theme-static .statistics-table-warning {
+  color: #fdba74;
+}
+.dark .statistics-table-negative,
+.theme-static .statistics-table-negative {
+  color: #fca5a5;
+}
+.dark .statistics-table-total,
+.theme-static .statistics-table-total {
+  background-color: rgb(6 78 59 / .5);
+}
+
+/* Spinner de Omiki (OmikiSpinner): la O del logo late y dos aros giran alrededor. */
+.omiki-spinner-ring {
+  position: absolute;
+  inset: 4% 8%;
+  border-radius: 9999px;
+  border: 4px solid transparent;
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  animation: omiki-spin 1s linear infinite;
+}
+.omiki-spinner-ring--slow {
+  inset: 0 4%;
+  border-width: 2px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+  border-bottom-color: #a3e635;
+  animation-duration: 1.8s;
+  animation-direction: reverse;
+}
+.omiki-spinner-logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: auto;
+  transform: translate(-50%, -50%);
+  animation: omiki-pulse 2s ease-in-out infinite;
+}
+@keyframes omiki-spin { to { transform: rotate(360deg); } }
+@keyframes omiki-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.07); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .omiki-spinner-ring, .omiki-spinner-logo { animation: none; }
+}

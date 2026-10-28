@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect } from 'react';
-import { GolfHole, RoundPlayer, RoundScore, GameMode, DecidedResult } from '../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { GolfHole, RoundPlayer, RoundScore, GameMode, DecidedResult, ScoreChangeInput } from '../types';
 import { HoleCard } from './HoleCard';
 import { ConfirmModal } from './ConfirmModal';
 import { CourseChangeModal } from './CourseChangeModal';
@@ -11,6 +11,9 @@ import { golfService } from '../services/golfService';
 import { getStrokesReceived, calculateScoreToPar } from '../utils/calculations';
 import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
+import { ThemeToggle } from './ThemeToggle';
+import { FinalResultModal } from './FinalResultModal';
+import { calculateFinalResult, isDecidedBeforeLastHole, type FinalResult } from '../utils/finalResult';
 
 interface ScorecardProps {
   holes: GolfHole[];
@@ -28,12 +31,14 @@ interface ScorecardProps {
   hasEditAccess?: boolean;
   isCreator?: boolean;
   canFinishRound?: boolean;
+  isRoundFinished?: boolean;
   courseName?: string;
   groupCode?: string | null;
+  hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   decidedResult?: DecidedResult | null;
   onHoleChange: (holeNumber: number) => void;
-  onScoreChange: (playerId: string, holeNumber: number, score: any) => void;
+  onScoreChange: (playerId: string, holeNumber: number, score: ScoreChangeInput | null) => void;
   onShowLeaderboard: () => void;
   onResetGame: () => void;
   backDestination?: 'back' | 'home';
@@ -52,10 +57,11 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   courseId,
   accessCode,
   hasEditAccess = true,
-  isCreator = false,
   canFinishRound = false,
+  isRoundFinished = false,
   courseName = '',
   groupCode = null,
+  hoyo19Enabled,
   gameMode = 'stableford',
   decidedResult = null,
   onHoleChange,
@@ -66,7 +72,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onCourseChanged,
   messagesButton,
 }) => {
-  const isDivend = groupCode === 'DIVEND';
+  const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isModeScoring = gameMode !== 'stableford';
   const modeLabels: Record<GameMode, string> = {
     stableford: 'Stableford',
@@ -75,6 +81,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     parejas: 'Parejas',
   };
   const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showPendingScoresModal, setShowPendingScoresModal] = useState(false);
+  const pendingWarningShownForAttempt = useRef(false);
   const [showAccessCode, setShowAccessCode] = useState(false);
   useEffect(() => {
     console.log('📊 Scorecard: Players prop updated:', players.map(p => ({ name: p.name, playing_handicap: p.playing_handicap })));
@@ -98,10 +106,27 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     const round = roundsMap.get(player.id);
     return playableHoles.every((h) => isEnteredScore(round?.scores[h.hole_number]));
   });
-  const firstMissing = playableHoles.flatMap((h) => players.map((player) => ({ h, player })))
-    .find(({ h, player }) => !isEnteredScore(roundsMap.get(player.id)?.scores[h.hole_number]));
+  const lastPlayableHole = playableHoles[playableHoles.length - 1];
+  const lastHoleScoresComplete = !!lastPlayableHole && players.length > 0 && players.every((player) =>
+    isEnteredScore(roundsMap.get(player.id)?.scores[lastPlayableHole.hole_number])
+  );
+  const hasPendingScoresBeforeLastHole = playableHoles.slice(0, -1).some((h) =>
+    players.some((player) => !isEnteredScore(roundsMap.get(player.id)?.scores[h.hole_number]))
+  );
 
   const isLastHole = currentHole === playableHoles.length;
+
+  useEffect(() => {
+    if (!lastHoleScoresComplete || allScoresComplete) {
+      pendingWarningShownForAttempt.current = false;
+      return;
+    }
+
+    if (isLastHole && hasPendingScoresBeforeLastHole && !pendingWarningShownForAttempt.current) {
+      pendingWarningShownForAttempt.current = true;
+      setShowPendingScoresModal(true);
+    }
+  }, [allScoresComplete, hasPendingScoresBeforeLastHole, isLastHole, lastHoleScoresComplete]);
 
   const handleFinishWithConfirm = () => {
     console.log('📋 Abriendo modal de confirmación de finalización...');
@@ -163,7 +188,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
   useEffect(() => {
     if (handshakeAcknowledged) return;
-    if (decidedResult && !handshakeData?.isOpen) {
+    if (decidedResult && isDecidedBeforeLastHole(decidedResult) && !handshakeData?.isOpen) {
       setHandshakeData({
         isOpen: true,
         winner: decidedResult.winner_label,
@@ -172,29 +197,51 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     }
   }, [decidedResult, handshakeAcknowledged, handshakeData?.isOpen]);
 
+  const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
+  const wereScoresComplete = useRef(allScoresComplete);
+
+  useEffect(() => {
+    setFinalResult(null);
+    wereScoresComplete.current = allScoresComplete;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundId, gameMode]);
+
+  useEffect(() => {
+    const justCompleted = allScoresComplete && !wereScoresComplete.current;
+    wereScoresComplete.current = allScoresComplete;
+    if (!justCompleted || !isModeScoring || isDecidedBeforeLastHole(decidedResult)) return;
+    setFinalResult(calculateFinalResult(
+      gameMode,
+      players,
+      Object.fromEntries(players.map((p) => [p.id, roundsMap.get(p.id)?.scores])),
+    ));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allScoresComplete]);
+
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <NavigationButton destination={backDestination}
-              onClick={onResetGame}
-              className="bg-neutral hover:bg-neutral-hover text-ink p-2 rounded-lg transition-colors"
-            />
-            <h1 className="flex-1 text-center text-lg font-bold text-title sm:text-2xl md:text-3xl">
-              <span className="sm:hidden">Tarjeta</span><span className="hidden sm:inline">Tarjeta de Puntuación</span>
-            </h1>
-            <div className="flex shrink-0 items-center gap-2">
-              {messagesButton}
+          <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div className="flex items-center gap-2">
+              <NavigationButton destination={backDestination} onClick={onResetGame} />
+              <ThemeToggle className="!h-11 !w-11" />
+            </div>
+            <div className="flex justify-center">{messagesButton}</div>
+            <div className="flex justify-end">
               <button
                 onClick={onShowLeaderboard}
-                className="bg-accent hover:bg-accent-hover text-on-accent px-3 sm:px-4 py-2 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                aria-label="Clasificación"
               >
                 <Trophy size={20} />
                 <span className="hidden sm:inline">Clasificación</span>
               </button>
             </div>
           </div>
+          <h1 className="mb-6 text-center text-2xl font-bold text-title md:text-3xl">
+            Tarjeta de Puntuación
+          </h1>
 
           <div className="mb-4 bg-accent rounded-lg p-4 text-on-accent">
             <div className="flex items-center justify-between">
@@ -263,9 +310,9 @@ export const Scorecard: React.FC<ScorecardProps> = ({
           {!hasEditAccess && (
             <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
               <div className="flex items-center gap-2">
-                <Lock className="text-amber-600" size={20} />
+                <Lock className="text-amber-700" size={20} />
                 <span className="text-sm font-medium text-amber-900">
-                  Solo lectura - No tienes permiso para editar esta partida
+                  {isRoundFinished ? 'Esta partida está finalizada. Puedes consultar los resultados, pero no modificarlos.' : 'Solo lectura - No tienes permiso para editar esta partida'}
                 </span>
               </div>
             </div>
@@ -286,6 +333,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 )}
                 readonly={!hasEditAccess}
                 groupCode={groupCode}
+                hoyo19Enabled={isDivend}
                 gameMode={gameMode}
                 teamAssignments={gameMode === 'parejas' && players.length === 4 ? Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1])) : undefined}
                 onScoreChange={(playerId, score) => {
@@ -319,14 +367,23 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               Anterior
             </button>
 
-            {isLastHole && allScoresComplete && canFinishRound ? (
+            {isLastHole && allScoresComplete && canFinishRound && !isRoundFinished ? (
               <WriteButton
                 onClick={handleFinishWithConfirm}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
-                <Trophy size={20} />
-                Finalizar Partida
+                Finalizar
               </WriteButton>
+            ) : isLastHole && (isRoundFinished || (allScoresComplete && !canFinishRound)) ? (
+              <button
+                type="button"
+                disabled
+                title={isRoundFinished ? 'El creador ha finalizado la partida' : 'Solo el creador puede finalizar la partida'}
+                className="flex-1 min-w-0 bg-neutral text-ink-3 text-sm sm:text-base font-semibold px-3 py-3 rounded-lg flex items-center justify-center gap-2 text-center cursor-not-allowed"
+              >
+                {isRoundFinished && <Lock size={20} className="shrink-0" />}
+                <span>{isRoundFinished ? 'Finalizada' : 'Pendiente de finalizar'}</span>
+              </button>
             ) : (
               <button
                 onClick={() => onHoleChange(Math.min(playableHoles.length, currentHole + 1))}
@@ -339,24 +396,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             )}
           </div>
 
-          {isLastHole && !allScoresComplete && firstMissing && (
-            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
-              <p className="font-semibold">Faltan golpes por informar</p>
-              <p className="mt-1 text-sm">Primer pendiente: {firstMissing.player.name}, hoyo {firstMissing.h.hole_number}.</p>
-              <button
-                type="button"
-                onClick={() => onHoleChange(playableHoles.findIndex((playableHole) => playableHole.hole_number === firstMissing.h.hole_number) + 1)}
-                className="mt-3 rounded-lg bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700"
-              >
-                Ir al primer pendiente
-              </button>
-            </div>
-          )}
-
-          {isLastHole && allScoresComplete && !canFinishRound && (
-            <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm font-medium text-blue-900">
-              La tarjeta está completa. Solo el creador puede finalizar la partida.
-            </div>
+          {isLastHole && allScoresComplete && !canFinishRound && !isRoundFinished && (
+            <p className="-mt-3 mb-6 text-center text-sm text-ink-3">
+              Solo el creador de la partida puede finalizarla.
+            </p>
           )}
 
           <div className="border-t pt-4">
@@ -545,9 +588,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                               return s ? s.mode_points ?? 0 : null;
                             });
                             if (ps.every((v) => v !== null)) {
-                              const allRaya = scoresForHole.every(s => s?.abandoned);
-                              t0Accum += allRaya ? 0.5 : (ps[0] ?? 0);
-                              t1Accum += allRaya ? 0.5 : (ps[2] ?? 0);
+                              t0Accum += ps[0] ?? 0;
+                              t1Accum += ps[2] ?? 0;
                             }
                           });
                           const label = `${t0Accum}-${t1Accum}`;
@@ -588,9 +630,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                 roundsMap.get(p.id)?.scores[h.hole_number]
                               );
                               if (scoresForHole.every(Boolean)) {
-                                const allRaya = scoresForHole.every(s => s?.abandoned);
-                                t0 += allRaya ? 0.5 : (scoresForHole[0]?.mode_points ?? 0);
-                                t1 += allRaya ? 0.5 : (scoresForHole[2]?.mode_points ?? 0);
+                                t0 += scoresForHole[0]?.mode_points ?? 0;
+                                t1 += scoresForHole[2]?.mode_points ?? 0;
                               }
                             });
                             const label = `${t0}-${t1}`;
@@ -616,7 +657,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 <span>Birdie</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-card border-2 border-line-2"></div>
+                <div className="w-4 h-4 rounded-full bg-white border-2 border-line-2"></div>
                 <span>Par</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -633,7 +674,9 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
               {players.map((player) => {
                 const round = roundsMap.get(player.id);
-                const totalPoints = round?.totalStablefordPoints ?? 0;
+                const totalPoints = playableHoles.reduce((sum, h) => {
+                  return sum + (round?.scores[h.hole_number]?.stableford_points ?? 0);
+                }, 0);
                 const hasAbandonedScores = false;
 
                 const totalGrossStrokes = playableHoles.reduce((sum, h) => {
@@ -644,7 +687,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
                 const coursePar = playableHoles.reduce((sum, h) => sum + h.par, 0);
                 const scoreToPar = totalGrossStrokes > 0
-                  ? calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap, numHoles)
+                  ? calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap)
                   : null;
 
                 return (
@@ -783,6 +826,32 @@ export const Scorecard: React.FC<ScorecardProps> = ({
         />
       )}
 
+      {showPendingScoresModal && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pending-scores-title"
+        >
+          <div className="w-full max-w-md rounded-xl bg-card p-6 text-center shadow-card">
+            <h2 id="pending-scores-title" className="text-xl font-bold text-ink">
+              Hay hoyos pendientes de informar
+            </h2>
+            <p className="mt-3 text-ink-2">
+              Revisa la tabla de golpes antes de finalizar la partida.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowPendingScoresModal(false)}
+              autoFocus
+              className="mt-6 w-full rounded-lg bg-amber-600 px-4 py-3 font-bold text-amber-950 transition-colors hover:bg-amber-700"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
       {showCourseChangeModal && courseId && (
         <CourseChangeModal
           currentCourseId={courseId}
@@ -816,6 +885,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             setHandshakeData(null);
           }}
         />
+      )}
+
+      {finalResult && (
+        <FinalResultModal result={finalResult} onClose={() => setFinalResult(null)} />
       )}
     </div>
   );

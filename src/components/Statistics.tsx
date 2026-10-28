@@ -1,8 +1,21 @@
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect } from 'react';
+import { TopBar } from './TopBar';
+import { OmikiLoadingScreen } from './OmikiSpinner';
+import React, { useState, useEffect, useCallback } from 'react';
+import { SelectMenu } from './SelectMenu';
 import { golfService } from '../services/golfService';
 import { User, Users, MapPin, TrendingUp, Trophy, Award, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine } from 'lucide-react';
-import { Group } from '../types';
+import {
+  Group,
+  ArchivedRound,
+  PlayerStatisticsSummary,
+  DetailedPlayerStatistics,
+  GroupStatisticsSummary,
+  CourseStatisticsSummary,
+  HolePerformanceStatistics,
+  BestCourseRoundStatistics,
+  RankingRpcRow,
+} from '../types';
 import { AwardRankingModal } from './AwardRankingModal';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
@@ -11,23 +24,69 @@ interface StatisticsProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   currentGroup: Group;
+  messagesButton?: React.ReactNode;
 }
 
 type TabType = 'player' | 'group' | 'course';
 
-export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup }) => {
+interface PlayerStatisticsView extends PlayerStatisticsSummary {
+  detailed: DetailedPlayerStatistics | null;
+}
+
+interface CourseStatisticsView extends CourseStatisticsSummary {
+  hoyoMuerte: HolePerformanceStatistics | null;
+  hoyoGloria: HolePerformanceStatistics | null;
+  mejorRonda: BestCourseRoundStatistics | null;
+}
+
+interface Phase2Statistics {
+  killer: RankingRpcRow | null;
+  paquete: RankingRpcRow | null;
+  shark: RankingRpcRow | null;
+  viciado: RankingRpcRow | null;
+  francotirador: RankingRpcRow | null;
+  maquina: RankingRpcRow | null;
+  amigoDelMasUno: RankingRpcRow | null;
+  reyDelBosque: RankingRpcRow | null;
+  laPaliza: RankingRpcRow | null;
+  sharkRanking: RankingRpcRow[];
+  viciadoRanking: RankingRpcRow[];
+  francotiradorRanking: RankingRpcRow[];
+  maquinaRanking: RankingRpcRow[];
+  amigoDelMasUnoRanking: RankingRpcRow[];
+  reyDelBosqueRanking: RankingRpcRow[];
+}
+
+interface ModalRankingEntry extends RankingRpcRow {
+  value?: number;
+  rounds_played?: number;
+  handicap: number | null;
+}
+
+const toModalRanking = (
+  entries: RankingRpcRow[],
+  getValue: (entry: RankingRpcRow) => number | undefined,
+): ModalRankingEntry[] => entries.map((entry) => ({
+  ...entry,
+  value: getValue(entry),
+  rounds_played: entry.total_rounds,
+  handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
+}));
+
+export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup, messagesButton }) => {
   const [activeTab, setActiveTab] = useState<TabType>('player');
-  const [loading, setLoading] = useState(false);
+  // Empieza cargando: así no se ve un instante la pantalla con pestañas antes de saber si hay partidas.
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [archivedRounds, setArchivedRounds] = useState<any[]>([]);
-  const [historyRounds, setHistoryRounds] = useState<any[]>([]);
+  const [archivedRounds, setArchivedRounds] = useState<ArchivedRound[]>([]);
+  const [historyRounds, setHistoryRounds] = useState<ArchivedRound[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<string>('');
-  const [playerStats, setPlayerStats] = useState<any>(null);
-  const [groupStats, setGroupStats] = useState<any>(null);
+  const [playerStats, setPlayerStats] = useState<PlayerStatisticsView | null>(null);
+  const [groupStats, setGroupStats] = useState<GroupStatisticsSummary | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
-  const [courseStats, setCourseStats] = useState<any>(null);
-  const [divendStats, setDivendStats] = useState<any>(null);
+  const [courseStats, setCourseStats] = useState<CourseStatisticsView | null>(null);
+  const [divendStats, setDivendStats] = useState<Awaited<ReturnType<typeof golfService.getDivendStatistics>> | null>(null);
 
   const [uniquePlayers, setUniquePlayers] = useState<string[]>([]);
   const [uniqueCourses, setUniqueCourses] = useState<string[]>([]);
@@ -37,65 +96,21 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   const [rankingModal, setRankingModal] = useState<{
     isOpen: boolean;
     type: 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque' | null;
-    data: any[];
+    data: ModalRankingEntry[];
   }>({
     isOpen: false,
     type: null,
     data: [],
   });
 
-  const [phase2Stats, setPhase2Stats] = useState<any>(null);
+  const [phase2Stats, setPhase2Stats] = useState<Phase2Statistics | null>(null);
   const [showArchivedRoundsModal, setShowArchivedRoundsModal] = useState(false);
-  const [selectedArchivedRound, setSelectedArchivedRound] = useState<any>(null);
+  const [selectedArchivedRound, setSelectedArchivedRound] = useState<ArchivedRound | null>(null);
 
-  const isDivend = currentGroup.group_code === 'DIVEND';
+  // Rojas y cervezas: grupos con la gamificación Hoyo 19 activada (DIVEND siempre).
+  const isDivend = currentGroup.group_code === 'DIVEND' || !!currentGroup.hoyo_19_enabled;
 
-  useEffect(() => {
-    loadArchivedRounds();
-  }, []);
-
-  const loadArchivedRounds = async () => {
-    try {
-      setLoading(true);
-      const [rounds, history] = await Promise.all([golfService.getStatisticsRounds(currentGroup.id), golfService.getArchivedRounds(currentGroup.id)]);
-      setHistoryRounds(history);
-      setArchivedRounds(rounds);
-
-      const players = new Set<string>();
-      const courses = new Set<string>();
-
-      rounds.forEach((round) => {
-        courses.add(round.course_name);
-        round.final_ranking.forEach((ranking: any) => {
-          players.add(ranking.player_name);
-        });
-      });
-
-      setUniquePlayers(Array.from(players).sort());
-      setUniqueCourses(Array.from(courses).sort());
-
-      if (players.size > 0 && !selectedPlayer) {
-        const firstPlayer = Array.from(players).sort()[0];
-        setSelectedPlayer(firstPlayer);
-        await loadPlayerStatistics(firstPlayer);
-      }
-
-      if (courses.size > 0 && !selectedCourse) {
-        const firstCourse = Array.from(courses).sort()[0];
-        setSelectedCourse(firstCourse);
-        await loadCourseStatistics(firstCourse);
-      }
-
-      await loadGroupStatistics();
-    } catch (err) {
-      setError('Error cargando estadísticas');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadPlayerStatistics = async (playerName: string) => {
+  const loadPlayerStatistics = useCallback(async (playerName: string) => {
     try {
       const [basicStats, detailedStats] = await Promise.all([
         golfService.getPlayerStatistics(playerName, currentGroup.id),
@@ -110,9 +125,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       setError('Error cargando estadísticas del jugador');
       console.error(err);
     }
-  };
+  }, [currentGroup.id]);
 
-  const loadGroupStatistics = async () => {
+  const loadGroupStatistics = useCallback(async () => {
     try {
       const stats = await golfService.getGroupStatistics(currentGroup.id);
       setGroupStats(stats);
@@ -159,9 +174,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       setError('Error cargando estadísticas del grupo');
       console.error(err);
     }
-  };
+  }, [currentGroup.id, isDivend]);
 
-  const loadCourseStatistics = async (courseName: string) => {
+  const loadCourseStatistics = useCallback(async (courseName: string) => {
     try {
       const [basicStats, hoyoMuerte, hoyoGloria, mejorRonda] = await Promise.all([
         golfService.getCourseStatistics(courseName, currentGroup.id),
@@ -180,7 +195,53 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       setError('Error cargando estadísticas del campo');
       console.error(err);
     }
-  };
+  }, [currentGroup.id]);
+
+  const loadArchivedRounds = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [rounds, history] = await Promise.all([
+        golfService.getStatisticsRounds(currentGroup.id),
+        golfService.getArchivedRounds(currentGroup.id),
+      ]);
+      setHistoryRounds(history);
+      setArchivedRounds(rounds);
+
+      const players = new Set<string>();
+      const courses = new Set<string>();
+
+      rounds.forEach((round) => {
+        courses.add(round.course_name);
+        round.final_ranking.forEach((ranking) => players.add(ranking.player_name));
+      });
+
+      setUniquePlayers(Array.from(players).sort());
+      setUniqueCourses(Array.from(courses).sort());
+
+      if (players.size > 0 && !selectedPlayer) {
+        const firstPlayer = Array.from(players).sort()[0];
+        setSelectedPlayer(firstPlayer);
+        await loadPlayerStatistics(firstPlayer);
+      }
+
+      if (courses.size > 0 && !selectedCourse) {
+        const firstCourse = Array.from(courses).sort()[0];
+        setSelectedCourse(firstCourse);
+        await loadCourseStatistics(firstCourse);
+      }
+
+      await loadGroupStatistics();
+    } catch (err) {
+      setError('Error cargando estadísticas');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentGroup.id, selectedPlayer, selectedCourse, loadPlayerStatistics, loadCourseStatistics, loadGroupStatistics]);
+
+  useEffect(() => {
+    void loadArchivedRounds();
+  }, [loadArchivedRounds]);
 
   const handlePlayerChange = async (playerName: string) => {
     setSelectedPlayer(playerName);
@@ -192,10 +253,10 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     await loadCourseStatistics(courseName);
   };
 
-const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque') => {
+  const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque') => {
     console.log('>>> 1. BOTÓN PULSADO - Tipo de ranking:', type);
     try {
-      let modalData: any[] = [];
+      let modalData: ModalRankingEntry[] = [];
 
       switch (type) {
         case 'patrocinador': {
@@ -203,105 +264,55 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
           const patrocinadorData = await golfService.getPatrocinadorRanking(currentGroup.id);
           console.log('>>> 3. DATOS RECIBIDOS DE LA API (Patrocinador):', patrocinadorData);
 
-          modalData = (patrocinadorData || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_beers_paid,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(patrocinadorData, (entry) => entry.total_beers_paid);
           break;
         }
         case 'barraLibre': {
           const barraLibreData = await golfService.getBarraLibreRanking(currentGroup.id);
           console.log('>>> DATOS BARRA LIBRE:', barraLibreData);
-          modalData = (barraLibreData || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_beers_won,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(barraLibreData, (entry) => entry.total_beers_won);
           break;
         }
         case 'corto': {
           const cortoData = await golfService.getCortoRanking(currentGroup.id);
           console.log('>>> DATOS CORTO:', cortoData);
-          modalData = (cortoData || []).map((entry: any) => ({
-            ...entry,
-            value: entry.no_paso_rojas_count,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(cortoData, (entry) => entry.no_paso_rojas_count);
           break;
         }
         case 'driverOro': {
           const driverOroData = await golfService.getDriverOroRanking(currentGroup.id);
           console.log('>>> DATOS DRIVER ORO:', driverOroData);
-          modalData = (driverOroData || []).map((entry: any) => ({
-            ...entry,
-            value: entry.no_paso_rojas_count,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(driverOroData, (entry) => entry.no_paso_rojas_count);
           break;
         }
         case 'shark': {
           console.log('>>> DATOS SHARK:', phase2Stats?.sharkRanking);
-          modalData = (phase2Stats?.sharkRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_wins,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.sharkRanking || [], (entry) => entry.total_wins);
           break;
         }
         case 'viciado': {
           console.log('>>> DATOS VICIADO:', phase2Stats?.viciadoRanking);
-          modalData = (phase2Stats?.viciadoRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_rounds,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.viciadoRanking || [], (entry) => entry.total_rounds);
           break;
         }
         case 'francotirador': {
           console.log('>>> DATOS FRANCOTIRADOR:', phase2Stats?.francotiradorRanking);
-          modalData = (phase2Stats?.francotiradorRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_eagles,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.francotiradorRanking || [], (entry) => entry.total_eagles);
           break;
         }
         case 'maquina': {
           console.log('>>> DATOS MAQUINA:', phase2Stats?.maquinaRanking);
-          modalData = (phase2Stats?.maquinaRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_birdies,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.maquinaRanking || [], (entry) => entry.total_birdies);
           break;
         }
         case 'amigoDelMasUno': {
           console.log('>>> DATOS AMIGO DEL +1:', phase2Stats?.amigoDelMasUnoRanking);
-          modalData = (phase2Stats?.amigoDelMasUnoRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_bogeys,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.amigoDelMasUnoRanking || [], (entry) => entry.total_bogeys);
           break;
         }
         case 'reyDelBosque': {
           console.log('>>> DATOS REY DEL BOSQUE:', phase2Stats?.reyDelBosqueRanking);
-          modalData = (phase2Stats?.reyDelBosqueRanking || []).map((entry: any) => ({
-            ...entry,
-            value: entry.total_double_bogeys_plus,
-            rounds_played: entry.total_rounds,
-            handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-          }));
+          modalData = toModalRanking(phase2Stats?.reyDelBosqueRanking || [], (entry) => entry.total_double_bogeys_plus);
           break;
         }
       }
@@ -319,13 +330,13 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
 
   const renderHandicapEvolution = () => {
     const playerRounds = archivedRounds
-      .filter((round) => round.final_ranking.some((r: any) => r.player_name === selectedPlayer))
+      .filter((round) => round.final_ranking.some((r) => r.player_name === selectedPlayer))
       .sort((a, b) => new Date(a.played_at).getTime() - new Date(b.played_at).getTime());
 
     if (playerRounds.length === 0) return null;
 
     const handicapData = playerRounds.map((round) => {
-      const playerRanking = round.final_ranking.find((r: any) => r.player_name === selectedPlayer);
+      const playerRanking = round.final_ranking.find((r) => r.player_name === selectedPlayer);
       return {
         date: new Date(round.played_at).toLocaleDateString('es-ES'),
         handicap: playerRanking?.handicap || 0,
@@ -442,9 +453,37 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
     );
   };
 
+  const renderSpanishHandsStats = () => {
+    const playerRounds = archivedRounds.filter((round) =>
+      round.player_stats?.some((ps) => ps.player_name === selectedPlayer)
+    );
+
+    let totalSpanishHands = 0;
+    let roundsWithSpanishHands = 0;
+    playerRounds.forEach((round) => {
+      const count = round.player_stats?.find((ps) => ps.player_name === selectedPlayer)?.spanish_hands_count || 0;
+      totalSpanishHands += count;
+      if (count > 0) roundsWithSpanishHands += 1;
+    });
+
+    if (playerRounds.length === 0) return null;
+
+    return (
+      <div className="bg-gradient-to-r from-sky-50 to-sky-100 rounded-lg p-6 border border-sky-200">
+        <h3 className="text-xl font-bold text-sky-900 mb-4">Spanish Hands</h3>
+        <div className="text-center">
+          <p className="text-5xl font-bold text-sky-700">{totalSpanishHands}</p>
+          <p className="text-sm text-ink-3 mt-2">
+            en {roundsWithSpanishHands} de {playerRounds.length} partidas
+          </p>
+        </div>
+      </div>
+    );
+  };
+
   const renderNoPasoRojasStats = () => {
     const playerRounds = archivedRounds.filter((round) =>
-      round.player_stats?.some((ps: any) => ps.player_name === selectedPlayer)
+      round.player_stats?.some((ps) => ps.player_name === selectedPlayer)
     );
 
     if (playerRounds.length === 0) return null;
@@ -453,7 +492,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
     let totalHoles = 0;
 
     playerRounds.forEach((round) => {
-      const playerStat = round.player_stats.find((ps: any) => ps.player_name === selectedPlayer);
+      const playerStat = round.player_stats?.find((ps) => ps.player_name === selectedPlayer);
       if (playerStat) {
         totalNoPasoRojas += playerStat.no_paso_rojas_count || 0;
         totalHoles += playerStat.total_holes_played || 0;
@@ -477,14 +516,13 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
     );
   };
 
-  if (historyRounds.length === 0 && !loading) {
+  if (loading && historyRounds.length === 0) return <OmikiLoadingScreen />;
+
+  if (historyRounds.length === 0) {
     return (
       <div className="min-h-screen bg-app p-4 md:p-8">
         <div className="max-w-4xl mx-auto">
-          <NavigationButton destination={backDestination}
-            onClick={onBack}
-            className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors mb-6"
-          />
+          <TopBar left={<NavigationButton destination={backDestination} onClick={onBack} />} center={messagesButton} />
 
           <div className="bg-card rounded-lg shadow-card p-8 text-center">
             <TrendingUp size={64} className="mx-auto text-ink-4 mb-4" />
@@ -501,15 +539,8 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <NavigationButton destination={backDestination}
-            onClick={onBack}
-            className="bg-card hover:bg-card-2 text-title font-bold py-2 px-3 rounded-lg flex items-center justify-center transition-colors"
-          />
-
-          <h1 className="text-3xl font-bold text-title">Estadísticas</h1>
-          <div className="w-24"></div>
-        </div>
+        <TopBar className="mb-3" left={<NavigationButton destination={backDestination} onClick={onBack} />} center={messagesButton} />
+        <h1 className="mb-6 text-center text-3xl font-bold text-title">Estadísticas</h1>
 
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded mb-6">
@@ -570,24 +601,20 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                   <label className="block text-sm font-medium text-ink-2 mb-2">
                     Selecciona un jugador
                   </label>
-                  <select
+                  <SelectMenu
                     value={selectedPlayer}
-                    onChange={(e) => handlePlayerChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  >
-                    {uniquePlayers.map((player) => (
-                      <option key={player} value={player}>
-                        {player}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handlePlayerChange}
+                    ariaLabel="Selecciona un jugador"
+                    icon={<User size={19} />}
+                    options={uniquePlayers.map((player) => ({ value: player, label: player }))}
+                  />
                 </div>
 
                 {playerStats && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <StatCard
-                        icon={<Trophy className="text-yellow-600" />}
+                        icon={<Trophy className="text-yellow-800" />}
                         label="Partidas"
                         value={playerStats.totalRounds}
                       />
@@ -600,7 +627,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                         icon={<TrendingUp className="text-blue-600" />}
                         label="Puntos Totales"
                         value={playerStats.totalPoints}
-                        subtitle={groupStats ? `Posición: ${groupStats.playerStats.findIndex((p: any) => p.name === selectedPlayer) + 1}º` : undefined}
+                        subtitle={groupStats ? `Posición: ${groupStats.playerStats.findIndex((p) => p.name === selectedPlayer) + 1}º` : undefined}
                       />
                       <StatCard
                         icon={<TrendingUp className="text-blue-600" />}
@@ -733,6 +760,8 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                         {renderNoPasoRojasStats()}
                       </>
                     )}
+
+                    {renderSpanishHandsStats()}
                   </div>
                 )}
               </div>
@@ -842,7 +871,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" menos veces</p>
                               <p className="text-2xl font-bold text-yellow-800">{divendStats.driverOro.name}</p>
-                              <p className="text-lg text-yellow-600">{divendStats.driverOro.value} veces</p>
+                              <p className="text-lg text-yellow-800">{divendStats.driverOro.value} veces</p>
                               {divendStats.driverOro.rounds_played !== undefined && (
                                 <p className="text-xs text-ink-3 mt-1">en {divendStats.driverOro.rounds_played} partidas</p>
                               )}
@@ -865,9 +894,9 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Mejor vuelta histórica</p>
                               <p className="text-2xl font-bold text-yellow-800">{phase2Stats.killer.player_name}</p>
-                              <p className="text-lg text-yellow-600">{phase2Stats.killer.best_score} puntos</p>
+                              <p className="text-lg text-yellow-800">{phase2Stats.killer.best_score} puntos</p>
                               <p className="text-xs text-ink-3 mt-1">{phase2Stats.killer.course_name}</p>
-                              <p className="text-xs text-ink-3">{new Date(phase2Stats.killer.played_at).toLocaleDateString('es-ES')}</p>
+                              <p className="text-xs text-ink-3">{typeof phase2Stats.killer.played_at === 'string' || typeof phase2Stats.killer.played_at === 'number' ? new Date(phase2Stats.killer.played_at).toLocaleDateString('es-ES') : ''}</p>
                             </div>
                           )}
 
@@ -881,7 +910,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               <p className="text-2xl font-bold text-ink">{phase2Stats.paquete.player_name}</p>
                               <p className="text-lg text-ink-3">{phase2Stats.paquete.worst_score} puntos</p>
                               <p className="text-xs text-ink-3 mt-1">{phase2Stats.paquete.course_name}</p>
-                              <p className="text-xs text-ink-3">{new Date(phase2Stats.paquete.played_at).toLocaleDateString('es-ES')}</p>
+                              <p className="text-xs text-ink-3">{typeof phase2Stats.paquete.played_at === 'string' || typeof phase2Stats.paquete.played_at === 'number' ? new Date(phase2Stats.paquete.played_at).toLocaleDateString('es-ES') : ''}</p>
                             </div>
                           )}
 
@@ -990,7 +1019,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más bogeys</p>
                               <p className="text-2xl font-bold text-amber-800">{phase2Stats.amigoDelMasUno.player_name}</p>
-                              <p className="text-lg text-amber-600">{phase2Stats.amigoDelMasUno.total_bogeys} bogeys totales</p>
+                              <p className="text-lg text-amber-700">{phase2Stats.amigoDelMasUno.total_bogeys} bogeys totales</p>
                               <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.amigoDelMasUno.best_single_day} bogeys</p>
                             </div>
                           )}
@@ -1037,7 +1066,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                     <div>
                       <h3 className="text-lg font-bold text-ink mb-4">Clasificación General</h3>
                       <div className="space-y-3">
-                        {groupStats.playerStats.map((player: any, index: number) => (
+                        {groupStats.playerStats.map((player, index) => (
                           <div
                             key={player.name}
                             className={`p-4 rounded-lg border ${
@@ -1080,7 +1109,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                                 </p>
                                 {isDivend && (
                                   <div className="flex items-center gap-1 justify-end mt-1">
-                                    <Beer size={16} className="text-amber-600" />
+                                    <Beer size={16} className="text-amber-700" />
                                     <p
                                       className={`text-sm font-semibold ${
                                         player.beerBalance >= 0 ? 'text-accent-ink' : 'text-red-600'
@@ -1108,17 +1137,13 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                   <label className="block text-sm font-medium text-ink-2 mb-2">
                     Selecciona un campo
                   </label>
-                  <select
+                  <SelectMenu
                     value={selectedCourse}
-                    onChange={(e) => handleCourseChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent"
-                  >
-                    {uniqueCourses.map((course) => (
-                      <option key={course} value={course}>
-                        {course}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleCourseChange}
+                    ariaLabel="Selecciona un campo"
+                    icon={<MapPin size={19} />}
+                    options={uniqueCourses.map((course) => ({ value: course, label: course }))}
+                  />
                 </div>
 
                 {courseStats && courseStats.totalRounds > 0 && (
@@ -1149,7 +1174,7 @@ const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 
                     <div>
                       <h3 className="text-lg font-bold text-ink mb-4">Top 5 Jugadores</h3>
                       <div className="space-y-2">
-                        {courseStats.topPlayers.map((player: any, index: number) => (
+                        {courseStats.topPlayers.map((player, index) => (
                           <div
                             key={player.name}
                             className="p-4 rounded-lg bg-card border border-line flex items-center justify-between"

@@ -1,10 +1,11 @@
 import React from 'react';
 import { X, Trophy, Users, Calendar, MapPin } from 'lucide-react';
+import type { ArchivedRound } from '../types';
 
 interface ArchivedRoundsModalProps {
-  rounds: any[];
+  rounds: ArchivedRound[];
   onClose: () => void;
-  onSelectRound: (round: any) => void;
+  onSelectRound: (round: ArchivedRound) => void;
 }
 
 export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
@@ -23,22 +24,11 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
     }
     acc[dateKey].push(round);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, ArchivedRound[]>);
 
   const sortedDates = Object.keys(groupedByDate).sort((a, b) =>
     new Date(b).getTime() - new Date(a).getTime()
   );
-
-  const getWinner = (round: any) => {
-    if (!round.final_ranking || round.final_ranking.length === 0) {
-      return { name: 'N/A', points: 0 };
-    }
-    const winner = round.final_ranking[0];
-    return {
-      name: winner.player_name,
-      points: winner.points || winner.total_points,
-    };
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -64,7 +54,7 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
           ) : (
             <div className="space-y-4">
               {sortedDates.map((dateKey) => {
-                const dayRounds: any[] = groupedByDate[dateKey];
+                const dayRounds = groupedByDate[dateKey];
                 const date = new Date(dateKey);
                 const formattedDate = date.toLocaleDateString('es-ES', {
                   weekday: 'long',
@@ -75,12 +65,12 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
 
                 const allPlayers = new Set<string>();
                 dayRounds.forEach((round) => {
-                  round.final_ranking?.forEach((player: any) => {
+                  round.final_ranking?.forEach((player) => {
                     allPlayers.add(player.player_db_id || player.player_name);
                   });
                 });
 
-                const courses: string[] = dayRounds.map((r: any) => String(r.course_name));
+                const courses: string[] = dayRounds.map((r) => String(r.course_name));
                 const uniqueCourses: string[] = [...new Set(courses)];
 
                 return (

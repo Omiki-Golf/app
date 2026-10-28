@@ -82,7 +82,7 @@ Deno.serve(async req => {
     const diagnostic=stage==='stripe-session' ? Object.fromEntries(
       ['type','code','param'].flatMap(key=>{
         const value=stripeError[key as keyof typeof stripeError];
-        return typeof value==='string' && /^[a-zA-Z_\[\]]{1,80}$/.test(value) ? [[key,value]] : [];
+        return typeof value==='string' && /^[a-zA-Z_\x5B\x5D]{1,80}$/.test(value) ? [[key,value]] : [];
       })) : undefined;
     return reply({error:'No se ha podido conectar con Stripe Sandbox. Reintenta o consulta con administración.',code:`checkout-${stage}`,diagnostic},503);
   }

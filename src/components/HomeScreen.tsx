@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
-import { Zap, LogIn, Plus, Share2, User, ChevronRight, FlaskConical } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -14,6 +14,8 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
+  /** Nombre del grupo propio; si existe, el botón de Team entra en él en lugar de crear otro. */
+  teamName?: string;
   onShowProfile: () => void;
   onShowAuth: () => void;
   onShowShare: () => void;
@@ -31,6 +33,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onQuickPlay,
   onJoinQuickPlay,
   onCreateTeam,
+  teamName,
   onShowProfile,
   onShowAuth,
   onShowShare,
@@ -67,7 +70,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </button>
 
             {!isAuthenticated && <ThemeToggle />}
-            {isAuthenticated && <LanguageSwitcher />}
           </div>
 
           <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
@@ -91,15 +93,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </div>
           ) : (
             <div className="flex shrink-0 items-center gap-2">
-              <div className="text-right">
-                <p className="text-xs font-bold capitalize text-ink">{planType}</p>
+              <div className="min-w-0 text-right">
+                <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
                 <p className="text-xs text-ink-3">HCP {profile?.exact_handicap ?? 0}</p>
               </div>
               <button
                 onClick={onShowProfile}
                 title={t('common.profile')}
                 aria-label={t('common.openProfile')}
-                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${avatarPlanClasses[planType]}`}
+                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${profile ? avatarPlanClasses[planType] : 'border-line bg-card-2'}`}
               >
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />
@@ -126,7 +128,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             className="w-full flex items-center justify-center gap-3 bg-accent text-on-accent px-6 py-4 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
           >
             <Zap className="w-6 h-6" />
-            {isExpress ? t('home.createExpress') : t('home.createGame')}
+            {t('home.createGame')}
           </WriteButton>
 
           <WriteButton
@@ -141,17 +143,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {isTeam && (
             <WriteButton
               onClick={onCreateTeam}
-              className="w-full flex items-center justify-center gap-3 bg-amber-500 text-white px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-3 bg-amber-500 text-amber-950 px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
             >
-              <Plus className="w-6 h-6" />
-              {t('home.createTeam')}
+              {teamName ? <Users className="w-6 h-6" aria-hidden="true" /> : <Plus className="w-6 h-6" aria-hidden="true" />}
+              <span className="truncate">{teamName || t('home.createTeam')}</span>
             </WriteButton>
           )}
         </div>
 
         <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-28 object-contain" />
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <div className="hidden mt-6 flex-wrap items-center justify-center gap-3" aria-hidden="true">
           <WriteButton
             type="button"
             onClick={onToggleSimulator}
@@ -181,7 +183,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {simulatorEnabled && (
-          <p className="text-center text-xs text-ink-4 mt-2">
+          <p className="hidden text-center text-xs text-ink-4 mt-2" aria-hidden="true">
             {t('home.preview', { user: profile?.nick || t('common.user'), plan: planType })}
           </p>
         )}

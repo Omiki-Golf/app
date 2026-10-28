@@ -2,9 +2,10 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
 import { X, Award, Target, Users, Trophy, Beer } from 'lucide-react';
 import { golfService } from '../services/golfService';
+import type { ArchivedDailyRanking, ArchivedPlayerStat, ArchivedRound, ArchivedRoundRanking } from '../types';
 
 interface ArchivedRoundDetailModalProps {
-  round: any;
+  round: ArchivedRound;
   onClose: () => void;
   onBack: () => void;
 }
@@ -14,8 +15,8 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
   onClose,
   onBack,
 }) => {
-  const [dailyRanking, setDailyRanking] = useState<any[]>([]);
-  const [allRounds, setAllRounds] = useState<any[]>([]);
+  const [dailyRanking, setDailyRanking] = useState<ArchivedDailyRanking[]>([]);
+  const [allRounds, setAllRounds] = useState<ArchivedRound[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const modeLabels: Record<string, string> = {
@@ -54,25 +55,28 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
     loadDayData();
   }, [round.group_id, round.played_at]);
 
-  const matchesPlayer = (entry: any, player: any) => player.player_id && entry.player_id ? entry.player_id === player.player_id : entry.player_name === player.player_name;
+  const matchesPlayer = (
+    entry: { player_id?: string | null; player_name: string },
+    player: { player_id?: string | null; player_name: string },
+  ) => player.player_id && entry.player_id ? entry.player_id === player.player_id : entry.player_name === player.player_name;
 
-  const getRoundScorecard = (roundData: any) => {
+  const getRoundScorecard = (roundData: ArchivedRound) => {
     const holeScores = roundData.hole_scores || [];
 
     const uniqueHoles = Array.from(
-      new Set(holeScores.map((score: any) => score.hole_number))
-    ).sort((a: any, b: any) => a - b);
+      new Set(holeScores.map((score) => score.hole_number))
+    ).sort((a, b) => a - b);
 
     const holesArray = uniqueHoles.map((holeNum) => {
-      const firstScore = holeScores.find((s: any) => s.hole_number === holeNum);
+      const firstScore = holeScores.find((s) => s.hole_number === holeNum);
       return {
         hole_number: holeNum,
         par: firstScore?.par || 0,
       };
     });
 
-    const getScoreForHole = (player: any, holeNumber: number) => {
-      const score = holeScores.find((s: any) => matchesPlayer(s, player) && s.hole_number === holeNumber);
+    const getScoreForHole = (player: ArchivedRoundRanking, holeNumber: number) => {
+      const score = holeScores.find((s) => matchesPlayer(s, player) && s.hole_number === holeNumber);
       if (!score) return { gross: '-', net: '-', points: '-', noPasoRojas: false };
       return {
         gross: score.gross_strokes || '-',
@@ -82,17 +86,17 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
       };
     };
 
-    const getPlayerTotals = (player: any) => {
-      const playerScores = holeScores.filter((s: any) => matchesPlayer(s, player));
-      const playerStat = roundData.player_stats?.find((ps: any) => matchesPlayer(ps, player));
+    const getPlayerTotals = (player: ArchivedRoundRanking) => {
+      const playerScores = holeScores.filter((s) => matchesPlayer(s, player));
+      const playerStat = roundData.player_stats?.find((ps) => matchesPlayer(ps, player));
 
       if (!playerScores || playerScores.length === 0) {
         return { totalGross: 0, totalNet: 0, totalPoints: 0, noPasoRojasCount: 0 };
       }
       return {
-        totalGross: playerScores.reduce((sum: number, s: any) => sum + (s.gross_strokes || 0), 0),
-        totalNet: playerScores.reduce((sum: number, s: any) => sum + (s.net_strokes || 0), 0),
-        totalPoints: playerScores.reduce((sum: number, s: any) => sum + (s.stableford_points || 0), 0),
+        totalGross: playerScores.reduce((sum, s) => sum + (s.gross_strokes || 0), 0),
+        totalNet: playerScores.reduce((sum, s) => sum + (s.net_strokes || 0), 0),
+        totalPoints: playerScores.reduce((sum, s) => sum + (s.stableford_points || 0), 0),
         noPasoRojasCount: playerStat?.no_paso_rojas_count || 0,
       };
     };
@@ -100,26 +104,26 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
     return { holesArray, getScoreForHole, getPlayerTotals, holeScores };
   };
 
-  const getRoundStats = (roundData: any) => {
-    const getPlayerStats = (player: any) => {
-      const playerStat = roundData.player_stats?.find((ps: any) => matchesPlayer(ps, player));
-      const playerScores = roundData.hole_scores?.filter((s: any) => matchesPlayer(s, player)) || [];
+  const getRoundStats = (roundData: ArchivedRound) => {
+    const getPlayerStats = (player: ArchivedPlayerStat) => {
+      const playerStat = roundData.player_stats?.find((ps) => matchesPlayer(ps, player));
+      const playerScores = roundData.hole_scores?.filter((s) => matchesPlayer(s, player)) || [];
 
-      const eagles = playerStat?.hole_results?.eagles || playerScores.filter((s: any) => s.net_strokes <= s.par - 2).length;
-      const birdies = playerStat?.hole_results?.birdies || playerScores.filter((s: any) => s.net_strokes === s.par - 1).length;
-      const bogeys = playerStat?.hole_results?.bogeys || playerScores.filter((s: any) => s.net_strokes === s.par + 1).length;
+      const eagles = playerStat?.hole_results?.eagles || playerScores.filter((s) => s.net_strokes <= s.par - 2).length;
+      const birdies = playerStat?.hole_results?.birdies || playerScores.filter((s) => s.net_strokes === s.par - 1).length;
+      const bogeys = playerStat?.hole_results?.bogeys || playerScores.filter((s) => s.net_strokes === s.par + 1).length;
 
       // Dobles+ debe incluir dobles bogeys + triples bogeys+
       let double_bogeys;
       if (playerStat?.hole_results?.double_bogeys !== undefined) {
         double_bogeys = (playerStat.hole_results.double_bogeys || 0) + (playerStat.hole_results.triple_bogey_plus || 0);
       } else {
-        double_bogeys = playerScores.filter((s: any) => s.net_strokes >= s.par + 2).length;
+        double_bogeys = playerScores.filter((s) => s.net_strokes >= s.par + 2).length;
       }
 
       let pars = playerStat?.hole_results?.pars;
       if (pars === undefined || pars === null) {
-        pars = playerScores.filter((s: any) => s.net_strokes === s.par).length;
+        pars = playerScores.filter((s) => s.net_strokes === s.par).length;
       }
 
       return {
@@ -178,7 +182,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                   Clasificación General del día
                 </h3>
                 <div className="space-y-2">
-                  {dailyRanking.map((player: any, index: number) => {
+                  {dailyRanking.map((player, index) => {
                     const totalPlayers = dailyRanking.length;
                     const isOdd = totalPlayers % 2 !== 0;
                     const middleIndex = Math.floor(totalPlayers / 2);
@@ -262,14 +266,14 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                         <tr>
                           <th className="text-left py-2 px-2 font-semibold text-ink-2 border-b sticky left-0 bg-card-2 z-10">Hoyo</th>
                           <th className="text-center py-2 px-2 font-semibold text-ink-2 border-b">Par</th>
-                          {roundData.final_ranking?.map((player: any, index: number) => (
+                          {roundData.final_ranking?.map((player, index) => (
                             <th
                               key={index}
                               colSpan={3}
                               className={`text-center py-2 px-2 font-semibold border-b border-l ${index === 0 ? 'bg-amber-200 text-ink' : 'text-ink-2'}`}
                             >
                               <div className="flex items-center justify-center gap-1">
-                                {index === 0 && <Trophy size={16} className="text-amber-600" />}
+                                {index === 0 && <Trophy size={16} className="text-amber-700" />}
                                 {gameMode === 'parejas' && roundData.final_ranking.length === 4 && (
                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${index < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                                     {index < 2 ? 'P1' : 'P2'}
@@ -283,7 +287,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                         <tr className="bg-card-2">
                           <th className="py-1 px-2 border-b sticky left-0 bg-card-2 z-10"></th>
                           <th className="py-1 px-2 border-b"></th>
-                          {roundData.final_ranking?.map((_: any, index: number) => (
+                          {roundData.final_ranking?.map((_, index) => (
                             <React.Fragment key={index}>
                               <th className={`text-center py-1 px-1 text-ink-3 border-b border-l text-[10px] ${index === 0 ? 'bg-amber-200' : ''}`}>B</th>
                               <th className={`text-center py-1 px-1 text-ink-3 border-b text-[10px] ${index === 0 ? 'bg-amber-200' : ''}`}>N</th>
@@ -293,11 +297,11 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                         </tr>
                       </thead>
                       <tbody>
-                        {holesArray.map((hole: any) => (
+                        {holesArray.map((hole) => (
                           <tr key={hole.hole_number} className="hover:bg-card-2 border-b">
                             <td className="py-2 px-2 font-bold text-ink sticky left-0 bg-card z-10">{hole.hole_number}</td>
                             <td className="text-center py-2 px-2 font-semibold text-ink-2">{hole.par}</td>
-                            {roundData.final_ranking?.map((player: any, index: number) => {
+                            {roundData.final_ranking?.map((player, index) => {
                               const score = getScoreForHole(player, hole.hole_number);
                               const isWinner = index === 0;
                               const cellBg = score.noPasoRojas ? 'bg-red-200' : (isWinner ? 'bg-amber-100' : '');
@@ -319,8 +323,8 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                         ))}
                         <tr className="bg-card-2 font-bold">
                           <td className="py-2 px-2 sticky left-0 bg-card-2 z-10">TOTAL</td>
-                          <td className="text-center py-2 px-2">{holesArray.reduce((sum: number, h: any) => sum + h.par, 0)}</td>
-                          {roundData.final_ranking?.map((player: any, index: number) => {
+                          <td className="text-center py-2 px-2">{holesArray.reduce((sum, h) => sum + h.par, 0)}</td>
+                          {roundData.final_ranking?.map((player, index) => {
                             const totals = getPlayerTotals(player);
                             const isWinner = index === 0;
                             return (
@@ -366,16 +370,16 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                         </tr>
                       </thead>
                       <tbody>
-                        {roundData.player_stats.map((playerStat: any, index: number) => {
+                        {roundData.player_stats.map((playerStat, index) => {
                           const stats = getPlayerStats(playerStat);
                           const isWinner = matchesPlayer(roundData.final_ranking?.[0] || {}, playerStat);
                           return (
                             <tr key={index} className={`border-b hover:bg-card-2 ${isWinner ? 'bg-amber-100' : ''}`}>
                               <td className="py-3 px-4 font-semibold text-ink">
                                 <div className="flex items-center gap-2">
-                                  {isWinner && <Trophy size={18} className="text-amber-600" />}
+                                  {isWinner && <Trophy size={18} className="text-amber-700" />}
                                   {playerStat.player_name}{playerStat.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
-                                  {isWinner && <span className="text-xs text-amber-600 font-bold">(Ganador/a)</span>}
+                                  {isWinner && <span className="text-xs text-amber-700 font-bold">(Ganador/a)</span>}
                                 </div>
                               </td>
                               <td className="text-center py-3 px-4 text-ink-2">{stats.eagles}</td>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { messageService } from "../services/messageService";
 import { userService } from "../services/userService";
 export function useNotificationCount(
@@ -13,12 +13,21 @@ export function useNotificationCount(
     activity: 0,
   });
   const version = useRef(0);
+  const stableActivityScope = useMemo(() => ({
+    roundId: activityScope.roundId,
+    groupId: activityScope.groupId,
+    accessCode: activityScope.accessCode,
+  }), [activityScope.roundId, activityScope.groupId, activityScope.accessCode]);
+  const invalidatePendingRefresh = useCallback(() => {
+    version.current++;
+  }, []);
   const refresh = useCallback(async () => {
     const request = ++version.current;
-    const [messages, invitations, activity] = await Promise.allSettled([
+    const [messages, invitations, quickRounds, activity] = await Promise.allSettled([
       messageService.inbox(userId),
       userId ? userService.getInvitationCount(userId) : Promise.resolve(0),
-      messageService.activity(activityScope, userId),
+      userId ? userService.getQuickRoundInvitationCount() : Promise.resolve(0),
+      messageService.activity(stableActivityScope, userId),
     ]);
     if (request !== version.current) return;
     setState((previous) => ({
@@ -30,8 +39,8 @@ export function useNotificationCount(
             ? previous.messages
             : 0,
       invitations:
-        invitations.status === "fulfilled"
-          ? invitations.value
+        invitations.status === "fulfilled" && quickRounds.status === "fulfilled"
+          ? invitations.value + quickRounds.value
           : previous.id === userId
             ? previous.invitations
             : 0,
@@ -40,20 +49,18 @@ export function useNotificationCount(
           ? activity.value.unread
           : previous.id === userId ? previous.activity : 0,
     }));
-  }, [userId, activityScope.roundId, activityScope.groupId, activityScope.accessCode]);
+  }, [userId, stableActivityScope]);
   useEffect(() => {
     void refresh();
     const tick = () => void refresh();
     const timer = window.setInterval(tick, 30000);
     window.addEventListener("focus", tick);
     return () => {
-      // Invalidate asynchronous requests; this ref is a counter, not a DOM node.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      version.current++;
+      invalidatePendingRefresh();
       window.clearInterval(timer);
       window.removeEventListener("focus", tick);
     };
-  }, [refresh, refreshKey]);
+  }, [refresh, refreshKey, invalidatePendingRefresh]);
   return {
     count: state.id === userId ? state.messages + state.invitations + state.activity : 0,
     refresh,

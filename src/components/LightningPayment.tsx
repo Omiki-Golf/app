@@ -1,10 +1,11 @@
 // src/components/LightningPayment.tsx
 // Componente que muestra el QR de Lightning y espera el pago
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Zap, Copy, CheckCircle, Loader2, X } from 'lucide-react';
 import { createInvoice, checkPayment, LightningInvoice } from '../services/lightningService';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface LightningPaymentProps {
   amountSats: number;
@@ -28,18 +29,15 @@ export const LightningPayment: React.FC<LightningPaymentProps> = ({
   const [elapsed, setElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    startPayment();
-    return () => cleanup();
-  }, []);
-
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
-  };
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
 
-  const startPayment = async () => {
+  const startPayment = useCallback(async () => {
     setState('creating');
     setErrorMsg('');
     setElapsed(0);
@@ -66,18 +64,23 @@ export const LightningPayment: React.FC<LightningPaymentProps> = ({
         }
       }, 3000);
 
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         if (intervalRef.current) {
           cleanup();
           setState('error');
           setErrorMsg('El tiempo para pagar ha expirado. Intenta de nuevo.');
         }
       }, 600_000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setState('error');
-      setErrorMsg(err.message || 'Error al crear el invoice. Intenta de nuevo.');
+      setErrorMsg(getErrorMessage(err, 'Error al crear el invoice. Intenta de nuevo.'));
     }
-  };
+  }, [amountSats, description, onSuccess, cleanup]);
+
+  useEffect(() => {
+    void startPayment();
+    return cleanup;
+  }, [startPayment, cleanup]);
 
   const copyInvoice = async () => {
     if (!invoice) return;

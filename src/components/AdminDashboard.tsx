@@ -1,7 +1,8 @@
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Target, TrendingUp, Calendar, MapPin, Activity, AlertCircle, Settings, Save, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface AdminStats {
   users: {
@@ -59,12 +60,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   const [configMessage, setConfigMessage] = useState('');
   const [configError, setConfigError] = useState('');
 
-  useEffect(() => {
-    loadAdminStats();
-    loadAdminConfig();
-  }, []);
-
-  const loadAdminConfig = async () => {
+  const loadAdminConfig = useCallback(async () => {
     try {
       const { data: user } = await supabase.auth.getUser();
       if (user.user?.email) {
@@ -82,7 +78,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
     } catch (err) {
       console.error('Error loading admin config:', err);
     }
-  };
+  }, []);
 
   const handleChangeEmail = async () => {
     try {
@@ -106,9 +102,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       setConfigMessage('Correo actualizado correctamente. Revisa tu nuevo correo para confirmar el cambio.');
       setNewEmail('');
       setCurrentEmail(newEmail);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error changing email:', err);
-      setConfigError(err.message || 'Error al cambiar el correo');
+      setConfigError(getErrorMessage(err, 'Error al cambiar el correo'));
     }
   };
 
@@ -139,9 +135,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       setConfigMessage('Contraseña actualizada correctamente');
       setNewPassword('');
       setConfirmPassword('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error changing password:', err);
-      setConfigError(err.message || 'Error al cambiar la contraseña');
+      setConfigError(getErrorMessage(err, 'Error al cambiar la contraseña'));
     }
   };
 
@@ -183,41 +179,13 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       setCurrentPin(newPin);
       setNewPin('');
       setConfirmPin('');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error changing PIN:', err);
-      setConfigError(err.message || 'Error al cambiar el PIN');
+      setConfigError(getErrorMessage(err, 'Error al cambiar el PIN'));
     }
   };
 
-  const loadAdminStats = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const [usersStats, groupsStats, roundsStats, coursesStats, activityStats] = await Promise.all([
-        fetchUsersStats(),
-        fetchGroupsStats(),
-        fetchRoundsStats(),
-        fetchCoursesStats(),
-        fetchActivityStats(),
-      ]);
-
-      setStats({
-        users: usersStats,
-        groups: groupsStats,
-        rounds: roundsStats,
-        courses: coursesStats,
-        activity: activityStats,
-      });
-    } catch (err: any) {
-      console.error('Error loading admin stats:', err);
-      setError('Error al cargar las estadísticas de administrador');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUsersStats = async () => {
+  const fetchUsersStats = useCallback(async () => {
     const { data: groups } = await supabase
       .from('groups')
       .select('user_auth_id, created_at');
@@ -252,9 +220,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       newThisWeek,
       newThisMonth,
     };
-  };
+  }, []);
 
-  const fetchGroupsStats = async () => {
+  const fetchGroupsStats = useCallback(async () => {
     const { data: groups } = await supabase
       .from('groups')
       .select('id, name');
@@ -315,9 +283,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       avgPlayersPerGroup: Math.round(avgPlayersPerGroup * 10) / 10,
       topGroups,
     };
-  };
+  }, []);
 
-  const fetchRoundsStats = async () => {
+  const fetchRoundsStats = useCallback(async () => {
     const { data: activeRounds } = await supabase
       .from('golf_rounds')
       .select('*')
@@ -358,9 +326,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       slopeEnabled,
       slopeDisabled,
     };
-  };
+  }, []);
 
-  const fetchCoursesStats = async () => {
+  const fetchCoursesStats = useCallback(async () => {
     const { data: rounds } = await supabase
       .from('golf_rounds')
       .select('course_id, golf_courses!inner(name)');
@@ -368,7 +336,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
     const courseCount: Record<string, { name: string; count: number }> = {};
 
     rounds?.forEach((r) => {
-      const courseName = (r.golf_courses as any)?.name || 'Unknown';
+      const courseName = (r.golf_courses as { name?: string } | null)?.name || 'Unknown';
       if (!courseCount[courseName]) {
         courseCount[courseName] = { name: courseName, count: 0 };
       }
@@ -380,9 +348,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       .slice(0, 5);
 
     return { mostPlayed };
-  };
+  }, []);
 
-  const fetchActivityStats = async () => {
+  const fetchActivityStats = useCallback(async () => {
     const { data: rounds } = await supabase
       .from('golf_rounds')
       .select('created_at')
@@ -400,7 +368,40 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       .map(([date, count]) => ({ date, count }));
 
     return { roundsByDay: last30Days };
-  };
+  }, []);
+
+  const loadAdminStats = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const [usersStats, groupsStats, roundsStats, coursesStats, activityStats] = await Promise.all([
+        fetchUsersStats(),
+        fetchGroupsStats(),
+        fetchRoundsStats(),
+        fetchCoursesStats(),
+        fetchActivityStats(),
+      ]);
+
+      setStats({
+        users: usersStats,
+        groups: groupsStats,
+        rounds: roundsStats,
+        courses: coursesStats,
+        activity: activityStats,
+      });
+    } catch (err: unknown) {
+      console.error('Error loading admin stats:', err);
+      setError('Error al cargar las estadísticas de administrador');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchUsersStats, fetchGroupsStats, fetchRoundsStats, fetchCoursesStats, fetchActivityStats]);
+
+  useEffect(() => {
+    void loadAdminStats();
+    void loadAdminConfig();
+  }, [loadAdminStats, loadAdminConfig]);
 
   if (loading) {
     return (
@@ -655,7 +656,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           <div className="bg-card rounded-xl shadow-card p-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-amber-100 rounded-lg">
-                <Calendar className="w-6 h-6 text-amber-600" />
+                <Calendar className="w-6 h-6 text-amber-700" />
               </div>
               <h2 className="text-xl font-bold text-ink">Partidas</h2>
             </div>
