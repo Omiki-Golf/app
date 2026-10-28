@@ -1019,7 +1019,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <span>{sharing ? 'Generando...' : 'Compartir'}</span>
             </button>
 
-            {!isSharedView && (
+            {/* Solo quien creó la partida puede eliminarla; los jugadores vinculados solo la ven. */}
+            {!isSharedView && roundData?.isCreator !== false && (
               <WriteButton
                 onClick={() => setShowDeleteConfirm(true)}
                 className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"

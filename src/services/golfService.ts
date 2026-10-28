@@ -474,8 +474,10 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     return data;
   },
 
-  async getActiveRounds(): Promise<GolfRound[]> {
-    const groupId = storageUtils.getCurrentGroupId();
+  async getActiveRounds(groupOverride?: string | null): Promise<GolfRound[]> {
+    const groupId = groupOverride === undefined
+      ? storageUtils.getCurrentGroupId()
+      : groupOverride;
 
     if (!groupId && (await supabase.auth.getSession()).data.session?.user) {
       const { data, error } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['active', 'completed'] });
@@ -1118,8 +1120,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   },
 
   // Player database operations
-  async getAllPlayers(groupOverride?: string): Promise<Player[]> {
-    const groupId = groupOverride ?? storageUtils.getCurrentGroupId();
+  async getAllPlayers(groupOverride?: string | null): Promise<Player[]> {
+    const groupId = groupOverride === undefined ? storageUtils.getCurrentGroupId() : groupOverride;
 
     if (groupId) {
       const { data, error } = await supabase.rpc('list_group_game_players', { p_group: groupId });
@@ -1193,8 +1195,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return playerRows.map((item) => item.player_id).filter((id): id is string => !!id);
   },
 
-  async createPlayer(name: string, exactHandicap: number): Promise<Player> {
-    const groupId = storageUtils.getCurrentGroupId();
+  async createPlayer(name: string, exactHandicap: number, groupOverride?: string | null): Promise<Player> {
+    const groupId = groupOverride === undefined ? storageUtils.getCurrentGroupId() : groupOverride;
 
     const { data, error } = await supabase
       .from('players')
@@ -1266,8 +1268,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return playerRows.map((item) => item.name).filter(Boolean);
   },
 
-  async getOrCreatePlayer(name: string, exactHandicap: number): Promise<Player> {
-    const groupId = storageUtils.getCurrentGroupId();
+  async getOrCreatePlayer(name: string, exactHandicap: number, groupOverride?: string | null): Promise<Player> {
+    const groupId = groupOverride === undefined ? storageUtils.getCurrentGroupId() : groupOverride;
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!groupId && user) return this.saveQuickPlayerSuggestion(name, exactHandicap * 2);
@@ -1295,7 +1297,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }
 
     // Create new player
-    return await this.createPlayer(name, exactHandicap);
+    return await this.createPlayer(name, exactHandicap, groupId);
   },
 
   async addGroupRoundPlayer(groupId: string, roundId: string, name: string, handicap: number, isGuest: boolean, playerId?: string): Promise<RoundPlayer> {
@@ -2915,6 +2917,24 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
 async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRound | null> {
   const userId = getUserId();
+
+  // Con sesión: las partidas propias y aquellas en las que la cuenta está vinculada como jugador,
+  // las mismas que lista el desplegable de Mis partidas y que cuentan en Mis estadísticas.
+  const sessionUser = (await supabase.auth.getSession()).data.session?.user;
+  if (sessionUser) {
+    const { data: mine, error: mineError } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['completed', 'archived'] });
+    if (mineError) throw mineError;
+    const rows = (mine || []) as GolfRound[];
+    const round = roundId ? rows.find(item => item.id === roundId) : rows[0];
+    if (!round) return null;
+    const [players, scores, course, holes] = await Promise.all([
+      this.getRoundPlayers(round.id),
+      this.getRoundScores(round.id),
+      this.getCourse(round.course_id),
+      this.getCourseHoles(round.course_id, round.num_holes, round.holes_range),
+    ]);
+    return { round, players, scores, course, holes, isCreator: round.user_id === sessionUser.id };
+  }
 
   // Definimos la consulta base
   let query = supabase
