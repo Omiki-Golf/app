@@ -10,7 +10,7 @@ import { ConfirmModal } from './ConfirmModal';
 import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
-import { getUserId } from '../utils/userId';
+import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
 import { Eye, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
 
@@ -36,6 +36,7 @@ interface ActiveRoundsViewerProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   onJoinRound: (roundId: string) => void;
+  onViewResults: (roundId: string) => void;
   currentGroup?: Group | null;
   messagesButton?: React.ReactNode;
 }
@@ -43,6 +44,7 @@ interface ActiveRoundsViewerProps {
 export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   onBack, backDestination = 'back',
   onJoinRound,
+  onViewResults,
   currentGroup,
   messagesButton,
 }) => {
@@ -630,6 +632,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           <div className="space-y-4">
             {rounds.map((roundStats) => {
               const isExpanded = !currentGroup || selectedRound === roundStats.round.id;
+              const isRoundCreator = isVerifiedLocalRoundCreator(roundStats.round.user_id);
               const courseHoles = roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos';
 
               const maxHole = roundStats.scores.length > 0
@@ -778,7 +781,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 >
                                   {item.stats.totalPoints}
                                 </p>
-                                {!(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (
+                                {!(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (currentGroup || isRoundCreator) && (
                                   <WriteButton
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -811,7 +814,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             : 'Ver Partida'}
                         </button>
 
-                        {roundStats.players.length < playerLimit && !(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (
+                        {roundStats.players.length < playerLimit && !(roundStats.round.status === 'completed' && !roundStats.round.group_id) && (currentGroup || isRoundCreator) && (
                           <WriteButton
                             onClick={(e) => {
                               e.stopPropagation();
@@ -824,7 +827,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           </WriteButton>
                         )}
 
-                        {!currentGroup && !missingScore && (
+                        {!currentGroup && isRoundCreator && !missingScore && (
                           <WriteButton
                             onClick={() => handleFinishAndArchiveClick(roundStats)}
                             disabled={loading}
@@ -889,7 +892,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         {!currentGroup && (
                           <button
                             onClick={() => {
-                              onJoinRound(roundStats.round.id);
+                              onViewResults(roundStats.round.id);
                               setSelectedRound(null);
                             }}
                             className="w-full sm:flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -898,13 +901,15 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados
                           </button>
                         )}
-                        <WriteButton
-                          onClick={() => setRoundToArchive(roundStats.round.id)}
-                          className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Archive size={20} />
-                          Archivar Partida
-                        </WriteButton>
+                        {(currentGroup || isRoundCreator) && (
+                          <WriteButton
+                            onClick={() => setRoundToArchive(roundStats.round.id)}
+                            className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Archive size={20} />
+                            Archivar Partida
+                          </WriteButton>
+                        )}
                         {currentGroup && (
                           <button
                             onClick={() => {
@@ -917,7 +922,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados Completos
                           </button>
                         )}
-                        {!currentGroup && (
+                        {!currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                             disabled={loading}

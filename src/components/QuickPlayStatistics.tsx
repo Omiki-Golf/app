@@ -148,7 +148,7 @@ const calculatePlayerHighlights = (
   });
 };
 
-export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, sharedRoundData = null, messagesButton }) => {
+export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack, roundId, sharedRoundData = null, messagesButton }) => {
   const isSharedView = !!sharedRoundData;
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
@@ -244,9 +244,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
         setAvailableRounds(rounds);
 
         if (rounds.length > 0) {
-          const firstRoundId = rounds[0].id;
-          setSelectedRoundId(firstRoundId);
-          await loadRoundData(firstRoundId);
+          const initialRoundId = roundId && rounds.some(round => round.id === roundId) ? roundId : rounds[0].id;
+          setSelectedRoundId(initialRoundId);
+          await loadRoundData(initialRoundId);
         } else {
           setLoading(false);
         }
@@ -257,7 +257,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     };
 
     void init();
-  }, [sharedRoundData, loadRoundData]);
+  }, [roundId, sharedRoundData, loadRoundData]);
 
   const handleDelete = async () => {
     if (!selectedRoundId) return;

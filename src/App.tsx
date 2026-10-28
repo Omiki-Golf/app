@@ -8,7 +8,7 @@ import { golfService } from './services/golfService';
 import { calculateModePoints, ModeScoreInput } from './utils/calculations';
 import { accessCodeStorage } from './utils/accessCode';
 import { storageUtils } from './utils/storage';
-import { getUserId, getDeviceUserId, isVerifiedLocalRoundCreator } from './utils/userId';
+import { getUserId, isVerifiedLocalRoundCreator } from './utils/userId';
 import { canEditRoundScores } from './utils/roundEditing';
 import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthContext
 import { RoundSetup } from './components/RoundSetup';
@@ -130,6 +130,8 @@ function App() {
   const [pendingRoundId, setPendingRoundId] = useState<string | null>(null);
   const [accessCodeError, setAccessCodeError] = useState('');
   const [sharedExpressStats, setSharedExpressStats] = useState<QuickPlayCompletedRound | null>(null);
+  const [statisticsRoundId, setStatisticsRoundId] = useState<string | null>(null);
+  const [statisticsReturnView, setStatisticsReturnView] = useState<ViewType | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
 
@@ -435,7 +437,8 @@ function App() {
             const isCreator = isVerifiedLocalRoundCreator(roundData.round.user_id);
             const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status);
 
-            if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator && roundData.round.user_id !== getDeviceUserId()) {
+            const isAcceptedParticipant = Boolean(user && roundData.players.some(player => player.user_id === user.id));
+            if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator && !isAcceptedParticipant) {
               accessCodeStorage.removeAccessCode(activeRoundId);
               storageUtils.clearActiveRound();
               setCurrentView('setup');
@@ -470,7 +473,7 @@ function App() {
       }
     };
     restoreActiveRound();
-  }, [groupLoading, hasActiveRound, setCurrentView]);
+  }, [groupLoading, hasActiveRound, setCurrentView, user]);
 
   useEffect(() => {
     const roundId = roundState.round?.id;
@@ -1506,6 +1509,11 @@ function App() {
         <ActiveRoundsViewer backDestination="back"
           onBack={() => backFromProfileSection(currentGroup ? 'main' : 'setup')}
           onJoinRound={handleJoinRound}
+          onViewResults={(roundId) => {
+            setStatisticsRoundId(roundId);
+            setStatisticsReturnView('active-rounds');
+            setCurrentView('quickplay-statistics');
+          }}
           currentGroup={currentGroup}
           messagesButton={inlineMessagesButton}
         />
@@ -1525,11 +1533,18 @@ function App() {
 
       {currentView === 'quickplay-statistics' && !currentGroup && (
         <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><QuickPlayStatistics
-          roundId={roundState.round?.id}
+          roundId={statisticsRoundId ?? roundState.round?.id}
           sharedRoundData={sharedExpressStats}
           onBack={() => {
             setSharedExpressStats(null);
-            backFromProfileSection('setup');
+            setStatisticsRoundId(null);
+            if (statisticsReturnView) {
+              const returnView = statisticsReturnView;
+              setStatisticsReturnView(null);
+              setCurrentView(returnView);
+            } else {
+              backFromProfileSection('setup');
+            }
           }}
           messagesButton={sharedExpressStats ? undefined : inlineMessagesButton}
         /></Suspense>
