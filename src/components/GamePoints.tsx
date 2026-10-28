@@ -1,5 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
+import { TopBar } from './TopBar';
+import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect } from 'react';
 import { Users, Trophy, TrendingUp, ChevronDown, ChevronUp, UserX, History, Edit2, Save, X, User } from 'lucide-react';
 import { golfService } from '../services/golfService';
@@ -27,9 +29,10 @@ interface DailyRanking {
 interface GamePointsProps {
   onBack: () => void;
   groupId?: string | null;
+  messagesButton?: React.ReactNode;
 }
 
-export function GamePoints({ onBack, groupId }: GamePointsProps) {
+export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps) {
   const [players, setPlayers] = useState<Player[]>([]);
   const [dailyRankings, setDailyRankings] = useState<DailyRanking[]>([]);
   const [handicapHistory, setHandicapHistory] = useState<HandicapHistoryEntry[]>([]);
@@ -290,27 +293,14 @@ export function GamePoints({ onBack, groupId }: GamePointsProps) {
   const handicapAdjustments = getHandicapAdjustments();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-app p-4 md:p-8 flex items-center justify-center">
-        <div className="text-ink text-xl">Cargando...</div>
-      </div>
-    );
+    return <OmikiLoadingScreen />;
   }
 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
-          {/* Cabecera fija: el botón de volver sigue visible al bajar y el texto pasa por debajo
-              de la franja, sin cruzarse con la campana de avisos fija en el centro. */}
-          <div className="sticky top-0 z-[100] -mx-6 -mt-6 mb-6 flex min-h-[4.75rem] items-center rounded-t-lg bg-card px-6 pb-3 pt-[max(.75rem,env(safe-area-inset-top))] md:-mx-8 md:-mt-8 md:px-8">
-            <NavigationButton destination="back"
-              onClick={onBack}
-              aria-label="Volver al grupo"
-              title="Volver al grupo"
-              className="flex items-center text-accent-ink hover:text-title transition-colors"
-            />
-          </div>
+      <div className="max-w-6xl mx-auto">
+        <div>
+          <TopBar className="mb-3" left={<NavigationButton destination="back" onClick={onBack} aria-label="Volver al grupo" title="Volver al grupo" />} center={messagesButton} />
 
           <h1 className="text-3xl md:text-4xl font-bold text-title mb-8 text-center">
             Clasificación y jugadores

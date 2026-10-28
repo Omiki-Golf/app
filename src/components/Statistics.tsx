@@ -1,5 +1,6 @@
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
+import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { golfService } from '../services/golfService';
@@ -74,7 +75,8 @@ const toModalRanking = (
 
 export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup, messagesButton }) => {
   const [activeTab, setActiveTab] = useState<TabType>('player');
-  const [loading, setLoading] = useState(false);
+  // Empieza cargando: así no se ve un instante la pantalla con pestañas antes de saber si hay partidas.
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const [archivedRounds, setArchivedRounds] = useState<ArchivedRound[]>([]);
@@ -514,7 +516,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     );
   };
 
-  if (historyRounds.length === 0 && !loading) {
+  if (loading && historyRounds.length === 0) return <OmikiLoadingScreen />;
+
+  if (historyRounds.length === 0) {
     return (
       <div className="min-h-screen bg-app p-4 md:p-8">
         <div className="max-w-4xl mx-auto">

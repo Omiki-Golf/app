@@ -1009,7 +1009,7 @@ function App() {
   );
 
   const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
-    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics';
+    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
     {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
@@ -1503,7 +1503,7 @@ function App() {
       )}
 
       {currentView === 'active-rounds' && (
-        <ActiveRoundsViewer backDestination={!returnToProfile && currentGroup ? 'home' : 'back'}
+        <ActiveRoundsViewer backDestination="back"
           onBack={() => backFromProfileSection(currentGroup ? 'main' : 'setup')}
           onJoinRound={handleJoinRound}
           currentGroup={currentGroup}
@@ -1512,11 +1512,11 @@ function App() {
       )}
 
       {currentView === 'game-points' && (
-        <GamePoints groupId={currentGroup?.id} onBack={() => setCurrentView('main')} />
+        <GamePoints groupId={currentGroup?.id} onBack={() => setCurrentView('main')} messagesButton={inlineMessagesButton} />
       )}
 
       {currentView === 'statistics' && currentGroup && (
-        <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><Statistics backDestination={returnToProfile ? 'back' : 'home'}
+        <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><Statistics backDestination="back"
           onBack={() => backFromProfileSection('main')}
           currentGroup={currentGroup}
           messagesButton={inlineMessagesButton}
