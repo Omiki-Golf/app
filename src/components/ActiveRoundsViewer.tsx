@@ -2,7 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
 import { TopBar } from './TopBar';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { shouldRefreshRoundList } from '../utils/roundListEvents';
 import { GolfRound, RoundPlayer, RoundScore, Group, Player } from '../types';
 import { golfService } from '../services/golfService';
@@ -73,29 +73,11 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [pinActionType, setPinActionType] = useState<'deleteAll' | 'deletePlayer' | null>(null);
   const [updatingHandicaps, setUpdatingHandicaps] = useState(false);
 
-  useEffect(() => {
-    listSnapshot.current = { loaded: false, ids: new Set<string>() };
-    loadActiveRounds();
-
-    const subscription = golfService.subscribeToRounds((payload) => {
-      const snapshot = listSnapshot.current;
-      // If the screen changes context, retain reloads rather than filter with a stale closure.
-      const sameContext = listGroupId.current === (currentGroup?.id ?? null);
-      if (shouldRefreshRoundList(payload, listGroupId.current, snapshot.ids, snapshot.loaded && sameContext)) {
-        loadActiveRounds();
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [currentGroup?.id]);
-
-  const loadActiveRounds = async () => {
+  const loadActiveRounds = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const activeRounds = await golfService.getActiveRounds();
+      const activeRounds = await golfService.getActiveRounds(currentGroup?.id ?? null);
 
       const roundsWithDetails = await Promise.all(
         activeRounds.map(async (round) => {
@@ -113,7 +95,25 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentGroup?.id]);
+
+  useEffect(() => {
+    listSnapshot.current = { loaded: false, ids: new Set<string>() };
+    void loadActiveRounds();
+
+    const subscription = golfService.subscribeToRounds((payload) => {
+      const snapshot = listSnapshot.current;
+      // If the screen changes context, retain reloads rather than filter with a stale closure.
+      const sameContext = listGroupId.current === (currentGroup?.id ?? null);
+      if (shouldRefreshRoundList(payload, listGroupId.current, snapshot.ids, snapshot.loaded && sameContext)) {
+        void loadActiveRounds();
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [currentGroup?.id, loadActiveRounds]);
 
   const handleArchiveRoundClick = async (roundId: string) => {
     try {
@@ -314,18 +314,24 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const handleAddPlayerClick = async (roundId: string) => {
     try {
       const target = rounds.find(item => item.round.id === roundId);
-      const players = await golfService.getAllPlayers(target?.round.group_id || undefined);
+      const groupId = target?.round.group_id ?? null;
+      const players = await golfService.getAllPlayers(groupId);
       setCanManagePlayers(players.some(player => player.can_manage));
       setNewPlayerIsGuest(false);
       const roundPlayers = await golfService.getRoundPlayers(roundId);
       const roundPlayerIds = roundPlayers.map(p => p.player_id).filter(Boolean);
-      const [busy, busyNames] = await Promise.all([golfService.getPlayersInActiveRounds(roundId), golfService.getPlayerNamesInActiveRounds(roundId, target?.round.group_id || undefined)]);
+      const [busy, busyNames] = groupId
+        ? await Promise.all([
+            golfService.getPlayersInActiveRounds(roundId),
+            golfService.getPlayerNamesInActiveRounds(roundId, groupId),
+          ])
+        : [[], []];
       const normalized = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
       const available = players.map(player => ({
         ...player,
         unavailable_reason: roundPlayerIds.includes(player.id) || roundPlayers.some(item => normalized(item.name) === normalized(player.name))
           ? 'Ya está en esta partida'
-          : busy.includes(player.id) || busyNames.some(name => normalized(name) === normalized(player.name)) ? 'Está en otra partida activa' : '',
+          : groupId && (busy.includes(player.id) || busyNames.some(name => normalized(name) === normalized(player.name))) ? 'Está en otra partida activa' : '',
       }));
       setAvailablePlayers(available);
       setShowAddPlayerModal(roundId);
@@ -362,7 +368,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         if (round.round.group_id) {
           await golfService.addGroupRoundPlayer(round.round.group_id, roundId, newPlayerName.trim(), baseHandicap, newPlayerIsGuest);
         } else {
-          const player = await golfService.getOrCreatePlayer(newPlayerName.trim(), baseHandicap);
+          const player = await golfService.getOrCreatePlayer(newPlayerName.trim(), baseHandicap, null);
           await golfService.addPlayerToRound(roundId, player.name, player.exact_handicap, round.round.use_slope, player.quick_suggestion ? undefined : player.id);
         }
       } else if (selectedPlayerId) {

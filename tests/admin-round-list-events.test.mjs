@@ -36,7 +36,8 @@ test('deletes, incomplete events and events before initial load retain reload be
 
 test('actual viewer subscription keeps initial load and skips only unrelated refreshes', async () => {
   const source = await readFile(new URL('../src/components/ActiveRoundsViewer.tsx', import.meta.url), 'utf8');
-  const effect = source.slice(source.indexOf('  useEffect(() => {'), source.indexOf('  const loadActiveRounds ='));
+  const loadFunction = source.indexOf('  const loadActiveRounds =');
+  const effect = source.slice(source.indexOf('  useEffect(() => {', loadFunction), source.indexOf('  const handleArchiveRoundClick', loadFunction));
   let loads = 0;
   let callback;
   let cleanup;

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { clearStoredAuthSession, supabase } from '../services/supabaseClient';
 import { setAuthenticatedUserId } from '../utils/userId';
 import { readExpressCredential } from '../utils/expressCredential';
+import { storageUtils } from '../utils/storage';
 import { authContext, UserSubscription } from './authContextValue';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -97,6 +98,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     await supabase.auth.signOut({ scope: 'local' });
     await clearStoredAuthSession();
+    // A group is account-scoped UI context. Keeping it after logout can make
+    // the anonymous Express screen query rounds from the previous account's
+    // group and then offer actions that the Express identity cannot perform.
+    storageUtils.clearCurrentGroup();
     currentUserId.current = null;
     setAuthenticatedUserId(null);
     setUser(null);

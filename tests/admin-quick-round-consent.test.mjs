@@ -13,7 +13,7 @@ const service = await readFile(new URL('../src/services/golfService.ts', import.
 
 test('registered quick-round players require consent and accepted participation appears in history', async () => {
   const db = new PGlite();
-  const owner = randomUUID(), invited = randomUUID(), rejected = randomUUID(), round = randomUUID(), course = randomUUID();
+  const owner = randomUUID(), invited = randomUUID(), rejected = randomUUID(), round = randomUUID(), secondRound = randomUUID(), course = randomUUID();
   try {
     await db.exec(`
       CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA auth;
@@ -39,17 +39,24 @@ test('registered quick-round players require consent and accepted participation 
     await db.query("INSERT INTO user_profiles(user_id,nick,exact_handicap) VALUES($1,'Creator',18),($2,'Kikeas01',14),($3,'Kikeas02',12)", [owner, invited, rejected]);
     await db.query("INSERT INTO golf_courses VALUES($1,'Costa Azahar')", [course]);
     await db.query("INSERT INTO golf_rounds(id,user_id,status,num_holes,use_slope,course_id) VALUES($1,$2,'active',18,false,$3)", [round, owner, course]);
+    await db.query("INSERT INTO golf_rounds(id,user_id,status,num_holes,use_slope,course_id) VALUES($1,$2,'active',18,false,$3)", [secondRound, owner, course]);
     await db.query("SELECT set_config('request.uid',$1,false)", [owner]); await db.exec('SET ROLE authenticated');
     const player = (await db.query('SELECT add_registered_quick_round_player($1,$2) player', [round, invited])).rows[0].player;
     const rejectedPlayer = (await db.query('SELECT add_registered_quick_round_player($1,$2) player', [round, rejected])).rows[0].player;
+    const samePlayerInAnotherQuickRound = (await db.query('SELECT add_registered_quick_round_player($1,$2) player', [secondRound, invited])).rows[0].player;
     assert.equal(player.user_id, null);
     assert.equal(player.participation_status, 'pending');
+    assert.equal(samePlayerInAnotherQuickRound.participation_status, 'pending');
     await db.exec('RESET ROLE');
+    assert.equal((await db.query('SELECT count(*)::int n FROM quick_round_participation_invitations WHERE invited_user_id=$1', [invited])).rows[0].n, 2);
+    const invitation = (await db.query('SELECT * FROM quick_round_participation_invitations WHERE round_id=$1 AND invited_user_id=$2', [round, invited])).rows[0];
     await db.query("UPDATE golf_rounds SET status='archived' WHERE id=$1", [round]);
     await db.query("SELECT set_config('request.uid',$1,false)", [invited]); await db.exec('SET ROLE authenticated');
-    const invitationRow = (await db.query('SELECT * FROM list_my_quick_round_invitations()')).rows[0];
-    const invitation = Object.values(invitationRow)[0];
-    assert.equal(invitation.inviter_nick, 'Creator');
+    const invitationRows = (await db.query('SELECT * FROM list_my_quick_round_invitations()')).rows;
+    const invitationDetails = invitationRows.map(row => Object.values(row)[0]).find(item => item.id === invitation.id);
+    assert.ok(invitationDetails);
+    assert.equal(invitationDetails.id, invitation.id);
+    assert.equal(invitationDetails.inviter_nick, 'Creator');
     await db.query("SELECT respond_quick_round_invitation($1,'accepted')", [invitation.id]);
     assert.equal((await db.query("SELECT count(*)::int n FROM list_my_quick_rounds(ARRAY['archived'])")).rows[0].n, 1);
     await db.exec('RESET ROLE');

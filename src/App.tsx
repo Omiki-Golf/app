@@ -1481,6 +1481,7 @@ function App() {
           currentHole={roundState.holes[roundState.currentHole - 1]?.hole_number ?? roundState.currentHole}
           onBack={() => setCurrentView('scorecard')}
           hasGroup={!!currentGroup}
+          groupId={currentGroup?.id ?? null}
           gameMode={roundState.round.game_mode}
           messagesButton={inlineMessagesButton}
         />
@@ -1563,6 +1564,7 @@ function App() {
                 currentHole={roundState.holes[roundState.currentHole - 1]?.hole_number ?? roundState.currentHole}
                 onBack={handleBackToMain}
                 hasGroup={!!currentGroup}
+                groupId={currentGroup?.id ?? null}
                 gameMode={roundState.round.game_mode}
               />
             </div>

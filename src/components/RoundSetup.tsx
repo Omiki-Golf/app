@@ -184,12 +184,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
   const loadActiveRoundsCount = useCallback(async () => {
     try {
-      const activeRounds = await golfService.getActiveRounds();
+      const activeRounds = await golfService.getActiveRounds(currentGroup?.id ?? null);
       setActiveRoundsCount(activeRounds.length);
     } catch (err) {
       console.error('Error cargando contador de partidas:', err);
     }
-  }, []);
+  }, [currentGroup?.id]);
 
   const loadCompletedRounds = useCallback(async () => {
     try {

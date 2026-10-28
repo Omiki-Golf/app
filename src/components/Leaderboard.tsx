@@ -1,5 +1,5 @@
 import { NavigationButton } from './NavigationButton';
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, GameMode } from '../types';
 import { Trophy, Medal, Eye, RefreshCw } from 'lucide-react';
 import { golfService } from '../services/golfService';
@@ -16,6 +16,7 @@ interface LeaderboardProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
   hasGroup?: boolean;
+  groupId?: string | null;
   gameMode?: GameMode;
   messagesButton?: React.ReactNode;
 }
@@ -32,6 +33,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   currentHole,
   onBack, backDestination = 'back',
   hasGroup = false,
+  groupId,
   gameMode = 'stableford',
   messagesButton,
 }) => {
@@ -40,14 +42,10 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   const [showAllRounds, setShowAllRounds] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadAllActiveRounds();
-  }, []);
-
-  const loadAllActiveRounds = async () => {
+  const loadAllActiveRounds = useCallback(async () => {
     try {
       setLoading(true);
-      const activeRounds = await golfService.getActiveRounds();
+      const activeRounds = await golfService.getActiveRounds(groupId ?? null);
 
       const roundsWithDetails = await Promise.all(
         activeRounds.map(async (round) => {
@@ -63,7 +61,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [groupId]);
+
+  useEffect(() => {
+    void loadAllActiveRounds();
+  }, [loadAllActiveRounds]);
 
   const roundsMap = new Map(rounds.map((r) => [r.playerId, r]));
 
