@@ -13,6 +13,20 @@ import { initializeTheme } from './hooks/useTheme';
 import './i18n';
 import './index.css';
 
+// Tras publicar una versión nueva, una pestaña abierta antes pide pantallas (archivos)
+// que ya no existen en el servidor. Recargamos una vez para entrar en la versión actual;
+// si vuelve a fallar enseguida, dejamos que se vea el error para no entrar en bucle.
+window.addEventListener('vite:preloadError', event => {
+  const key = 'omiki.chunkReloadAt';
+  try {
+    const last = Number(window.sessionStorage.getItem(key) || 0);
+    if (Date.now() - last < 10000) return;
+    window.sessionStorage.setItem(key, String(Date.now()));
+  } catch { return; }
+  event.preventDefault();
+  window.location.reload();
+});
+
 try {
   initializeTheme();
   const rootElement = document.getElementById('root');
