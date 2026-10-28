@@ -161,6 +161,12 @@ html.theme-transition * {
 .dark .theme-static .text-orange-900 { color: #7c2d12; }
 .dark .theme-static .text-red-700 { color: #b91c1c; }
 
+/* Tarjetas doradas (ganador): texto oscuro fijo sobre amarillo en ambos temas. */
+.gold-card .text-yellow-900, .dark .gold-card .text-yellow-900 { color: #422006; }
+.gold-card .text-yellow-800, .dark .gold-card .text-yellow-800 { color: #713f12; }
+.gold-card .text-green-700, .dark .gold-card .text-green-700 { color: #14532d; }
+.gold-card .text-red-700, .dark .gold-card .text-red-700 { color: #991b1b; }
+
 /* Tablas de estadisticas: legibles en ambos temas y estables al exportar. */
 .statistics-panel {
   background-color: var(--card);

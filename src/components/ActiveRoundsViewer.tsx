@@ -11,7 +11,7 @@ import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
-import { Eye, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
 
 const gameModeLabels: Record<string, string> = {
@@ -255,7 +255,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
     if (!round) return;
 
-    if (round.round.user_id !== currentUserId) {
+    // En partidas rápidas, un jugador vinculado puede descartar la partida de otro (no se borra).
+    if (round.round.user_id !== currentUserId && currentGroup) {
       setError('No tienes permisos para eliminar esta partida. Solo el creador puede eliminarla.');
       return;
     }
@@ -263,15 +264,22 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     setRoundToDelete(roundId);
   };
 
+  const isDismissal = (roundId: string | null) => {
+    const round = rounds.find(r => r.round.id === roundId);
+    return !!round && !currentGroup && round.round.user_id !== getUserId();
+  };
+
   const handleConfirmDeleteRound = async () => {
     if (!roundToDelete) return;
 
     const roundId = roundToDelete;
+    const dismiss = isDismissal(roundId);
     setRoundToDelete(null);
 
     try {
       setError('');
-      await golfService.deleteRound(roundId);
+      if (dismiss) await golfService.dismissQuickRound(roundId);
+      else await golfService.deleteRound(roundId);
       await loadActiveRounds();
     } catch (err) {
       setError(deletionErrorMessage(err, 'Error eliminando la partida'));
@@ -633,6 +641,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
             {rounds.map((roundStats) => {
               const isExpanded = !currentGroup || selectedRound === roundStats.round.id;
               const isRoundCreator = isVerifiedLocalRoundCreator(roundStats.round.user_id);
+              const isLinkedGuest = !currentGroup && roundStats.round.user_id !== getUserId();
               const courseHoles = roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos';
 
               const maxHole = roundStats.scores.length > 0
@@ -737,10 +746,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                               disabled={loading}
                               className="text-red-500 hover:bg-red-50 disabled:opacity-50 p-2 rounded-lg transition-colors"
-                              title="Eliminar partida"
-                              aria-label="Eliminar partida"
+                              title={isLinkedGuest ? 'Descartar partida' : 'Eliminar partida'}
+                              aria-label={isLinkedGuest ? 'Descartar partida' : 'Eliminar partida'}
                             >
-                              <Trash2 size={20} />
+                              {isLinkedGuest ? <EyeOff size={20} /> : <Trash2 size={20} />}
                             </WriteButton>
                           )}
                         </div>
@@ -892,7 +901,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         {!currentGroup && (
                           <button
                             onClick={() => {
-                              onViewResults(roundStats.round.id);
+                              // El creador abre la tarjeta para poder corregir hoyos; los vinculados ven las estadísticas.
+                              if (isRoundCreator) onJoinRound(roundStats.round.id);
+                              else onViewResults(roundStats.round.id);
                               setSelectedRound(null);
                             }}
                             className="w-full sm:flex-1 bg-accent hover:bg-accent-hover text-on-accent font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -922,14 +933,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados Completos
                           </button>
                         )}
-                        {!currentGroup && isRoundCreator && (
+                        {!currentGroup && (isRoundCreator || isLinkedGuest) && (
                           <WriteButton
                             onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                             disabled={loading}
-                            className="w-full sm:flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                            className={`w-full sm:flex-1 ${isLinkedGuest ? 'bg-slate-600 hover:bg-slate-700' : 'bg-red-600 hover:bg-red-700'} disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2`}
                           >
-                            <Trash2 size={20} />
-                            Eliminar
+                            {isLinkedGuest ? <EyeOff size={20} /> : <Trash2 size={20} />}
+                            {isLinkedGuest ? 'Descartar' : 'Eliminar'}
                           </WriteButton>
                         )}
                       </div>
@@ -969,7 +980,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       {/* Modal Borrar Una Partida */}
       {roundToDelete && (
         <ConfirmModal
-          message="¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express."
+          message={isDismissal(roundToDelete)
+            ? '¿Descartar esta partida? Dejará de aparecer en tus partidas y estadísticas. El resto de jugadores la seguirá viendo.'
+            : '¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express.'}
           onConfirm={handleConfirmDeleteRound}
           onCancel={() => setRoundToDelete(null)}
         />

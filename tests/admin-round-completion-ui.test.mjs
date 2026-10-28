@@ -33,7 +33,7 @@ test('actual open-card status subscription and focus revoke stale member editing
       canEditRoundScores,
       getUserId: () => 'member',
       storageUtils: { clearActiveRound() {} },
-      accessCodeStorage: { removeAccessCode() {} },
+      accessCodeStorage: { removeAccessCode() {}, hasAccessCode() { return false; }, getAccessCode() { return null; } },
       window: {
         setInterval(fn) { timerCallback = fn; return 1; },
         addEventListener(name, fn) { if (name === 'focus') focusCallback = fn; },

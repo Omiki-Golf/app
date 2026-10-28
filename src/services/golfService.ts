@@ -425,30 +425,8 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     groupId: string | null = null
   ): Promise<GolfRound> {
     const userId = await getRoundOwnerId();
-    // Generate a unique access code
-    let accessCode = generateAccessCode();
-    let isUnique = false;
-    let attempts = 0;
-    const maxAttempts = 10;
-
-    while (!isUnique && attempts < maxAttempts) {
-      const { data: existing } = await supabase
-        .from('golf_rounds')
-        .select('id')
-        .eq('access_code', accessCode)
-        .maybeSingle();
-
-      if (!existing) {
-        isUnique = true;
-      } else {
-        accessCode = generateAccessCode();
-        attempts++;
-      }
-    }
-
-    if (!isUnique) {
-      throw new Error('No se pudo generar un código único. Por favor intenta de nuevo.');
-    }
+    // The server keeps the code private and replaces it if another active round already uses it.
+    const accessCode = generateAccessCode();
 
     const { data, error } = await supabase
       .from('golf_rounds')
@@ -1034,36 +1012,28 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return { holes: newHoles, players: updatedPlayersArray };
   },
 
+  // Los códigos de acceso son privados: solo el servidor los compara.
   async verifyAccessCode(roundId: string, accessCode: string): Promise<boolean> {
-    const { data, error } = await supabase
-      .from('golf_rounds')
-      .select('access_code')
-      .eq('id', roundId)
-      .maybeSingle();
-
-    if (error || !data) return false;
-    return data.access_code === accessCode.toUpperCase();
+    const { data, error } = await supabase.rpc('verify_round_access_code', { p_round: roundId, p_code: accessCode.toUpperCase() });
+    if (error) throw error;
+    return data === true;
   },
 
   async getRoundByAccessCode(accessCode: string, groupId?: string | null, searchAll?: boolean): Promise<GolfRound | null> {
-    let query = supabase
-      .from('golf_rounds')
-      .select('*')
-      .eq('access_code', accessCode.toUpperCase())
-      .eq('status', 'active');
+    const { data, error } = await supabase.rpc('find_active_round_by_code', {
+      p_code: accessCode.toUpperCase(),
+      p_group: groupId ?? null,
+      p_search_all: !!searchAll,
+    });
+    if (error) throw error;
+    return ((data || []) as GolfRound[])[0] ?? null;
+  },
 
-    if (!searchAll) {
-      if (groupId) {
-        query = query.eq('group_id', groupId);
-      } else {
-        query = query.is('group_id', null);
-      }
-    }
-
-    const { data, error } = await query.maybeSingle();
-
-    if (error || !data) return null;
-    return data;
+  /** Código para compartir: solo lo recibe el creador (o el grupo, en partidas de grupo). */
+  async getRoundAccessCode(roundId: string): Promise<string | null> {
+    const { data, error } = await supabase.rpc('get_round_access_code', { p_round: roundId });
+    if (error) throw error;
+    return data || null;
   },
 
   async getExpressRoundStatisticsByCode(accessCode: string): Promise<QuickPlayCompletedRound | null> {
@@ -1424,7 +1394,16 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data;
   },
 
-  async recordHoleScores(roundId: string, holeNumber: number, scores: Array<Partial<RoundScore>>): Promise<RoundScore[]> {
+  /** Sin código escribe el creador verificado; con código, quien lo tenga mientras la partida está activa. */
+  async recordHoleScores(roundId: string, holeNumber: number, scores: Array<Partial<RoundScore>>, accessCode?: string | null): Promise<RoundScore[]> {
+    if (accessCode) {
+      const { data, error } = await supabase.rpc('write_round_hole_scores_by_code', {
+        p_round: roundId, p_hole: holeNumber, p_scores: scores, p_access_code: accessCode.toUpperCase(),
+      });
+      if (error) throw error;
+      if (!data?.ok) throw Object.assign(new Error(data?.error || 'Código de acceso incorrecto'), { code: '42501' });
+      return (data.scores || []) as RoundScore[];
+    }
     const { data, error } = await supabase.rpc('write_verified_hole_scores', { p_round: roundId, p_hole: holeNumber, p_scores: scores });
     if (error) throw error;
     return data || [];
@@ -1444,8 +1423,17 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
   async deleteScore(
     roundId: string,
     playerId: string,
-    holeNumber: number
+    holeNumber: number,
+    accessCode?: string | null
   ): Promise<void> {
+    if (accessCode) {
+      const { data, error } = await supabase.rpc('delete_round_score_by_code', {
+        p_round: roundId, p_player: playerId, p_hole: holeNumber, p_access_code: accessCode.toUpperCase(),
+      });
+      if (error) throw error;
+      if (!data?.ok) throw Object.assign(new Error(data?.error || 'Código de acceso incorrecto'), { code: '42501' });
+      return;
+    }
     const { error } = await supabase.rpc('delete_verified_round_score', {
       p_round: roundId, p_player: playerId, p_hole: holeNumber,
     });
@@ -3002,6 +2990,12 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
 
       if (deleteError) throw deleteError;
     }
+  },
+
+  /** Oculta una partida rápida ajena solo para la cuenta vinculada; no borra nada de la base de datos. */
+  async dismissQuickRound(roundId: string): Promise<void> {
+    const { error } = await supabase.rpc('dismiss_quick_round', { p_round: roundId });
+    if (error) throw error;
   },
 
     calculateQuickPlayAwards(

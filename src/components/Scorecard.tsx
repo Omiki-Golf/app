@@ -57,6 +57,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   courseId,
   accessCode,
   hasEditAccess = true,
+  isCreator = false,
   canFinishRound = false,
   isRoundFinished = false,
   courseName = '',
@@ -248,7 +249,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-lg font-bold">{courseName || 'Campo de Golf'}</span>
-                  {hasEditAccess && onCourseChanged && roundId && courseId && (
+                  {/* Cambiar de campo es tarea del creador; con el código solo se informan golpes. */}
+                  {hasEditAccess && isCreator && onCourseChanged && roundId && courseId && (
                     <WriteButton
                       onClick={() => setShowCourseChangeModal(true)}
                       disabled={changingCourse}

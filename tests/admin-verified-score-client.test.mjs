@@ -13,7 +13,7 @@ function harness(mode='stableford',error=null){
  const scores=players.map((p,i)=>({id:'original-'+p.id,player_id:p.id,round_id:'round',hole_number:1,gross_strokes:i+5,net_strokes:i+5,strokes_received:0,stableford_points:1,mode_points:99,abandoned:false}));
  let state={round:{id:'round',game_mode:mode,status:'active'},hasEditAccess:true,players,scores};
  const inputState=state;const alerts=[];let sent;let refreshes=0;
- const context=vm.createContext({roundState:inputState,readOnly:false,console:{log(){},error(){}},calculateModePoints,
+ const context=vm.createContext({roundState:inputState,readOnly:false,console:{log(){},error(){}},calculateModePoints,accessCodeStorage:{getAccessCode:()=>null},
   setError:text=>alerts.push(text),setRoundState:fn=>{state=fn(state);},
   golfService:{
    async recordHoleScores(r,h,rows){if(error)throw error; sent=rows;return rows.map(s=>({...s,id:'persisted-'+s.player_id}));},

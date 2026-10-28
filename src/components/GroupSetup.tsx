@@ -165,7 +165,7 @@ export default function GroupSetup({ onGroupCreated, onGroupJoined, onQuickPlay,
           return;
         }
 
-        accessCodeStorage.saveAccessCode(round.id, round.access_code);
+        accessCodeStorage.saveAccessCode(round.id, joinCode.toUpperCase());
 
         // Mark as limited access since they joined with a round code, not group code
         const { storageUtils } = await import('../utils/storage');

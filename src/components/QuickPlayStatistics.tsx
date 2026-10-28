@@ -4,7 +4,7 @@ import { OmikiLoadingScreen, OmikiSpinner } from './OmikiSpinner';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
-import { Trophy, TrendingDown, Flag, Target, Zap, Trash2,
+import { Trophy, TrendingDown, Flag, Target, Zap, Trash2, EyeOff,
   Activity, Flame, Calendar, MessageCircle, Swords, Users, Briefcase, Download, Share2
 } from 'lucide-react';
 import { golfService } from '../services/golfService';
@@ -259,12 +259,19 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     void init();
   }, [roundId, sharedRoundData, loadRoundData]);
 
+  // El creador borra la partida; un jugador vinculado solo la descarta de sus listas y estadísticas.
+  const isLinkedPlayer = roundData?.isCreator === false;
+
   const handleDelete = async () => {
     if (!selectedRoundId) return;
     try {
-      await golfService.deleteQuickPlayCompletedRound(selectedRoundId);
+      if (isLinkedPlayer) {
+        await golfService.dismissQuickRound(selectedRoundId);
+      } else {
+        await golfService.deleteQuickPlayCompletedRound(selectedRoundId);
+        safeStorage.removeItem('quick_play_active_round');
+      }
       setShowDeleteConfirm(false);
-      safeStorage.removeItem('quick_play_active_round');
 
       const updatedRounds = availableRounds.filter(r => r.id !== selectedRoundId);
       setAvailableRounds(updatedRounds);
@@ -631,25 +638,25 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const renderPodiumGrid = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
       <div className="transform transition-all duration-700 hover:scale-105">
-        <div className="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl p-6 shadow-2xl border-4 border-yellow-300 relative">
+        <div className="gold-card bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl p-6 shadow-2xl border-4 border-yellow-300 relative">
           <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-yellow-300 rounded-full flex items-center justify-center text-3xl font-black text-yellow-900 shadow-lg">
             1
           </div>
           <div className="mt-6 text-center">
-            <p className="text-yellow-900 font-bold text-xl mb-2">{ranking[0].player.name}</p>
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-2">
+            <p className="text-yellow-900 font-black text-xl mb-2">{ranking[0].player.name}</p>
+            <div className="bg-white/35 backdrop-blur-sm rounded-lg p-4 mb-2">
               <p className="text-5xl font-black text-yellow-900 mb-1">{ranking[0].totalPoints}</p>
               <p className="text-yellow-900 text-sm font-semibold">{ranking[0].totalPoints} puntos / {getPlayerGrossStrokes(ranking[0].player.id)} golpes</p>
             </div>
             {gameMode === 'stableford' && (
-              <div className="bg-yellow-600/30 backdrop-blur-sm rounded-lg py-2 px-3 mb-2">
+              <div className="bg-white/25 backdrop-blur-sm rounded-lg py-2 px-3 mb-2">
                 <p className={`text-2xl font-black ${highlights[0]?.scoreToPar.value === 0 ? 'text-yellow-900' : highlights[0]?.scoreToPar.value < 0 ? 'text-green-700' : 'text-red-700'}`}>
                   {highlights[0]?.scoreToPar.display}
                 </p>
                 <p className="text-yellow-900 text-xs font-medium">vs Par Personal</p>
               </div>
             )}
-            <p className="text-yellow-800 text-xs mt-1">HCP: {ranking[0].player.playing_handicap}</p>
+            <p className="text-yellow-800 text-xs font-semibold mt-1">HCP: {ranking[0].player.playing_handicap}</p>
           </div>
         </div>
       </div>
@@ -1026,14 +1033,14 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <span>{sharing ? 'Generando...' : 'Compartir'}</span>
             </button>
 
-            {/* Solo quien creó la partida puede eliminarla; los jugadores vinculados solo la ven. */}
-            {!isSharedView && roundData?.isCreator !== false && (
+            {/* Solo quien creó la partida puede eliminarla; los jugadores vinculados pueden descartarla. */}
+            {!isSharedView && (
               <WriteButton
                 onClick={() => setShowDeleteConfirm(true)}
-                className="bg-red-600/90 hover:bg-red-700 backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105"
+                className={`${isLinkedPlayer ? 'bg-slate-600/90 hover:bg-slate-700' : 'bg-red-600/90 hover:bg-red-700'} backdrop-blur-sm text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-all hover:scale-105`}
               >
-                <Trash2 size={20} />
-                <span>Eliminar</span>
+                {isLinkedPlayer ? <EyeOff size={20} /> : <Trash2 size={20} />}
+                <span>{isLinkedPlayer ? 'Descartar' : 'Eliminar'}</span>
               </WriteButton>
             )}
           </div>
@@ -1111,7 +1118,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
                   <div className="flex-1 text-center">
-                    <div className="bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
+                    <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
                       <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
                         Ganador
                       </div>
@@ -1167,7 +1174,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                 <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
                   <div className="flex-1 text-center">
-                    <div className="bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
+                    <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
                       <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
                         {teamResult.isTie ? 'Empate' : 'Ganadora'}
                       </div>
@@ -1462,7 +1469,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
       {!isSharedView && showDeleteConfirm && (
         <ConfirmModal
-          message="¿Eliminar las estadísticas de esta partida? Se borrará la partida junto con todos sus golpes y resultados. Esta acción no se puede deshacer y las estadísticas no se podrán regenerar."
+          message={isLinkedPlayer
+            ? '¿Descartar esta partida? Dejará de aparecer en tus partidas y estadísticas. El resto de jugadores la seguirá viendo.'
+            : '¿Eliminar las estadísticas de esta partida? Se borrará la partida junto con todos sus golpes y resultados. Esta acción no se puede deshacer y las estadísticas no se podrán regenerar.'}
           onConfirm={handleDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />

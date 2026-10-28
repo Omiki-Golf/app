@@ -37,7 +37,7 @@ export const FinalResultModal: React.FC<FinalResultModalProps> = ({ result, onCl
         <p className="text-sm text-ink-3 mb-6 uppercase tracking-wider font-semibold">{modeLabels[result.mode]}</p>
 
         <div className="bg-accent-soft border border-accent-ring rounded-xl p-4 mb-5">
-          <p className="text-lg font-extrabold text-emerald-950">{headline}</p>
+          <p className="text-lg font-extrabold text-accent-ink">{headline}</p>
           {result.mode === 'parejas' && (
             <span className="mt-2 inline-block bg-accent text-on-accent text-xs font-bold px-3 py-1 rounded-full">
               Resultado: {result.resultText}

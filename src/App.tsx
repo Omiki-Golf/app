@@ -123,6 +123,20 @@ function App() {
     hasEditAccess: false,
     courseName: '',
   });
+  // El código ya no viaja en la fila pública: el creador (o su grupo) lo pide al servidor
+  // y quien entró con él lo tiene guardado en el dispositivo.
+  const [roundAccessCode, setRoundAccessCode] = useState<string | null>(null);
+  const shownRoundId = roundState.round?.id ?? null;
+  const shownRoundIsCreator = roundState.isCreator;
+  useEffect(() => {
+    if (!shownRoundId) { setRoundAccessCode(null); return; }
+    setRoundAccessCode(accessCodeStorage.getAccessCode(shownRoundId));
+    let live = true;
+    golfService.getRoundAccessCode(shownRoundId)
+      .then(code => { if (live && code) setRoundAccessCode(code); })
+      .catch(() => { /* Keep the stored code on a network failure. */ });
+    return () => { live = false; };
+  }, [shownRoundId, shownRoundIsCreator]);
   const [showHoleConfig, setShowHoleConfig] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -435,7 +449,7 @@ function App() {
           const roundData = await golfService.getRoundWithDetails(activeRoundId);
           if (roundData) {
             const isCreator = isVerifiedLocalRoundCreator(roundData.round.user_id);
-            const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status);
+            const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status, accessCodeStorage.hasAccessCode(activeRoundId));
 
             const isAcceptedParticipant = Boolean(user && roundData.players.some(player => player.user_id === user.id));
             if (!roundData.round.group_id && roundData.round.status !== 'active' && !isCreator && !isAcceptedParticipant) {
@@ -531,7 +545,7 @@ function App() {
         if (isGroupRound) {
           // El creador puede corregir resultados finalizados hasta archivar la partida.
           setRoundState(prev => prev.round?.id === roundId
-            ? { ...prev, round: data, hasEditAccess: canEditRoundScores(prev.isCreator, data.status) }
+            ? { ...prev, round: data, hasEditAccess: canEditRoundScores(prev.isCreator, data.status, accessCodeStorage.hasAccessCode(roundId)) }
             : prev);
           return;
         }
@@ -549,7 +563,7 @@ function App() {
           setCurrentView('setup');
           return;
         }
-        const edit = canEditRoundScores(isVerifiedLocalRoundCreator(data.user_id), data.status);
+        const edit = canEditRoundScores(isVerifiedLocalRoundCreator(data.user_id), data.status, accessCodeStorage.hasAccessCode(roundId));
         setRoundState(prev => prev.round?.id === roundId ? {...prev, round: data, hasEditAccess: edit} : prev);
       } catch { /* Keep the existing view on a transient network failure. */ }
     };
@@ -631,7 +645,8 @@ function App() {
       setLoading(true);
       const roundData = await golfService.getRoundWithDetails(roundId);
       if (roundData) {
-        accessCodeStorage.saveAccessCode(roundId, roundData.round.access_code);
+        const createdCode = await golfService.getRoundAccessCode(roundId).catch(() => null);
+        if (createdCode) accessCodeStorage.saveAccessCode(roundId, createdCode);
 
         const course = await golfService.getCourse(courseId);
 
@@ -662,9 +677,10 @@ function App() {
       if (roundData) {
         const isCreator = isVerifiedLocalRoundCreator(roundData.round.user_id);
         const storedCode = accessCodeStorage.getAccessCode(roundId);
-        const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status);
+        // Con el código se informan golpes; finalizar, archivar o cambiar campo sigue siendo del creador.
+        const hasEditAccess = canEditRoundScores(isCreator, roundData.round.status, !!storedCode);
 
-        if (!roundData.round.group_id && !isCreator && storedCode === roundData.round.access_code) {
+        if (!roundData.round.group_id && !isCreator && storedCode) {
           await golfService.registerExpressRoundAccess(roundId, storedCode);
         }
 
@@ -717,11 +733,12 @@ function App() {
       return;
     }
     const editingRoundId = roundState.round.id;
+    const editCode = roundState.isCreator ? null : accessCodeStorage.getAccessCode(editingRoundId);
     setError('');
 
     try {
       if (score === null) {
-        await golfService.deleteScore(roundState.round.id, playerId, holeNumber);
+        await golfService.deleteScore(roundState.round.id, playerId, holeNumber, editCode);
         setRoundState((prev) => ({
           ...prev,
           scores: prev.scores.filter((s) => !(s.player_id === playerId && s.hole_number === holeNumber)),
@@ -788,7 +805,7 @@ function App() {
           stableford_points: stablefordPoints, no_paso_rojas: noPasoRojas,
           spanish_hands: spanishHands, abandoned, mode_points: modePoints },
         ...updatedOtherScores,
-      ]);
+      ], editCode);
       let decidedResult = roundState.round.decided_result || null;
       if (isModeScoring && !decidedResult) {
         try {
@@ -1425,8 +1442,8 @@ function App() {
             useSlope={roundState.round.use_slope}
             numHoles={roundState.round.num_holes}
             courseId={roundState.round.course_id}
-            accessCode={roundState.round.access_code}
-            hasEditAccess={roundState.hasEditAccess && !readOnly}
+            accessCode={roundAccessCode ?? undefined}
+            hasEditAccess={roundState.isCreator && roundState.hasEditAccess && !readOnly}
             currentGroup={currentGroup}
             gameMode={roundState.round.game_mode}
             onPlayersUpdated={handlePlayersUpdated}
@@ -1462,7 +1479,7 @@ function App() {
           numHoles={roundState.round.num_holes}
           roundId={roundState.round.id}
           courseId={roundState.round.course_id}
-          accessCode={roundState.round.access_code}
+          accessCode={roundAccessCode ?? undefined}
           hasEditAccess={roundState.hasEditAccess && !readOnly}
           isCreator={roundState.isCreator}
           canFinishRound={roundState.isCreator}

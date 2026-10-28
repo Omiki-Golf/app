@@ -51,6 +51,9 @@ function CompactPlayer({ name, colorIndex }: { name: string; colorIndex: number 
   );
 }
 
+// Nombres largos: se recortan por el medio para dejar sitio a las cajas de resultado.
+const middleEllipsis = (value: string) => value.length <= 12 ? value : `${value.slice(0, 5)}…${value.slice(-5)}`;
+
 function ColorMarker({ colorIndex }: { colorIndex: number }) {
   const safeIndex = Math.max(0, colorIndex) % markerColors.length;
   return <span aria-hidden="true" className={`h-4 w-4 shrink-0 rounded-full border-2 shadow-sm ${markerColors[safeIndex]}`} />;
@@ -372,13 +375,13 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
               <button
                 onClick={() => handleToggleExpanded(player.id, isExpanded)}
                 disabled={readonly}
-                className="w-full bg-card-2 hover:bg-card-2 disabled:cursor-not-allowed p-3 flex items-center justify-between transition-colors"
+                className="w-full bg-card-2 hover:bg-card-2 disabled:cursor-not-allowed p-3 flex items-center justify-between gap-2 transition-colors"
               >
-                <div className="flex-1 text-left">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 text-left">
+                  <div className="flex min-w-0 items-center gap-2">
                     {isModeScoring && <ColorMarker colorIndex={isParejas ? team : playerIndex} />}
                     {isParejas && <span className="sr-only">{teamLabel}</span>}
-                    <p className="font-semibold text-ink">{player.name}</p>
+                    <p className="truncate font-semibold text-ink" title={player.name}>{middleEllipsis(player.name)}</p>
                   </div>
                   <p className="text-xs text-ink-3">HCP {player.playing_handicap}</p>
                 </div>
@@ -406,17 +409,18 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                       ? `${score.gross_strokes}` // Mostrar el gross_strokes (PAR + 2) cuando es raya
                       : getPointsText(score.stableford_points, isRaya);
                     return (
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-1.5">
                         {isModeScoring && !isParejas && allPlayersEntered && (
                           <div
-                            className="px-3 py-2 rounded-lg border-2 border-accent-ring bg-accent-soft text-accent-ink font-bold text-lg flex items-center justify-center min-w-[64px]"
+                            className="w-11 h-11 rounded-lg border-2 border-accent-ring bg-accent-soft text-accent-ink font-bold leading-none flex flex-col items-center justify-center"
                             title="Puntos asignados en el hoyo"
                           >
-                            {(score.mode_points ?? 0).toLocaleString('es-ES')} pts
+                            <span className="text-base">{(score.mode_points ?? 0).toLocaleString('es-ES')}</span>
+                            <span className="text-[9px] font-semibold uppercase">pts</span>
                           </div>
                         )}
                         <div
-                          className={`px-4 py-2 rounded-lg border-2 font-bold text-lg flex items-center justify-center min-w-[75px] relative ${getScoreColor(
+                          className={`h-11 px-2 rounded-lg border-2 font-bold text-lg whitespace-nowrap flex items-center justify-center min-w-[3rem] relative overflow-hidden ${getScoreColor(
                             score.stableford_points,
                             isRaya
                           )}`}
@@ -434,13 +438,13 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   })()
                 ) : (
                   // Hoyo pendiente / No asignado aún (gris tenue sin marco)
-                  <div className="text-ink-4 font-light text-xl px-4 flex items-center justify-center min-w-[75px]">
+                  <div className="text-ink-4 font-light text-xl flex shrink-0 items-center justify-center min-w-[3rem]">
                     -
                   </div>
                 )}
                 <ChevronDown
                   size={20}
-                  className={`ml-2 text-ink-3 transition-transform ${
+                  className={`shrink-0 text-ink-3 transition-transform ${
                     isExpanded ? 'rotate-180' : ''
                   }`}
                 />
