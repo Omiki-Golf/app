@@ -78,6 +78,8 @@ test('quick-round player picker only checks duplicates in the current round', as
     setSelectedPlayerId() {},
     setNewPlayerName() {},
     setNewPlayerHandicap() {},
+    setSelectedAccount() {},
+    setRegisteredResults() {},
     setError() { throw new Error('quick player picker failed'); },
     console: { error() {} },
   });

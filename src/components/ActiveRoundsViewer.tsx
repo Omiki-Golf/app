@@ -4,8 +4,10 @@ import { ThemeToggle } from './ThemeToggle';
 import { TopBar } from './TopBar';
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { shouldRefreshRoundList } from '../utils/roundListEvents';
-import { GolfRound, RoundPlayer, RoundScore, Group, Player } from '../types';
+import { GolfRound, RoundPlayer, RoundScore, Group, Player, UserProfile } from '../types';
 import { golfService } from '../services/golfService';
+import { userService } from '../services/userService';
+import { useAuth } from '../context/AuthContext';
 import { ConfirmModal } from './ConfirmModal';
 import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
@@ -39,6 +41,8 @@ interface ActiveRoundsViewerProps {
   onViewResults: (roundId: string) => void;
   currentGroup?: Group | null;
   messagesButton?: React.ReactNode;
+  // Solo el plan Express tiene cupo de partidas: el aviso de cupo no aplica a los demás.
+  isExpressPlan?: boolean;
 }
 
 export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
@@ -47,6 +51,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   onViewResults,
   currentGroup,
   messagesButton,
+  isExpressPlan = true,
 }) => {
   const [rounds, setRounds] = useState<RoundStats[]>([]);
   const listSnapshot = useRef({ loaded: false, ids: new Set<string>() });
@@ -69,6 +74,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [newPlayerName, setNewPlayerName] = useState('');
   const [newPlayerHandicap, setNewPlayerHandicap] = useState('');
   const [newPlayerIsGuest, setNewPlayerIsGuest] = useState(false);
+  // Partida rápida con sesión: como al crear la tarjeta, una cuenta registrada recibe invitación.
+  const { user } = useAuth();
+  const [registeredResults, setRegisteredResults] = useState<UserProfile[]>([]);
+  const [selectedAccount, setSelectedAccount] = useState<UserProfile | null>(null);
   const [canManagePlayers, setCanManagePlayers] = useState(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pinError, setPinError] = useState('');
@@ -321,6 +330,30 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     setConfirmDelete(false);
   };
 
+  const addingToQuickRound = !!showAddPlayerModal && !rounds.find(item => item.round.id === showAddPlayerModal)?.round.group_id;
+  useEffect(() => {
+    const term = newPlayerName.trim();
+    if (!user || !addingToQuickRound || selectedPlayerId !== 'new' || term.length < 2 || selectedAccount) { setRegisteredResults([]); return; }
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await userService.searchByNick(term);
+        if (active) setRegisteredResults(results.filter(result => result.user_id !== user.id));
+      } catch { if (active) setRegisteredResults([]); }
+    }, 350);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [newPlayerName, user, addingToQuickRound, selectedPlayerId, selectedAccount]);
+
+  const handleSelectAccount = (profile: UserProfile) => {
+    const numHoles = rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes;
+    // El hándicap del perfil es el exacto de 18 hoyos; el campo pide el de los hoyos de la partida.
+    const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
+    setSelectedAccount(profile);
+    setNewPlayerName(profile.nick);
+    setNewPlayerHandicap(String(Math.round(forHoles * 10) / 10));
+    setRegisteredResults([]);
+  };
+
   const handleAddPlayerClick = async (roundId: string) => {
     try {
       const target = rounds.find(item => item.round.id === roundId);
@@ -348,6 +381,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       setSelectedPlayerId('');
       setNewPlayerName('');
       setNewPlayerHandicap('');
+      setSelectedAccount(null);
+      setRegisteredResults([]);
     } catch (err) {
       setError('Error cargando jugadores');
       console.error(err);
@@ -375,7 +410,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           return;
         }
         const baseHandicap = round.round.num_holes === 18 ? handicap / 2 : handicap;
-        if (round.round.group_id) {
+        const pickedAccount = selectedAccount && normalizeNick(selectedAccount.nick) === normalizeNick(newPlayerName) ? selectedAccount : null;
+        if (!round.round.group_id && pickedAccount) {
+          await golfService.addRegisteredQuickRoundPlayer(roundId, pickedAccount.user_id);
+        } else if (round.round.group_id) {
           await golfService.addGroupRoundPlayer(round.round.group_id, roundId, newPlayerName.trim(), baseHandicap, newPlayerIsGuest);
         } else {
           const player = await golfService.getOrCreatePlayer(newPlayerName.trim(), baseHandicap, null);
@@ -971,7 +1009,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         <ConfirmModal
           message={currentGroup
             ? '¿Estás seguro de que quieres eliminar TODAS las partidas activas o finalizadas de este grupo?'
-            : '¿Estás seguro de que quieres eliminar todas tus partidas? La lista se limpiará, pero seguirán contando dentro del cupo consumido del Plan Express.'}
+            : isExpressPlan
+            ? '¿Estás seguro de que quieres eliminar todas tus partidas? La lista se limpiará, pero seguirán contando dentro del cupo consumido del Plan Express.'
+            : '¿Estás seguro de que quieres eliminar todas tus partidas?'}
           requiredText={currentGroup ? 'ELIMINAR TODAS' : undefined}
           onConfirm={handleConfirmDeleteAll}
           onCancel={() => setShowDeleteAllModal(false)}
@@ -983,7 +1023,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         <ConfirmModal
           message={isDismissal(roundToDelete)
             ? '¿Descartar esta partida? Dejará de aparecer en tus partidas y estadísticas. El resto de jugadores la seguirá viendo.'
-            : '¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express.'}
+            : isExpressPlan
+            ? '¿Seguro que quieres eliminar esta partida? Se quitará de tu lista pero seguirá contando dentro del cupo consumido de tu Plan Express.'
+            : '¿Seguro que quieres eliminar esta partida?'}
           onConfirm={handleConfirmDeleteRound}
           onCancel={() => setRoundToDelete(null)}
         />
@@ -1112,10 +1154,41 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                   <input
                     type="text"
                     value={newPlayerName}
-                    onChange={(e) => setNewPlayerName(e.target.value)}
+                    onChange={(e) => {
+                      setNewPlayerName(e.target.value);
+                      if (selectedAccount && normalizeNick(e.target.value) !== normalizeNick(selectedAccount.nick)) setSelectedAccount(null);
+                    }}
                     className="w-full px-3 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Nombre del jugador"
+                    placeholder={addingToQuickRound && user ? 'Nombre o nick registrado' : 'Nombre del jugador'}
                   />
+                  {selectedAccount && (
+                    <p className="text-xs text-accent-ink mt-1">Cuenta registrada · recibirá una invitación para guardar los resultados</p>
+                  )}
+                  {registeredResults.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-line bg-card">
+                      <div className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-ink-3">
+                        JUGADORES REGISTRADOS
+                      </div>
+                      {registeredResults.map((profile) => {
+                        const roundPlayers = rounds.find(item => item.round.id === showAddPlayerModal)?.players ?? [];
+                        const linkedInRound = roundPlayers.some(player => player.user_id === profile.user_id);
+                        const pendingInRound = roundPlayers.some(player => !player.user_id && normalizeNick(player.name) === normalizeNick(profile.nick));
+                        return (
+                          <button
+                            key={profile.user_id}
+                            type="button"
+                            onClick={() => handleSelectAccount(profile)}
+                            disabled={linkedInRound || pendingInRound}
+                            className="w-full rounded-lg px-3 py-2 text-left transition hover:bg-card-2 disabled:opacity-60"
+                          >
+                            <p className="font-semibold text-ink">{profile.nick}</p>
+                            <p className="text-xs text-ink-3">Cuenta registrada · recibirá una invitación para guardar los resultados</p>
+                            {(linkedInRound || pendingInRound) && <p className="text-xs font-medium text-amber-700">{pendingInRound ? 'Invitación pendiente' : 'Ya está en esta partida'}</p>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-ink-2 mb-1">
@@ -1154,6 +1227,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     </div>
   );
 };
+
+function normalizeNick(value: string | null | undefined): string {
+  return (value ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
 
 function getTimeElapsed(createdAt: string): string {
   const now = new Date();

@@ -460,7 +460,7 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     if (!groupId && (await supabase.auth.getSession()).data.session?.user) {
       const { data, error } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['active', 'completed'] });
       if (error) throw error;
-      return (data || []) as GolfRound[];
+      return this.withCodeQuickRounds((data || []) as GolfRound[]);
     }
 
     const userId = getUserId();
@@ -480,7 +480,19 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return groupId ? data || [] : this.withCodeQuickRounds(data || []);
+  },
+
+  /** Añade las partidas rápidas activas en las que se entró con el código; no rompe la lista si falla. */
+  async withCodeQuickRounds(own: GolfRound[]): Promise<GolfRound[]> {
+    const { data, error } = await supabase.rpc('list_my_code_quick_rounds');
+    if (error) {
+      console.error('Error cargando partidas con código:', error);
+      return own;
+    }
+    const known = new Set(own.map(round => round.id));
+    const extra = ((data || []) as GolfRound[]).filter(round => !known.has(round.id));
+    return [...own, ...extra].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   },
 
 async hasActiveQuickPlayRound(): Promise<boolean> {

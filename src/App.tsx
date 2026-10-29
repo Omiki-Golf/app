@@ -1524,6 +1524,7 @@ function App() {
 
       {currentView === 'active-rounds' && (
         <ActiveRoundsViewer backDestination="back"
+          isExpressPlan={activePlanType === 'express'}
           onBack={() => backFromProfileSection(currentGroup ? 'main' : 'setup')}
           onJoinRound={handleJoinRound}
           onViewResults={(roundId) => {

@@ -55,9 +55,10 @@ test('quick-round list follows the explicit current screen, not a stale stored g
   const result = await service.getActiveRounds(null);
 
   assert.equal(result[0].id, 'quick-round');
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].type, 'rpc');
-  assert.equal(calls[0].name, 'list_my_quick_rounds');
+  assert.equal(result.length, 1);
+  // Propias y vinculadas, más las activas en las que se entró con el código.
+  assert.deepEqual(calls.map(call => call.name), ['list_my_quick_rounds', 'list_my_code_quick_rounds']);
+  assert.ok(calls.every(call => call.type === 'rpc'));
   assert.deepEqual(Array.from(calls[0].args.p_statuses), ['active', 'completed']);
 });
 
