@@ -283,6 +283,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
       }
     } catch (err) {
       console.error('Error eliminando la partida:', err);
+      setShowDeleteConfirm(false);
+      setShareError(isLinkedPlayer ? 'No se pudo descartar la partida.' : 'No se pudo eliminar la partida.');
     }
   };
 

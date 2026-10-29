@@ -618,7 +618,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
               <h1 className="text-3xl font-bold text-title">
                 {currentGroup
                   ? `Partidas ${currentGroup.name || 'del Grupo'}`
-                  : 'Mi Partida'}
+                  : 'Partida en curso'}
               </h1>
             </div>
 
@@ -741,15 +741,16 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                       <div>
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <h3 className="font-bold text-ink">Clasificación</h3>
-                          {!currentGroup && (
+                          {/* En curso solo el creador elimina; descartar aparece cuando la partida está finalizada. */}
+                          {!currentGroup && !isLinkedGuest && (
                             <WriteButton
                               onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                               disabled={loading}
                               className="text-red-500 hover:bg-red-50 disabled:opacity-50 p-2 rounded-lg transition-colors"
-                              title={isLinkedGuest ? 'Descartar partida' : 'Eliminar partida'}
-                              aria-label={isLinkedGuest ? 'Descartar partida' : 'Eliminar partida'}
+                              title="Eliminar partida"
+                              aria-label="Eliminar partida"
                             >
-                              {isLinkedGuest ? <EyeOff size={20} /> : <Trash2 size={20} />}
+                              <Trash2 size={20} />
                             </WriteButton>
                           )}
                         </div>

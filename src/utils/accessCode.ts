@@ -1,4 +1,5 @@
 import { safeStorage } from './safeStorage';
+import { getUserId } from './userId';
 
 const ACCESS_CODES_KEY = 'golf_access_codes';
 
@@ -6,7 +7,12 @@ export interface StoredAccessCode {
   roundId: string;
   code: string;
   timestamp: number;
+  // Cuenta que introdujo el código: en un dispositivo compartido otra cuenta no hereda el acceso.
+  ownerId?: string;
 }
+
+const isOwnCode = (entry: StoredAccessCode, roundId: string, ownerId: string) =>
+  entry.roundId === roundId && entry.ownerId === ownerId;
 
 export function generateAccessCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
@@ -15,9 +21,10 @@ export function generateAccessCode(): string {
 export const accessCodeStorage = {
   saveAccessCode: (roundId: string, code: string): void => {
     try {
+      const ownerId = getUserId();
       const stored = accessCodeStorage.getAllAccessCodes();
-      const updated = stored.filter(s => s.roundId !== roundId);
-      updated.push({ roundId, code, timestamp: Date.now() });
+      const updated = stored.filter(s => !isOwnCode(s, roundId, ownerId));
+      updated.push({ roundId, code, timestamp: Date.now(), ownerId });
       safeStorage.setItem(ACCESS_CODES_KEY, JSON.stringify(updated));
     } catch (error) {
       console.error('Error saving access code:', error);
@@ -27,7 +34,8 @@ export const accessCodeStorage = {
   getAccessCode: (roundId: string): string | null => {
     try {
       const stored = accessCodeStorage.getAllAccessCodes();
-      const found = stored.find(s => s.roundId === roundId);
+      const ownerId = getUserId();
+      const found = stored.find(s => isOwnCode(s, roundId, ownerId));
       return found ? found.code : null;
     } catch (error) {
       console.error('Error getting access code:', error);
@@ -41,8 +49,9 @@ export const accessCodeStorage = {
 
   removeAccessCode: (roundId: string): void => {
     try {
+      const ownerId = getUserId();
       const stored = accessCodeStorage.getAllAccessCodes();
-      const updated = stored.filter(s => s.roundId !== roundId);
+      const updated = stored.filter(s => !isOwnCode(s, roundId, ownerId));
       safeStorage.setItem(ACCESS_CODES_KEY, JSON.stringify(updated));
     } catch (error) {
       console.error('Error removing access code:', error);

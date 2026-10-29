@@ -67,5 +67,13 @@ test('linked players see Descartar instead of a creator-only Eliminar', () => {
   assert.match(stats, /dismissQuickRound/);
   assert.match(stats, /'Descartar'/);
   assert.match(list, /dismissQuickRound/);
-  assert.match(list, /Descartar partida/);
+  assert.match(list, /isLinkedGuest \? 'Descartar' : 'Eliminar'/);
+  // Una partida en curso no ofrece descartar: solo el creador ve la papelera.
+  assert.match(list, /\{!currentGroup && !isLinkedGuest && \(/);
+});
+
+test('stored access codes belong to the account that entered them', async () => {
+  const codes = await readFile(new URL('../src/utils/accessCode.ts', import.meta.url), 'utf8');
+  assert.match(codes, /updated\.push\(\{ roundId, code, timestamp: Date\.now\(\), ownerId \}\)/);
+  assert.match(codes, /stored\.find\(s => isOwnCode\(s, roundId, ownerId\)\)/);
 });

@@ -6,7 +6,8 @@ import { PGlite } from '@electric-sql/pglite';
 const fixture = await readFile(new URL('./helpers/verified-round-owners-fixture.sql', import.meta.url), 'utf8');
 const migration = await readFile(new URL('../supabase/migrations/20261028100000_verified_round_owners.sql', import.meta.url), 'utf8');
 const administration = await readFile(new URL('../supabase/migrations/20260912190000_app_round_management.sql', import.meta.url), 'utf8');
-const setupSQL = fixture + administration.slice(administration.indexOf('CREATE FUNCTION public.admin_change_app_round('), administration.indexOf('CREATE FUNCTION public.count_available_quick_rounds(')) + migration;
+const archivedDelete = await readFile(new URL('../supabase/migrations/20261029100000_delete_archived_quick_rounds.sql', import.meta.url), 'utf8');
+const setupSQL = fixture + administration.slice(administration.indexOf('CREATE FUNCTION public.admin_change_app_round('), administration.indexOf('CREATE FUNCTION public.count_available_quick_rounds(')) + migration + archivedDelete;
 const A='00000000-0000-4000-8000-000000000001', B='00000000-0000-4000-8000-000000000002', ADMIN='00000000-0000-4000-8000-000000000003';
 const G='10000000-0000-4000-8000-000000000001';
 const SECRET='a'.repeat(64), OTHER='b'.repeat(64);
@@ -37,6 +38,13 @@ test('account creator retains correction; stale members and direct requests cann
   await as(db,A); await db.query("UPDATE golf_rounds SET status='archived' WHERE id=$1",[r]);
   await assert.rejects(save(db,r,p),/cerrada/);
   await assert.rejects(db.query('DELETE FROM golf_rounds WHERE id=$1',[r]),/cerrada/);
+  // Archivada: el creador solo puede pasarla a borrada (lógico); nadie más, ni otros cambios.
+  await assert.rejects(db.query("UPDATE golf_rounds SET status='active' WHERE id=$1",[r]),/cerrada/);
+  await as(db,B);
+  await assert.rejects(db.query("UPDATE golf_rounds SET status='deleted' WHERE id=$1",[r]),/creador/);
+  await as(db,A); await db.query("UPDATE golf_rounds SET status='deleted' WHERE id=$1",[r]);
+  await db.exec('RESET ROLE');
+  assert.equal((await db.query('SELECT status FROM golf_rounds WHERE id=$1',[r])).rows[0].status,'deleted');
  } finally {await db.close();}
 });
 

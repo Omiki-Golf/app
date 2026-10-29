@@ -2983,9 +2983,10 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
     if (findError) throw findError;
 
     if (rounds && rounds.length > 0) {
+      // Borrado lógico, también para partidas archivadas: sigue contando en el cupo Express.
       const { error: deleteError } = await supabase
         .from('golf_rounds')
-        .delete()
+        .update({ status: 'deleted' })
         .eq('id', rounds[0].id);
 
       if (deleteError) throw deleteError;
