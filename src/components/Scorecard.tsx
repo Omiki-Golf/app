@@ -557,7 +557,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                       {playableHoles.map((h) => {
                         const holeScores = players.map((p) => {
                           const s = roundsMap.get(p.id)?.scores[h.hole_number];
-                          return s ? s.mode_points ?? 0 : null;
+                          return isEnteredScore(s) ? s?.mode_points ?? 0 : null;
                         });
                         const allPlayed = holeScores.every((v) => v !== null);
                         if (!allPlayed) {
@@ -568,12 +568,22 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                           );
                         }
                         if (gameMode === 'match' && players.length === 2) {
-                          const diff = (holeScores[0] ?? 0) - (holeScores[1] ?? 0);
-                          const label = diff > 0 ? `${players[0].name.slice(0, 3).toUpperCase()}` : diff < 0 ? `${players[1].name.slice(0, 3).toUpperCase()}` : 'AS';
+                          let firstWins = 0, secondWins = 0;
+                          const currentHoleIndex = playableHoles.findIndex(ph => ph.hole_number === h.hole_number);
+                          playableHoles.slice(0, currentHoleIndex + 1).forEach((ph) => {
+                            const first = roundsMap.get(players[0].id)?.scores[ph.hole_number];
+                            const second = roundsMap.get(players[1].id)?.scores[ph.hole_number];
+                            if (!isEnteredScore(first) || !isEnteredScore(second)) return;
+                            const holeDiff = (first?.mode_points ?? 0) - (second?.mode_points ?? 0);
+                            if (holeDiff > 0) firstWins++;
+                            else if (holeDiff < 0) secondWins++;
+                          });
+                          const diff = firstWins - secondWins;
+                          const label = diff === 0 ? 'AS' : `${firstWins}-${secondWins}`;
                           const color = diff > 0 ? 'bg-emerald-200 text-title' : diff < 0 ? 'bg-neutral text-ink-2' : 'bg-card-2 text-ink-3';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
-                              <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
+                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
                             </td>
                           );
                         }
@@ -587,18 +597,18 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                               roundsMap.get(p.id)?.scores[ph.hole_number]
                             );
                             const ps = scoresForHole.map((s) => {
-                              return s ? s.mode_points ?? 0 : null;
+                              return isEnteredScore(s) ? s?.mode_points ?? 0 : null;
                             });
                             if (ps.every((v) => v !== null)) {
                               t0Accum += ps[0] ?? 0;
                               t1Accum += ps[2] ?? 0;
                             }
                           });
-                          const label = `${t0Accum}-${t1Accum}`;
+                          const label = `${t0Accum.toLocaleString('es-ES')}-${t1Accum.toLocaleString('es-ES')}`;
                           const color = t0Accum > t1Accum ? 'bg-emerald-200 text-title' : t0Accum < t1Accum ? 'bg-neutral text-ink-2' : 'bg-card-2 text-ink-3';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
-                              <span className={`text-[10px] font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
+                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
                             </td>
                           );
                         }

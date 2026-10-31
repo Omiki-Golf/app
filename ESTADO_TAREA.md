@@ -1,5 +1,12 @@
 # Estado para continuar — 30/09/2026
 
+## Actualización de traspaso — 31/10/2026
+
+- Estado actual y pruebas para Antigravity en `ANTIGRAVITY_HANDOFF.md`.
+- Antes de esta publicación, local, GitHub y VPS coincidían en `97847bc`. Supabase comprobado: 84 versiones remotas y 0 migraciones nuevas pendientes. Las referencias inferiores a migraciones pendientes son históricas.
+- Correcciones preparadas: marcador Match acumulado (`AS`, `0-1`, `AS`), decimales compactos en Parejas, colores de jugadores más distintos y nombre del ganador legible en ambos temas.
+- El usuario ha solicitado commit y publicación mediante el flujo npm habitual. Confirmar el resultado final del despliegue y el commit remoto; este documento se prepara antes de ejecutarlo.
+
 ## Permisos de puntuación — preparación local, 27/10/2026
 
 - Código y migración `20261028100000_verified_round_owners.sql` preparados; no aplicada ni publicado el código. Detalles y secuencia de publicación en `SCORE_PERMISSIONS_REVIEW.md`.

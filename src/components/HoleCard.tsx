@@ -23,10 +23,11 @@ interface HoleCardProps {
 }
 
 const markerColors = [
-  // Tonos con contraste suficiente para las iniciales en blanco (≥ 5:1).
-  'bg-blue-600 border-blue-800',
-  'bg-orange-700 border-orange-900',
-  'bg-violet-600 border-violet-800',
+  // Colores separados por tono y luminosidad; cada fondo define su tinta
+  // para mantener legibles las iniciales en los temas claro y oscuro.
+  'bg-blue-600 border-blue-300 text-white',
+  'bg-orange-500 border-orange-200 text-slate-950',
+  'bg-yellow-300 border-yellow-100 text-slate-950',
 ] as const;
 
 const playerInitials = (name: string) => name
@@ -42,7 +43,7 @@ function CompactPlayer({ name, colorIndex }: { name: string; colorIndex: number 
   const safeIndex = Math.max(0, colorIndex) % markerColors.length;
   return (
     <span
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-black leading-none text-white shadow-sm ${markerColors[safeIndex]}`}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-black leading-none shadow-sm ${markerColors[safeIndex]}`}
       title={name}
       aria-label={name}
     >

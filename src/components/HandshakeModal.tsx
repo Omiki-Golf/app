@@ -35,7 +35,7 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
 
         <div className="bg-accent-soft border border-accent-ring rounded-xl p-4 mb-5">
           <p className="text-xs text-accent-ink font-medium mb-1">Ganador</p>
-          <p className="text-xl font-extrabold text-emerald-950 mb-2">{winnerName}</p>
+          <p className="text-xl font-extrabold text-ink mb-2">{winnerName}</p>
           <span className="inline-block bg-accent text-on-accent text-xs font-bold px-3 py-1 rounded-full">
             Resultado: {marginText}
           </span>
