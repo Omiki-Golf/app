@@ -1099,7 +1099,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
       {showAddPlayerModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-card rounded-lg shadow-card max-w-md w-full p-6">
+          <div className="bg-card rounded-lg shadow-card max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="bg-blue-100 p-3 rounded-full">
                 <UserPlus className="text-blue-600" size={24} />
@@ -1114,6 +1114,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                 Selecciona un jugador
               </label>
               <SelectMenu
+                inline
                 value={selectedPlayerId}
                 onChange={(value) => { setSelectedPlayerId(value); setNewPlayerIsGuest(!!availablePlayers.find(player => player.id === value)?.is_guest); }}
                 ariaLabel="Selecciona un jugador"
