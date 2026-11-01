@@ -181,22 +181,33 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     margin: string;
   } | null>(null);
   const [handshakeAcknowledged, setHandshakeAcknowledged] = useState(false);
+  const wasDecidedBeforeLastHole = useRef(isDecidedBeforeLastHole(decidedResult));
 
   useEffect(() => {
     setHandshakeAcknowledged(false);
     setHandshakeData(null);
+    wasDecidedBeforeLastHole.current = isDecidedBeforeLastHole(decidedResult);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundId, gameMode]);
 
   useEffect(() => {
-    if (handshakeAcknowledged) return;
-    if (decidedResult && isDecidedBeforeLastHole(decidedResult) && !handshakeData?.isOpen) {
-      setHandshakeData({
-        isOpen: true,
-        winner: decidedResult.winner_label,
-        margin: decidedResult.display_text,
-      });
+    const isNowDecided = isDecidedBeforeLastHole(decidedResult);
+    const justDecided = isNowDecided && !wasDecidedBeforeLastHole.current;
+    wasDecidedBeforeLastHole.current = isNowDecided;
+
+    if (isRoundFinished || allScoresComplete) {
+      if (handshakeData?.isOpen) {
+        setHandshakeData(null);
+      }
+      return;
     }
-  }, [decidedResult, handshakeAcknowledged, handshakeData?.isOpen]);
+    if (handshakeAcknowledged || !justDecided || !decidedResult) return;
+    setHandshakeData({
+      isOpen: true,
+      winner: decidedResult.winner_label,
+      margin: decidedResult.display_text,
+    });
+  }, [decidedResult, handshakeAcknowledged, handshakeData?.isOpen, isRoundFinished, allScoresComplete]);
 
   const [finalResult, setFinalResult] = useState<FinalResult | null>(null);
   const wereScoresComplete = useRef(allScoresComplete);
