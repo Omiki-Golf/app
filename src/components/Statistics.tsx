@@ -562,7 +562,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
               className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
                 activeTab === 'player'
                   ? 'bg-accent text-on-accent'
-                  : 'bg-card-2 text-ink-2 hover:bg-gray-200'
+                  : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
               <User size={20} />
@@ -574,7 +574,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
               className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
                 activeTab === 'group'
                   ? 'bg-accent text-on-accent'
-                  : 'bg-card-2 text-ink-2 hover:bg-gray-200'
+                  : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
               <Users size={20} />
@@ -586,7 +586,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
               className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
                 activeTab === 'course'
                   ? 'bg-accent text-on-accent'
-                  : 'bg-card-2 text-ink-2 hover:bg-gray-200'
+                  : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
               <MapPin size={20} />

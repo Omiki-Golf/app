@@ -337,9 +337,9 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
               <div className="border border-line rounded-xl p-4">
                 <div className="flex items-start gap-2 mb-3">
                   <p className="text-sm font-medium text-ink flex-1">
-                    Quieres incluir en las partidas la Gamificacion Hoyo 19?
+                    ¿Quieres incluir en las partidas la Gamificación No paso de Rojas?
                   </p>
-                  <Tooltip text="El Hoyo 19 incluye gamificacion DIVEND (no paso de rojas, cervezas, etc.). Se activa por defecto pero puedes desactivarlo para grupos que no beben alcohol." />
+                  <Tooltip text="Penalización clásica del golf: si tu golpe de salida no logra superar las barras rojas (las barras de salida más adelantadas), pagas una ronda de cervezas a tu partida en el hoyo 19. Si no pasas de rojas 2 veces la pagas al grupo 😱" />
                 </div>
                 <div className="flex gap-2">
                   <button

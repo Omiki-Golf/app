@@ -405,33 +405,6 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           </div>
         )}
 
-        {/* Código de Grupo */}
-        {currentGroup && !hasLimitedAccess && !isArchivedGroup && (
-          <div className="bg-card rounded-lg shadow-card p-6">
-            <h3 className="text-lg font-semibold text-ink mb-3">{t('roundSetup.groupCode')}</h3>
-            <p className="text-sm text-ink-3 mb-3">
-              {t('roundSetup.shareCode')}
-            </p>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 bg-accent-soft border-2 border-green-300 rounded-lg px-4 py-3 text-center">
-                <span className="text-2xl font-mono font-bold text-accent-ink tracking-wider">
-                  {currentGroup.group_code}
-                </span>
-              </div>
-              <button
-                onClick={handleCopyGroupCode}
-                className="bg-accent hover:bg-accent-hover text-on-accent p-3 rounded-lg transition-colors"
-                title={t('groups.copyCode')}
-              >
-                {codeCopied ? <Check size={24} /> : <Copy size={24} />}
-              </button>
-            </div>
-            {currentGroup.name && (
-              <p className="text-sm text-ink-3 mt-2">{t('roundSetup.group', { name: currentGroup.name })}</p>
-            )}
-          </div>
-        )}
-
         <div className={`grid grid-cols-1 ${(isGroupCreator && !hasLimitedAccess && !isArchivedGroup) ? 'md:grid-cols-2 md:items-stretch' : ''} gap-4`}>
           {/* Nueva Partida */}
           {isGroupCreator && !hasLimitedAccess && !isArchivedGroup && (
@@ -673,6 +646,33 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
               Ver Estadísticas
               <ChevronRight size={20} />
             </button>
+          </div>
+        )}
+
+        {/* Código de Grupo */}
+        {currentGroup && !hasLimitedAccess && !isArchivedGroup && (
+          <div className="bg-card rounded-lg shadow-card p-6">
+            <h3 className="text-lg font-semibold text-ink mb-3">{t('roundSetup.groupCode')}</h3>
+            <p className="text-sm text-ink-3 mb-3">
+              {t('roundSetup.shareCode')}
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-accent-soft border-2 border-green-300 rounded-lg px-4 py-3 text-center">
+                <span className="text-2xl font-mono font-bold text-accent-ink tracking-wider">
+                  {currentGroup.group_code}
+                </span>
+              </div>
+              <button
+                onClick={handleCopyGroupCode}
+                className="bg-accent hover:bg-accent-hover text-on-accent p-3 rounded-lg transition-colors"
+                title={t('groups.copyCode')}
+              >
+                {codeCopied ? <Check size={24} /> : <Copy size={24} />}
+              </button>
+            </div>
+            {currentGroup.name && (
+              <p className="text-sm text-ink-3 mt-2">{t('roundSetup.group', { name: currentGroup.name })}</p>
+            )}
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Crown, Search, Trash2, UserPlus, Users } from 'lucide-react';
+import { ChevronDown, ChevronUp, Crown, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { golfService } from '../services/golfService';
 import { userService } from '../services/userService';
 import type { GroupMember, UserProfile } from '../types';
 import { WriteButton, useReadOnly } from '../context/ReadOnlyContext';
@@ -14,12 +15,13 @@ const handicap9 = (handicap18: number) => {
 
 const middleEllipsis = (value: string) => value.length <= 10 ? value : `${value.slice(0, 4)}…${value.slice(-5)}`;
 
-export function GroupMemberList({ groupId, ownerId, archived = false }: { groupId: string; ownerId?: string; archived?: boolean }) {
+export function GroupMemberList({ groupId, ownerId, archived = false, collapsible = false }: { groupId: string; ownerId?: string; archived?: boolean; collapsible?: boolean }) {
   const { user } = useAuth();
   const userId = user?.id;
   const identity = `${userId ?? ''}:${groupId}`;
   const readOnly = useReadOnly();
   const busyRef = useRef(false);
+  const [expanded, setExpanded] = useState(!collapsible);
   const [state, setState] = useState<{ identity: string; members: GroupMember[] } | null>(null);
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
@@ -41,7 +43,13 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
     let active = true;
     const load = async () => {
       try {
-        const [members, invitations] = await Promise.all([userService.getGroupMembers(groupId), userService.getGroupInvitationStatuses(groupId)]);
+        const [rawMembers, invitations, gamePlayers] = await Promise.all([
+          userService.getGroupMembers(groupId),
+          userService.getGroupInvitationStatuses(groupId),
+          golfService.getAllPlayers(groupId).catch(() => []),
+        ]);
+        const guestPlayerIds = new Set(gamePlayers.filter(player => player.is_guest).map(player => player.id));
+        const members = rawMembers.filter(member => member.user_id || !member.player_id || !guestPlayerIds.has(member.player_id));
         if (active) {
           setState({ identity, members });
           setInvitationStatuses(Object.fromEntries(invitations.map(invitation => [invitation.userId, invitation.status])));
@@ -146,10 +154,38 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
 
   if (!userId) return null;
   return <section className="space-y-3 mb-6 text-ink">
-    <div className="flex flex-wrap items-center justify-between gap-2 bg-accent-soft p-3 rounded-lg">
-      <h2 className="flex items-center gap-2 text-lg font-semibold text-title"><Users size={20} />Jugadores{members && ` (${rosterCount})`}</h2>
-      <div className="flex gap-2">{!archived && canManage && <WriteButton className="text-sm bg-accent text-on-accent rounded-lg px-3 py-1.5" onClick={() => setShowAdd(value => !value)}><UserPlus size={16} className="inline mr-1" />Añadir</WriteButton>}<button className="text-sm border border-line rounded-lg px-3 py-1.5" onClick={() => setRefresh(value => value + 1)}>Actualizar</button></div>
-    </div>
+    {collapsible ? (
+      <button
+        type="button"
+        onClick={() => setExpanded(value => !value)}
+        aria-expanded={expanded}
+        className="flex items-center justify-between w-full p-4 bg-accent-soft hover:bg-accent-soft rounded-lg transition-colors text-left"
+      >
+        <div className="flex items-center">
+          <Users className="w-6 h-6 mr-2 text-accent-ink shrink-0" />
+          <h2 className="text-2xl font-semibold text-title">Jugadores</h2>
+          {members && (
+            <span className="ml-3 text-sm text-accent-ink font-medium">
+              ({rosterCount})
+            </span>
+          )}
+        </div>
+        {expanded ? (
+          <ChevronUp className="w-6 h-6 text-accent-ink shrink-0" />
+        ) : (
+          <ChevronDown className="w-6 h-6 text-accent-ink shrink-0" />
+        )}
+      </button>
+    ) : (
+      <div className="flex flex-wrap items-center justify-between gap-2 bg-accent-soft p-3 rounded-lg">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-title"><Users size={20} />Jugadores{members && ` (${rosterCount})`}</h2>
+        <div className="flex gap-2">{!archived && canManage && <WriteButton className="text-sm bg-accent text-on-accent rounded-lg px-3 py-1.5" onClick={() => setShowAdd(value => !value)}><UserPlus size={16} className="inline mr-1" />Añadir</WriteButton>}<button className="text-sm border border-line rounded-lg px-3 py-1.5" onClick={() => setRefresh(value => value + 1)}>Actualizar</button></div>
+      </div>
+    )}
+    {expanded && <>
+    {collapsible && (
+      <div className="flex justify-end gap-2">{!archived && canManage && <WriteButton className="text-sm bg-accent text-on-accent rounded-lg px-3 py-1.5" onClick={() => setShowAdd(value => !value)}><UserPlus size={16} className="inline mr-1" />Añadir</WriteButton>}<button className="text-sm border border-line rounded-lg px-3 py-1.5" onClick={() => setRefresh(value => value + 1)}>Actualizar</button></div>
+    )}
     {showAdd && canManage && <div className="border border-line rounded-xl p-3 space-y-3">
       <div className="relative"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-4" /><input value={searchName} onChange={event => setSearchName(event.target.value)} placeholder="Nick o nombre del jugador..." className="w-full pl-9 pr-3 py-2 border border-line rounded-lg bg-card" /></div>
       {searchResults.map(profile => { const invitationStatus = invitationStatuses[profile.user_id]; const alreadyMember = members?.some(member => member.user_id === profile.user_id); return <button key={profile.user_id} disabled={busy || alreadyMember || Boolean(invitationStatus)} onClick={() => void inviteRegistered(profile)} className="w-full flex items-center gap-2 p-2 rounded-lg bg-card-2 disabled:opacity-70 text-left"><img src={normalizeAvatarUrl(profile.avatar_url)} alt="" className="w-8 h-8 rounded-full" /><span className="min-w-0 flex-1"><span className="block font-medium truncate">{profile.nick}</span><span className="block text-xs text-ink-3">HCP 18: {(profile.exact_handicap ?? 0).toFixed(1)}</span></span><span className="shrink-0 text-xs font-medium">{alreadyMember ? 'Miembro' : invitationStatus === 'pending' ? 'Invitación pendiente' : invitationStatus === 'accepted' ? 'Invitación aceptada' : invitationStatus === 'rejected' ? 'Invitación rechazada' : <UserPlus size={17} />}</span></button>; })}
@@ -172,6 +208,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false }: { groupI
       </article>)}
     </section>)}
     {members?.length === 0 && !loadError && <p className="text-ink-3">No hay jugadores en el grupo.</p>}
+    </>}
     {edit?.identity === identity && <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"><div role="dialog" aria-modal="true" aria-labelledby="member-edit-title" className="bg-card border border-line rounded-2xl p-5 max-w-lg w-full space-y-4"><h3 id="member-edit-title" className="font-semibold text-lg">{edit.action === 'handicap' ? 'Editar hándicap del grupo' : 'Eliminar del grupo'}</h3><p>{edit.member.profile?.nick || 'Jugador'}</p>{edit.action === 'handicap' ? <label className="block">Hándicap para 18 hoyos<input type="number" min="0" max="54" step="any" value={handicap} disabled={confirm || busy} onChange={event => setHandicap(event.target.value)} className="block w-full bg-card border border-line rounded-xl p-3 mt-2" /></label> : <p>Se retirará este jugador del grupo. Sus resultados anteriores se conservan.</p>}{confirm && <p className="font-semibold">{edit.action === 'handicap' ? `Confirmar HCP 18: ${handicap}.` : 'Confirma la retirada de este jugador.'}</p>}{error && <p role="alert" className="text-red-500">{error}</p>}<div className="flex gap-3"><button disabled={busy} className="border border-line rounded-xl px-4 py-2" onClick={() => setEdit(null)}>Cancelar</button><WriteButton disabled={busy || (edit.action === 'handicap' && !validHandicap)} className="bg-accent text-on-accent rounded-xl px-4 py-2 disabled:opacity-50" onClick={() => confirm ? void apply() : setConfirm(true)}>{busy ? 'Guardando…' : confirm ? 'Confirmar' : 'Revisar cambio'}</WriteButton></div></div></div>}
   </section>;
 }

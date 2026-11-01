@@ -65,7 +65,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
         golfService.getDailyRankings(),
         golfService.getHandicapHistory(),
       ]);
-      setPlayers(playersData.filter(player => !player.auth_user_id));
+      setPlayers(playersData.filter(player => !player.auth_user_id && !player.is_guest));
       setDailyRankings(rankingsData);
       setHandicapHistory(historyData);
     } catch (error) {
@@ -571,7 +571,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
               </div>
             )}
 
-            {groupId && <GroupMemberList key={groupId} groupId={groupId} />}
+            {groupId && <GroupMemberList key={groupId} groupId={groupId} collapsible />}
             <div>
               <button
                 onClick={() => setShowPlayers(!showPlayers)}
