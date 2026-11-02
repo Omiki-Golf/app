@@ -681,6 +681,38 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     </div>
   );
 
+  // Match y Parejas: VS y diferencia centrados encima; las dos fichas compactas en la misma fila.
+  type VersusSide = { label: string; name: string; points: number };
+  const renderVersusCards = (vsClass: string, winner: VersusSide, loser: VersusSide, difference: { text: string; label: string }) => (
+    <>
+      <div className="mb-3 flex justify-center">
+        <div className="flex items-center gap-2 rounded-xl bg-white/10 py-1 pl-1 pr-3">
+          <span className={`rounded-lg px-3 py-1 text-lg font-black text-white shadow-lg ${vsClass}`}>VS</span>
+          <span className="text-lg font-bold text-white">{difference.text}</span>
+          <span className="text-xs text-white/60">{difference.label}</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:gap-4 text-center">
+        <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl border-2 border-yellow-300 p-3 shadow-xl">
+          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-yellow-900">
+            <Trophy size={12} /> {winner.label}
+          </span>
+          <p className="mt-1 break-words text-base font-black leading-tight text-yellow-900">{winner.name}</p>
+          <p className="mt-1 text-3xl font-black leading-none text-yellow-900">{winner.points}</p>
+          <p className="mt-1 text-xs font-semibold text-yellow-800">puntos</p>
+        </div>
+        <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl border-2 border-slate-500 p-3 shadow-xl">
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-white">
+            <TrendingDown size={12} /> {loser.label}
+          </span>
+          <p className="mt-1 break-words text-base font-black leading-tight text-white">{loser.name}</p>
+          <p className="mt-1 text-3xl font-black leading-none text-white">{loser.points}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-300">puntos</p>
+        </div>
+      </div>
+    </>
+  );
+
   // La pantalla y la imagen comparten las mismas tablas y premios.
   const renderStatisticsDetails = (exporting = false) => (
     <>
@@ -1077,52 +1109,21 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-8 shadow-2xl border-2 border-red-500/30 relative overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-3 md:p-6 shadow-2xl border-2 border-red-500/30 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-amber-500 to-red-500"></div>
 
-                <div className="flex items-center justify-center gap-3 mb-6">
+                <div className="flex items-center justify-center gap-3 mb-3">
                   <Swords size={28} className="text-red-400" />
                   <h2 className="text-2xl md:text-3xl font-black text-white tracking-wider">MATCH PLAY</h2>
                   <Swords size={28} className="text-red-400" />
                 </div>
 
-                <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-                  <div className="flex-1 text-center">
-                    <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                        Ganador
-                      </div>
-                      <Trophy size={32} className="mx-auto text-yellow-900 mb-2" />
-                      <p className="text-yellow-900 font-black text-2xl mb-1">{matchResult.winner?.name || '—'}</p>
-                      <p className="text-5xl font-black text-yellow-900">{matchResult.winnerPoints}</p>
-                      <p className="text-yellow-800 text-sm font-semibold mt-1">puntos</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="bg-red-600 text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg">
-                      VS
-                    </div>
-                    <div className="mt-3 bg-white/10 rounded-lg px-4 py-2">
-                      <p className="text-white font-bold text-lg">
-                        {matchResult.displayText || `+${matchResult.margin}`}
-                      </p>
-                      <p className="text-white/60 text-xs">diferencia</p>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 text-center">
-                    <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl p-6 shadow-xl border-4 border-slate-500 relative">
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-slate-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                        Perdedor
-                      </div>
-                      <TrendingDown size={32} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-white font-black text-2xl mb-1">{matchResult.loser?.name || '—'}</p>
-                      <p className="text-5xl font-black text-white">{matchResult.loserPoints}</p>
-                      <p className="text-slate-300 text-sm font-semibold mt-1">puntos</p>
-                    </div>
-                  </div>
-                </div>
+                {renderVersusCards(
+                  'bg-red-600',
+                  { label: 'Ganador', name: matchResult.winner?.name || '—', points: matchResult.winnerPoints },
+                  { label: 'Perdedor', name: matchResult.loser?.name || '—', points: matchResult.loserPoints },
+                  { text: matchResult.displayText || `+${matchResult.margin}`, label: 'diferencia' },
+                )}
               </div>
             </div>
           )}
@@ -1133,60 +1134,21 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
               }`}
             >
-              <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-8 shadow-2xl border-2 border-blue-500/30 relative overflow-hidden">
+              <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 rounded-3xl p-3 md:p-6 shadow-2xl border-2 border-blue-500/30 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-cyan-500 to-blue-500"></div>
 
-                <div className="flex items-center justify-center gap-3 mb-6">
+                <div className="flex items-center justify-center gap-3 mb-3">
                   <Users size={28} className="text-blue-400" />
                   <h2 className="text-2xl md:text-3xl font-black text-white tracking-wider">PAREJAS</h2>
                   <Users size={28} className="text-blue-400" />
                 </div>
 
-                <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8">
-                  <div className="flex-1 text-center">
-                    <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl p-6 shadow-xl border-4 border-yellow-300 relative">
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-yellow-300 text-yellow-900 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                        {teamResult.isTie ? 'Empate' : 'Ganadora'}
-                      </div>
-                      <Trophy size={32} className="mx-auto text-yellow-900 mb-2" />
-                      <p className="text-yellow-900 font-black text-lg">
-                        {teamResult.isTie
-                          ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}`
-                          : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
-                      </p>
-                      <p className="text-5xl font-black text-yellow-900 mt-2">{teamResult.winningTeam?.totalPoints ?? 0}</p>
-                      <p className="text-yellow-800 text-sm font-semibold mt-1">puntos</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="bg-blue-600 text-white font-black text-2xl px-6 py-3 rounded-xl shadow-lg">
-                      VS
-                    </div>
-                    <div className="mt-3 bg-white/10 rounded-lg px-4 py-2">
-                      <p className="text-white font-bold text-lg">
-                        {teamResult.displayText || (teamResult.isTie ? '0' : `+${teamResult.margin}`)}
-                      </p>
-                      <p className="text-white/60 text-xs">{teamResult.isTie ? 'empate' : 'diferencia'}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 text-center">
-                    <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl p-6 shadow-xl border-4 border-slate-500 relative">
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-slate-500 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                        {teamResult.isTie ? 'Empate' : 'Perdedora'}
-                      </div>
-                      <TrendingDown size={32} className="mx-auto text-slate-300 mb-2" />
-                      <p className="text-white font-black text-lg">
-                        {teamResult.isTie
-                          ? `${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
-                          : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
-                      </p>
-                      <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? 0}</p>
-                      <p className="text-slate-300 text-sm font-semibold mt-1">puntos</p>
-                    </div>
-                  </div>
-                </div>
+                {renderVersusCards(
+                  'bg-blue-600',
+                  { label: teamResult.isTie ? 'Empate' : 'Ganadora', name: teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.winningTeam?.totalPoints ?? 0 },
+                  { label: teamResult.isTie ? 'Empate' : 'Perdedora', name: teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.losingTeam?.totalPoints ?? 0 },
+                  { text: teamResult.displayText || (teamResult.isTie ? '0' : `+${teamResult.margin}`), label: teamResult.isTie ? 'empate' : 'diferencia' },
+                )}
               </div>
             </div>
           )}
