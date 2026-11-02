@@ -45,8 +45,9 @@ import type { User } from '@supabase/supabase-js';
 const Statistics = lazy(() => import('./components/Statistics').then(module => ({ default: module.Statistics })));
 const QuickPlayStatistics = lazy(() => import('./components/QuickPlayStatistics').then(module => ({ default: module.QuickPlayStatistics })));
 const CareerStatistics = lazy(() => import('./components/CareerStatistics').then(module => ({ default: module.CareerStatistics })));
+const MyRoundStatistics = lazy(() => import('./components/MyRoundStatistics').then(module => ({ default: module.MyRoundStatistics })));
 
-type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics';
+type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics' | 'my-round-statistics';
 
 interface RoundState {
   round: GolfRound | null;
@@ -1029,7 +1030,7 @@ function App() {
   );
 
   const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
-    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points';
+    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-round-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points';
   const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
     {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
@@ -1164,7 +1165,7 @@ function App() {
               await logout();
               setCurrentView('main');
             }}
-            onShowRoundStats={() => openFromProfile(currentGroup ? 'statistics' : 'quickplay-statistics')}
+            onShowRoundStats={() => openFromProfile(currentGroup ? 'statistics' : 'my-round-statistics')}
             onShowCareerStats={() => setCurrentView('career-statistics')}
             onShowPlans={() => { setPlansContext('default'); openFromProfile('plans'); }}
             onShowProShop={() => setCurrentView('pro-shop')}
@@ -1173,6 +1174,21 @@ function App() {
             onShowSettings={() => setCurrentView('profile-details')}
             messagesButton={inlineMessagesButton}
           />
+        </div>
+      </>
+    );
+  }
+
+  if (currentView === 'my-round-statistics' && user) {
+    return withMessages(
+      <>
+        <IncognitoWarning />
+        <div className={isIncognito ? 'pt-10' : ''}>
+          <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><MyRoundStatistics
+            account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
+            onBack={() => backFromProfileSection('profile')}
+            messagesButton={inlineMessagesButton}
+          /></Suspense>
         </div>
       </>
     );
