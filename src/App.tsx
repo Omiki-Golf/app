@@ -147,6 +147,8 @@ function App() {
   const [sharedExpressStats, setSharedExpressStats] = useState<QuickPlayCompletedRound | null>(null);
   const [statisticsRoundId, setStatisticsRoundId] = useState<string | null>(null);
   const [statisticsReturnView, setStatisticsReturnView] = useState<ViewType | null>(null);
+  // Partida elegida en Mis partidas al abrir sus estadísticas: se recupera al volver.
+  const [myRoundsSelectedId, setMyRoundsSelectedId] = useState<string | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
 
@@ -1186,7 +1188,17 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><MyRoundStatistics
             account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
-            onBack={() => backFromProfileSection('profile')}
+            initialRoundId={myRoundsSelectedId}
+            onBack={() => {
+              setMyRoundsSelectedId(null);
+              backFromProfileSection('profile');
+            }}
+            onViewRoundStatistics={(roundId) => {
+              setMyRoundsSelectedId(roundId);
+              setStatisticsRoundId(roundId);
+              setStatisticsReturnView('my-round-statistics');
+              setCurrentView('quickplay-statistics');
+            }}
             messagesButton={inlineMessagesButton}
           /></Suspense>
         </div>

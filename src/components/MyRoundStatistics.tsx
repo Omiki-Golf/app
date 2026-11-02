@@ -3,11 +3,11 @@ import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { ThemeToggle } from './ThemeToggle';
-import { Activity, Award, Calendar, ChevronDown, Flame, Target, TrendingDown, Trophy } from 'lucide-react';
+import { Activity, Award, BarChart3, Calendar, ChevronDown, Flame, Target, TrendingDown, Trophy } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { findAccountPlayer, type CareerAccount } from '../utils/careerStats';
 import { computeMyRoundStats, type MyRoundDistribution, type MyRoundStats } from '../utils/myRoundStats';
-import { scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
+import { scoreResultBar, scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
 import type { GolfCourse, QuickPlayCompletedRound } from '../types';
 
 // Mis partidas: estadísticas de una partida concreta centradas en el jugador de la cuenta.
@@ -15,6 +15,10 @@ import type { GolfCourse, QuickPlayCompletedRound } from '../types';
 interface MyRoundStatisticsProps {
   account: CareerAccount;
   onBack: () => void;
+  /** Abre las estadísticas de la partida para todos los jugadores (como desde Crear/ver partida). */
+  onViewRoundStatistics?: (roundId: string) => void;
+  /** Partida que se mostraba antes de abrir sus estadísticas, para volver a ella. */
+  initialRoundId?: string | null;
   messagesButton?: React.ReactNode;
 }
 
@@ -45,23 +49,17 @@ const formatRoundLabel = (round: AvailableRound) => `${new Date(round.created_at
 
 const toParClass = (value: number) => value === 0 ? 'statistics-table-text' : value < 0 ? 'statistics-table-positive' : 'statistics-table-negative';
 
-const distributionItems: Array<{ key: keyof MyRoundDistribution; label: string; chip: string }> = [
-  { key: 'eagle', label: 'Eagles+', chip: scoreResultChip.eagle },
-  { key: 'birdie', label: 'Birdies', chip: scoreResultChip.birdie },
-  { key: 'par', label: 'Pares', chip: scoreResultChip.par },
-  { key: 'bogey', label: 'Bogeys', chip: scoreResultChip.bogey },
-  { key: 'double', label: 'Dobles', chip: scoreResultChip.double },
-  { key: 'triplePlus', label: 'Triples+', chip: 'bg-slate-900 text-white ring-red-500' },
+// Mismas barras que «Resultados por hoyo (neto)» de Mis estadísticas, con dobles y triples+ por separado.
+const distributionItems: Array<{ key: keyof MyRoundDistribution; label: string; color: string }> = [
+  { key: 'eagle', label: scoreResultLabel.eagle, color: scoreResultBar.eagle },
+  { key: 'birdie', label: scoreResultLabel.birdie, color: scoreResultBar.birdie },
+  { key: 'par', label: scoreResultLabel.par, color: scoreResultBar.par },
+  { key: 'bogey', label: scoreResultLabel.bogey, color: scoreResultBar.bogey },
+  { key: 'double', label: 'Doble bogey', color: scoreResultBar.double },
+  { key: 'triplePlus', label: 'Triple o peor', color: 'bg-black ring-1 ring-inset ring-red-500' },
 ];
 
-const pointsClass = (points: number) =>
-  points >= 4 ? 'statistics-table-positive' :
-  points === 3 ? 'statistics-table-accent' :
-  points === 2 ? 'statistics-table-text' :
-  points === 1 ? 'statistics-table-warning' :
-  'statistics-table-negative';
-
-export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, onBack, messagesButton }) => {
+export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, onBack, onViewRoundStatistics, initialRoundId = null, messagesButton }) => {
   const [loading, setLoading] = useState(true);
   const [availableRounds, setAvailableRounds] = useState<AvailableRound[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -113,8 +111,9 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
         const rounds = await golfService.getAvailableRoundsForStats();
         setAvailableRounds(rounds);
         if (rounds.length > 0) {
-          setSelectedRoundId(rounds[0].id);
-          await loadRound(rounds[0].id);
+          const firstRoundId = initialRoundId && rounds.some((round) => round.id === initialRoundId) ? initialRoundId : rounds[0].id;
+          setSelectedRoundId(firstRoundId);
+          await loadRound(firstRoundId);
         } else {
           setLoading(false);
         }
@@ -125,7 +124,7 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
       }
     };
     void init();
-  }, [loadRound]);
+  }, [loadRound, initialRoundId]);
 
   const handleSelectRound = (roundId: string) => {
     setSelectedRoundId(roundId);
@@ -213,17 +212,18 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                 </p>
               </div>
               <dl className="grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-lg bg-white/35 p-2">
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide">Mis puntos</dt>
-                  <dd className="mt-1 text-3xl font-black leading-none">{myStats.points}</dd>
+                {/* El valor va a la base de la ficha: queda alineado aunque la etiqueta ocupe una o dos líneas. */}
+                <div className="flex flex-col rounded-lg bg-white/35 p-2">
+                  <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide">Mis puntos</dt>
+                  <dd className="mt-auto pt-1 text-3xl font-black leading-none">{myStats.points}</dd>
                 </div>
-                <div className="rounded-lg bg-white/35 p-2">
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide">HCP de juego</dt>
-                  <dd className="mt-1 text-3xl font-black leading-none">{myStats.handicap}</dd>
+                <div className="flex flex-col rounded-lg bg-white/35 p-2">
+                  <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide">HCP de juego</dt>
+                  <dd className="mt-auto pt-1 text-3xl font-black leading-none">{myStats.handicap}</dd>
                 </div>
-                <div className="rounded-lg bg-white/25 p-2">
-                  <dt className="text-[11px] font-semibold uppercase tracking-wide">Vs Par Personal</dt>
-                  <dd className={`mt-1 text-3xl font-black leading-none ${myStats.toPar.value === 0 ? 'text-yellow-950' : myStats.toPar.value < 0 ? 'text-green-800' : 'text-red-700'}`}>
+                <div className="flex flex-col rounded-lg bg-white/25 p-2">
+                  <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide">Vs Par Personal</dt>
+                  <dd className={`mt-auto pt-1 text-3xl font-black leading-none ${myStats.toPar.value === 0 ? 'text-yellow-950' : myStats.toPar.value < 0 ? 'text-green-800' : 'text-red-700'}`}>
                     {myStats.toPar.display}
                   </dd>
                 </div>
@@ -232,7 +232,7 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
 
             {/* B. MIS HIGHLIGHTS */}
             <section aria-labelledby="my-highlights" className="statistics-panel rounded-2xl p-3 md:p-5">
-              <h2 id="my-highlights" className="statistics-table-title mb-3 text-xl font-black">Mis highlights</h2>
+              <h2 id="my-highlights" className="statistics-table-title mb-3 text-xl font-black">Mis Momentazos</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 p-3 text-white shadow-xl">
                   <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/80"><Target size={14} aria-hidden="true" /> Mejor hoyo</p>
@@ -277,46 +277,37 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
             {/* C. MIS TABLAS */}
             <section aria-labelledby="my-to-par" className="statistics-panel rounded-2xl p-3 md:p-5">
               <h2 id="my-to-par" className="statistics-table-title mb-3 text-xl font-black">Detalle contra par</h2>
-              <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                {distributionItems.map((item) => (
-                  <li key={item.key} className="statistics-table-line flex flex-col items-center gap-1 rounded-xl border p-2">
-                    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-base font-black ring-1 ${item.chip}`}>
-                      {myStats.distribution[item.key]}
-                    </span>
-                    <span className="statistics-table-text text-xs font-semibold">{item.label}</span>
-                  </li>
-                ))}
+              <ul className="space-y-2">
+                {distributionItems.map((item) => {
+                  const value = myStats.distribution[item.key];
+                  const maxBar = Math.max(1, ...distributionItems.map((entry) => myStats.distribution[entry.key]));
+                  return (
+                    <li key={item.key} className="grid grid-cols-[6.5rem_1fr_2.5rem] items-center gap-2 text-sm">
+                      <span className="statistics-table-text">{item.label}</span>
+                      <span className="h-2.5 overflow-hidden rounded-full bg-card-2">
+                        <span className={`block h-full rounded-full ${item.color}`} style={{ width: `${(value / maxBar) * 100}%` }} />
+                      </span>
+                      <span className="statistics-table-text text-right font-semibold">{value}</span>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
 
-            <section aria-labelledby="my-points" className="statistics-panel rounded-2xl p-3 md:p-5">
-              <div className="mb-3 flex items-baseline justify-between gap-2">
-                <h2 id="my-points" className="statistics-table-title text-xl font-black">Puntos por hoyo</h2>
-                <p className="statistics-table-accent text-sm font-black">Total {myStats.points}</p>
-              </div>
-              <ol className="grid grid-cols-9 gap-1">
-                {myStats.holes.map((hole) => (
-                  <li key={hole.holeNumber} className="statistics-table-line flex flex-col items-center rounded-lg border py-1">
-                    <span className="statistics-table-text text-[10px] opacity-70">{hole.holeNumber}</span>
-                    <span className={`text-base font-black ${hole.played ? pointsClass(hole.points) : 'statistics-table-text'}`}>
-                      {hole.played ? hole.points : '–'}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </section>
-
+            {/* Golpes con el color del resultado y, debajo, los puntitos de golpes de ventaja, como en la tarjeta. */}
             <section aria-labelledby="my-card" className="statistics-panel rounded-2xl p-3 md:p-5">
-              <div className="mb-3 flex items-baseline justify-between gap-2">
-                <h2 id="my-card" className="statistics-table-title text-xl font-black">Tarjeta (golpes)</h2>
-                <p className="statistics-table-accent text-sm font-black">Total {myStats.totalGrossStrokes}</p>
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                <h2 id="my-card" className="statistics-table-title text-xl font-black">Mi tarjeta</h2>
+                <p className="statistics-table-accent text-sm font-black">{myStats.totalGrossStrokes} golpes · {myStats.points} puntos</p>
               </div>
               <ol className="grid grid-cols-9 gap-1">
                 {myStats.holes.map((hole) => {
                   const result = scoreResultFromPoints(hole.points, hole.abandoned);
                   return (
                     <li key={hole.holeNumber} className="flex flex-col items-center gap-0.5">
-                      <span className="statistics-table-text text-[10px] opacity-70">{hole.holeNumber}</span>
+                      {/* Cabecera como en la tarjeta de anotación: número del hoyo y P(par)•H(hándicap del hoyo). */}
+                      <span className="statistics-table-text text-xs font-bold leading-none">{hole.holeNumber}</span>
+                      <span className="statistics-table-text whitespace-nowrap text-[9px] leading-none opacity-70">P{hole.par}•H{hole.strokeIndex}</span>
                       {hole.played ? (
                         <span title={scoreResultLabel[result]} className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold ring-1 ${scoreResultChip[result]}`}>
                           {hole.grossStrokes}
@@ -324,6 +315,19 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                       ) : (
                         <span className="statistics-table-text inline-flex h-8 w-8 items-center justify-center text-sm font-bold">–</span>
                       )}
+                      {/* Puntitos de golpes de ventaja (HCP del jugador en esta partida), del mismo tamaño que en la tarjeta. */}
+                      <span className="flex h-1 min-h-[4px] gap-0.5" aria-label={`${hole.strokesReceived} golpes de ventaja`}>
+                        {hole.strokesReceived > 0 && Array.from({ length: hole.strokesReceived }).map((_, index) => (
+                          <span
+                            key={index}
+                            className="h-1 w-1 rounded-full bg-blue-500"
+                            title={`${hole.strokesReceived} golpe${hole.strokesReceived > 1 ? 's' : ''} recibido${hole.strokesReceived > 1 ? 's' : ''}`}
+                          />
+                        ))}
+                      </span>
+                      <span className={`text-xs font-black leading-none ${hole.played ? 'statistics-table-accent' : 'statistics-table-text opacity-50'}`} title={`${hole.points} puntos en el hoyo ${hole.holeNumber}`}>
+                        {hole.played ? hole.points : '–'}
+                      </span>
                     </li>
                   );
                 })}
@@ -366,6 +370,15 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                       ))}
                     </tbody>
                   </table>
+                  {onViewRoundStatistics && selectedRoundId && (
+                    <button
+                      type="button"
+                      onClick={() => onViewRoundStatistics(selectedRoundId)}
+                      className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 font-bold text-white transition-colors hover:bg-emerald-500"
+                    >
+                      <BarChart3 size={18} aria-hidden="true" /> Ver estadísticas
+                    </button>
+                  )}
                 </div>
               )}
             </section>

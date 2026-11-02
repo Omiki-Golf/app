@@ -1,5 +1,5 @@
 import type { GolfHole, QuickPlayAwardsSummary, RoundPlayer, RoundScore } from '../types';
-import { calculateScoreToPar } from './calculations.ts';
+import { calculateScoreToPar, getStrokesReceived } from './calculations.ts';
 
 // Estadísticas de una partida vistas por un solo jugador (Mis partidas): cómo jugué yo, no cómo le fue a todos.
 // Mismas reglas que la pantalla de estadísticas de la partida: resultado por golpes netos contra el par del hoyo,
@@ -17,10 +17,14 @@ export interface MyRoundDistribution {
 export interface MyRoundHole {
   holeNumber: number;
   par: number;
+  /** Hándicap del hoyo (la «H» de P4•H1 en la tarjeta). */
+  strokeIndex: number;
   played: boolean;
   abandoned: boolean;
   points: number;
   grossStrokes: number;
+  /** Golpes de ventaja en el hoyo: los puntitos de la tarjeta. */
+  strokesReceived: number;
 }
 
 export interface MyRoundAward {
@@ -82,14 +86,20 @@ const summarizePlayer = (player: RoundPlayer, scores: RoundScore[], holes: GolfH
   let points = 0;
   let grossStrokes = 0;
 
+  // Golpes de ventaja calculados como en la tarjeta de anotación, a partir del HCP de juego y el hándicap del hoyo.
+  const strokeIndexes = holes.map(hole => hole.stroke_index);
+  const numHoles = holes.length === 9 ? 9 : 18;
+
   const playerHoles = holes.map((hole): MyRoundHole => {
     const score = scores.find(item => item.player_id === player.id && item.hole_number === hole.hole_number);
     const gross = effectiveGrossStrokes(score, hole);
+    const strokesReceived = getStrokesReceived(player.playing_handicap, hole.stroke_index, numHoles, strokeIndexes);
+    const base = { holeNumber: hole.hole_number, par: hole.par, strokeIndex: hole.stroke_index, strokesReceived };
     grossStrokes += gross;
-    if (!score) return { holeNumber: hole.hole_number, par: hole.par, played: false, abandoned: false, points: 0, grossStrokes: 0 };
+    if (!score) return { ...base, played: false, abandoned: false, points: 0, grossStrokes: 0 };
     if (score.abandoned) {
       distribution.double++;
-      return { holeNumber: hole.hole_number, par: hole.par, played: true, abandoned: true, points: 0, grossStrokes: gross };
+      return { ...base, played: true, abandoned: true, points: 0, grossStrokes: gross };
     }
 
     const holePoints = score.stableford_points || 0;
@@ -105,7 +115,7 @@ const summarizePlayer = (player: RoundPlayer, scores: RoundScore[], holes: GolfH
     else if (diff === 2) distribution.double++;
     else distribution.triplePlus++;
 
-    return { holeNumber: hole.hole_number, par: hole.par, played: true, abandoned: false, points: holePoints, grossStrokes: gross };
+    return { ...base, played: true, abandoned: false, points: holePoints, grossStrokes: gross };
   });
 
   const best = bestHole as PlayerSummary['bestHole'];
