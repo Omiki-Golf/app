@@ -281,6 +281,20 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       return;
     }
 
+    // En un grupo, escribir el nombre a mano no permite saltarse lo que la lista ya impide:
+    // un mismo jugador no puede estar en esta partida dos veces ni a la vez en otra partida activa.
+    if (currentGroup) {
+      const typedName = normalizeName(searchTerm.trim());
+      if (players.some(player => normalizeName(player.name) === typedName)) {
+        setError(`${searchTerm.trim()} ya está en esta partida`);
+        return;
+      }
+      if ((selectedPlayer && playersInActiveRounds.includes(selectedPlayer.id)) || playerNamesInActiveRounds.some(name => normalizeName(name) === typedName)) {
+        setError(`${searchTerm.trim()} ya está jugando otra partida activa del grupo`);
+        return;
+      }
+    }
+
     if (currentGroup && !selectedPlayer && !creatingUnlinked && allPlayers.some(player => player.auth_user_id && player.name.toLowerCase() === searchTerm.trim().toLowerCase())) {
       setError('Selecciona al miembro de la lista. Para otro jugador sin cuenta, elige expresamente Crear ficha sin cuenta vinculada.');
       setShowDropdown(true);
@@ -525,9 +539,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               <button
                 type="button"
                 onClick={prefillSelf}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-ring bg-accent-soft px-4 py-3 font-semibold text-accent-ink transition-colors hover:bg-card-2"
+                className="flex w-full min-w-0 items-center justify-center gap-2 overflow-hidden whitespace-nowrap rounded-lg border-2 border-dashed border-accent-ring bg-accent-soft px-3 py-3 text-sm font-semibold text-accent-ink transition-colors hover:bg-card-2 sm:text-base"
               >
-                <Plus size={18} /> Añadirme a la partida ({account.nick})
+                {/* Siempre en una línea: si el nick es largo se recorta con puntos suspensivos. */}
+                <Plus size={18} className="shrink-0" />
+                <span className="shrink-0">Añadirme a la partida</span>
+                <span className="min-w-0 truncate">({account.nick})</span>
               </button>
             )}
             <div className="relative player-search-container">

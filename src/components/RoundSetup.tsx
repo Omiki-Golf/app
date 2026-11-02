@@ -125,8 +125,10 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             setSelectedCourseName(course.name);
           }
 
+          // Un campo de 9 hoyos solo tiene del 1 al 9: no se arrastra el 10-18 de la última partida en otro campo.
           if (holeCount === 9) {
             setNumHoles(9);
+            setHolesRange('1-9');
           }
 
         } catch (err) {
@@ -287,7 +289,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         selectedCourse,
         numHoles,
         useSlope,
-        numHoles === 9 ? holesRange : undefined,
+        numHoles === 9 ? (selectedCourseHoleCount === 18 ? holesRange : '1-9') : undefined,
         undefined,
         gameMode,
         currentGroup?.id ?? null
