@@ -559,6 +559,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const bogeyKing = highlights.reduce((max, h) => h.bogeys > max.bogeys ? h : max, highlights[0]);
   const doubleBogeyKing = highlights.reduce((max, h) => h.doubleBogeyPlus > max.doubleBogeyPlus ? h : max, highlights[0]);
   const getPlayerGrossStrokes = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.totalGrossStrokes ?? 0;
+  const getPlayerScoreToPar = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.scoreToPar ?? { value: 0, display: '-' };
 
   const bestIndividualHole = highlights.reduce((max, h) =>
     h.bestHole.points > max.bestHole.points ? h : max, highlights[0]
@@ -637,83 +638,46 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     index === 2 ? 'bg-orange-400 text-orange-950' :
     'bg-gray-600 text-white';
 
+  // Fichas del podio compactas: posición, nombre y HCP en una fila; puntos y vs par en dos columnas.
+  const podiumStyles = [
+    { card: 'gold-card bg-gradient-to-br from-yellow-400 to-yellow-500 border-yellow-300', badge: 'bg-yellow-300 text-yellow-900', name: 'text-yellow-900', hcp: 'text-yellow-800', box: 'bg-white/35', points: 'text-yellow-900', detail: 'text-yellow-900', toParBox: 'bg-white/25', toParLabel: 'text-yellow-900', even: 'text-yellow-900', under: 'text-green-700', over: 'text-red-700' },
+    { card: 'bg-gradient-to-br from-slate-600 to-slate-700 border-slate-400', badge: 'bg-slate-400 text-slate-900', name: 'text-slate-100', hcp: 'text-slate-300', box: 'bg-white/10', points: 'text-white', detail: 'text-slate-300', toParBox: 'bg-slate-500/30', toParLabel: 'text-slate-200', even: 'text-white', under: 'text-green-300', over: 'text-red-300' },
+    { card: 'bg-gradient-to-br from-orange-600 to-orange-700 border-orange-400', badge: 'bg-orange-400 text-orange-900', name: 'text-orange-100', hcp: 'text-orange-200', box: 'bg-white/10', points: 'text-white', detail: 'text-orange-200', toParBox: 'bg-orange-500/30', toParLabel: 'text-orange-200', even: 'text-white', under: 'text-green-300', over: 'text-red-300' },
+  ];
+
   const renderPodiumGrid = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-      <div className="transform transition-all duration-700 hover:scale-105">
-        <div className="gold-card bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl p-6 shadow-2xl border-4 border-yellow-300 relative">
-          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-yellow-300 rounded-full flex items-center justify-center text-3xl font-black text-yellow-900 shadow-lg">
-            1
-          </div>
-          <div className="mt-6 text-center">
-            <p className="text-yellow-900 font-black text-xl mb-2">{ranking[0].player.name}</p>
-            <div className="bg-white/35 backdrop-blur-sm rounded-lg p-4 mb-2">
-              <p className="text-5xl font-black text-yellow-900 mb-1">{ranking[0].totalPoints}</p>
-              <p className="text-yellow-900 text-sm font-semibold">{ranking[0].totalPoints} puntos / {getPlayerGrossStrokes(ranking[0].player.id)} golpes</p>
-            </div>
-            {gameMode === 'stableford' && (
-              <div className="bg-white/25 backdrop-blur-sm rounded-lg py-2 px-3 mb-2">
-                <p className={`text-2xl font-black ${highlights[0]?.scoreToPar.value === 0 ? 'text-yellow-900' : highlights[0]?.scoreToPar.value < 0 ? 'text-green-700' : 'text-red-700'}`}>
-                  {highlights[0]?.scoreToPar.display}
-                </p>
-                <p className="text-yellow-900 text-xs font-medium">vs Par Personal</p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {ranking.slice(0, 3).map((entry, index) => {
+        const style = podiumStyles[index];
+        const toPar = getPlayerScoreToPar(entry.player.id);
+        return (
+          <div key={entry.player.id} className="transform transition-all duration-700 hover:scale-105" style={{ animationDelay: `${index * 200}ms` }}>
+            <div className={`${style.card} rounded-2xl border-2 p-3 shadow-xl`}>
+              <div className="mb-2 flex items-center gap-2">
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-black shadow ${style.badge}`}>
+                  {index + 1}
+                </span>
+                <p className={`min-w-0 truncate text-lg font-black ${style.name}`}>{entry.player.name}</p>
+                <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>HCP {entry.player.playing_handicap}</span>
               </div>
-            )}
-            <p className="text-yellow-800 text-xs font-semibold mt-1">HCP: {ranking[0].player.playing_handicap}</p>
-          </div>
-        </div>
-      </div>
-
-      {ranking[1] && (
-        <div className="transform transition-all duration-700 hover:scale-105" style={{ animationDelay: '200ms' }}>
-          <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl p-6 shadow-2xl border-4 border-slate-400 relative">
-            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-slate-400 rounded-full flex items-center justify-center text-3xl font-black text-slate-900 shadow-lg">
-              2
-            </div>
-            <div className="mt-6 text-center">
-              <p className="text-slate-100 font-bold text-xl mb-2">{ranking[1].player.name}</p>
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-2">
-                <p className="text-5xl font-black text-white mb-1">{ranking[1].totalPoints}</p>
-                <p className="text-slate-300 text-sm font-semibold">{ranking[1].totalPoints} puntos / {getPlayerGrossStrokes(ranking[1].player.id)} golpes</p>
-              </div>
-              {gameMode === 'stableford' && (
-                <div className="bg-slate-500/30 backdrop-blur-sm rounded-lg py-2 px-3 mb-2">
-                  <p className={`text-2xl font-black ${highlights[1]?.scoreToPar.value === 0 ? 'text-white' : highlights[1]?.scoreToPar.value < 0 ? 'text-green-300' : 'text-red-300'}`}>
-                    {highlights[1]?.scoreToPar.display}
-                  </p>
-                  <p className="text-slate-200 text-xs font-medium">vs Par Personal</p>
+              <div className={`grid gap-2 text-center ${gameMode === 'stableford' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                <div className={`rounded-lg p-2 ${style.box}`}>
+                  <p className={`text-3xl font-black leading-none ${style.points}`}>{entry.totalPoints}</p>
+                  <p className={`mt-1 text-xs font-semibold ${style.detail}`}>puntos · {getPlayerGrossStrokes(entry.player.id)} golpes</p>
                 </div>
-              )}
-              <p className="text-slate-400 text-xs mt-1">HCP: {ranking[1].player.playing_handicap}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {ranking[2] && (
-        <div className="transform transition-all duration-700 hover:scale-105" style={{ animationDelay: '400ms' }}>
-          <div className="bg-gradient-to-br from-orange-600 to-orange-700 rounded-2xl p-6 shadow-2xl border-4 border-orange-400 relative">
-            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-16 h-16 bg-orange-400 rounded-full flex items-center justify-center text-3xl font-black text-orange-900 shadow-lg">
-              3
-            </div>
-            <div className="mt-6 text-center">
-              <p className="text-orange-100 font-bold text-xl mb-2">{ranking[2].player.name}</p>
-              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 mb-2">
-                <p className="text-5xl font-black text-white mb-1">{ranking[2].totalPoints}</p>
-                <p className="text-orange-300 text-sm font-semibold">{ranking[2].totalPoints} puntos / {getPlayerGrossStrokes(ranking[2].player.id)} golpes</p>
+                {gameMode === 'stableford' && (
+                  <div className={`rounded-lg p-2 ${style.toParBox}`}>
+                    <p className={`text-3xl font-black leading-none ${toPar.value === 0 ? style.even : toPar.value < 0 ? style.under : style.over}`}>
+                      {toPar.display}
+                    </p>
+                    <p className={`mt-1 text-xs font-medium ${style.toParLabel}`}>vs Par Personal</p>
+                  </div>
+                )}
               </div>
-              {gameMode === 'stableford' && (
-                <div className="bg-orange-500/30 backdrop-blur-sm rounded-lg py-2 px-3 mb-2">
-                  <p className={`text-2xl font-black ${highlights[2]?.scoreToPar.value === 0 ? 'text-white' : highlights[2]?.scoreToPar.value < 0 ? 'text-green-300' : 'text-red-300'}`}>
-                    {highlights[2]?.scoreToPar.display}
-                  </p>
-                  <p className="text-orange-200 text-xs font-medium">vs Par Personal</p>
-                </div>
-              )}
-              <p className="text-orange-400 text-xs mt-1">HCP: {ranking[2].player.playing_handicap}</p>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 
