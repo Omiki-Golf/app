@@ -16,7 +16,8 @@ import {
   BestCourseRoundStatistics,
   RankingRpcRow,
 } from '../types';
-import { AwardRankingModal } from './AwardRankingModal';
+import { AwardRankingModal, RankingModeToggle } from './AwardRankingModal';
+import { awardChampions, formatAverage, toFairEntries, type FairRankingEntry, type RankingMode } from '../utils/fairRanking';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
 
@@ -63,6 +64,52 @@ interface ModalRankingEntry extends RankingRpcRow {
   handicap: number | null;
 }
 
+type AwardType = 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque';
+
+interface DivendRankings {
+  patrocinador: RankingRpcRow[];
+  barraLibre: RankingRpcRow[];
+  corto: RankingRpcRow[];
+  driverOro: RankingRpcRow[];
+}
+
+// El total de cada premio en su fila de ranking (el promedio justo es este total ÷ partidas jugadas).
+const awardValue: Record<AwardType, (entry: RankingRpcRow) => number | undefined> = {
+  patrocinador: (entry) => entry.total_beers_paid,
+  barraLibre: (entry) => entry.total_beers_won,
+  corto: (entry) => entry.no_paso_rojas_count,
+  driverOro: (entry) => entry.no_paso_rojas_count,
+  shark: (entry) => entry.total_wins,
+  viciado: (entry) => entry.total_rounds,
+  francotirador: (entry) => entry.total_eagles,
+  maquina: (entry) => entry.total_birdies,
+  amigoDelMasUno: (entry) => entry.total_bogeys,
+  reyDelBosque: (entry) => entry.total_double_bogeys_plus,
+};
+
+/** Campeón absoluto (total) y justo (promedio por partida); si coinciden, uno solo. */
+const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean }> = ({ rows, type, unit, tone, lowerIsBetter = false }) => {
+  const { absolute, fair } = awardChampions(toFairEntries(rows, awardValue[type]), lowerIsBetter);
+  if (!absolute) return null;
+  const line = (label: string, entry: FairRankingEntry) => (
+    <div key={label}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{label}</p>
+      <p className={`text-xl font-bold leading-tight ${tone}`}>{entry.name}</p>
+      <p className="text-sm text-ink-2">
+        {entry.total} {unit} · <span className="font-semibold">{formatAverage(entry.average)}</span> por partida
+        <span className="text-ink-3"> ({entry.rounds} partidas)</span>
+      </p>
+    </div>
+  );
+  return (
+    <div className="space-y-2">
+      {!fair || fair.key === absolute.key
+        ? line('Absoluto y por partida', absolute)
+        : [line('Absoluto (total)', absolute), line('Justo (por partida)', fair)]}
+    </div>
+  );
+};
+
 const toModalRanking = (
   entries: RankingRpcRow[],
   getValue: (entry: RankingRpcRow) => number | undefined,
@@ -86,7 +133,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   const [groupStats, setGroupStats] = useState<GroupStatisticsSummary | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courseStats, setCourseStats] = useState<CourseStatisticsView | null>(null);
-  const [divendStats, setDivendStats] = useState<Awaited<ReturnType<typeof golfService.getDivendStatistics>> | null>(null);
+  const [divendRankings, setDivendRankings] = useState<DivendRankings | null>(null);
+  // Clasificación general: justa (promedio por partida) por defecto, o absoluta (puntos totales).
+  const [generalMode, setGeneralMode] = useState<RankingMode>('fair');
 
   const [uniquePlayers, setUniquePlayers] = useState<string[]>([]);
   const [uniqueCourses, setUniqueCourses] = useState<string[]>([]);
@@ -95,7 +144,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   //console.log('--- DATOS DEL RANKING ---', data);
   const [rankingModal, setRankingModal] = useState<{
     isOpen: boolean;
-    type: 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque' | null;
+    type: AwardType | null;
     data: ModalRankingEntry[];
   }>({
     isOpen: false,
@@ -133,8 +182,14 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       setGroupStats(stats);
 
       if (isDivend) {
-        const divend = await golfService.getDivendStatistics(currentGroup.id);
-        setDivendStats(divend);
+        // Ranking completo de cada premio: hace falta para el campeón por partida, no solo el primero del total.
+        const [patrocinador, barraLibre, corto, driverOro] = await Promise.all([
+          golfService.getPatrocinadorRanking(currentGroup.id).catch(() => []),
+          golfService.getBarraLibreRanking(currentGroup.id).catch(() => []),
+          golfService.getCortoRanking(currentGroup.id).catch(() => []),
+          golfService.getDriverOroRanking(currentGroup.id).catch(() => []),
+        ]);
+        setDivendRankings({ patrocinador, barraLibre, corto, driverOro });
       }
 
       try {
@@ -253,74 +308,24 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     await loadCourseStatistics(courseName);
   };
 
-  const openRankingModal = async (type: 'patrocinador' | 'barraLibre' | 'corto' | 'driverOro' | 'shark' | 'viciado' | 'francotirador' | 'maquina' | 'amigoDelMasUno' | 'reyDelBosque') => {
-    console.log('>>> 1. BOTÓN PULSADO - Tipo de ranking:', type);
+  const openRankingModal = async (type: AwardType) => {
     try {
-      let modalData: ModalRankingEntry[] = [];
-
-      switch (type) {
-        case 'patrocinador': {
-          console.log('>>> 2. Llamando a getPatrocinadorRanking...');
-          const patrocinadorData = await golfService.getPatrocinadorRanking(currentGroup.id);
-          console.log('>>> 3. DATOS RECIBIDOS DE LA API (Patrocinador):', patrocinadorData);
-
-          modalData = toModalRanking(patrocinadorData, (entry) => entry.total_beers_paid);
-          break;
-        }
-        case 'barraLibre': {
-          const barraLibreData = await golfService.getBarraLibreRanking(currentGroup.id);
-          console.log('>>> DATOS BARRA LIBRE:', barraLibreData);
-          modalData = toModalRanking(barraLibreData, (entry) => entry.total_beers_won);
-          break;
-        }
-        case 'corto': {
-          const cortoData = await golfService.getCortoRanking(currentGroup.id);
-          console.log('>>> DATOS CORTO:', cortoData);
-          modalData = toModalRanking(cortoData, (entry) => entry.no_paso_rojas_count);
-          break;
-        }
-        case 'driverOro': {
-          const driverOroData = await golfService.getDriverOroRanking(currentGroup.id);
-          console.log('>>> DATOS DRIVER ORO:', driverOroData);
-          modalData = toModalRanking(driverOroData, (entry) => entry.no_paso_rojas_count);
-          break;
-        }
-        case 'shark': {
-          console.log('>>> DATOS SHARK:', phase2Stats?.sharkRanking);
-          modalData = toModalRanking(phase2Stats?.sharkRanking || [], (entry) => entry.total_wins);
-          break;
-        }
-        case 'viciado': {
-          console.log('>>> DATOS VICIADO:', phase2Stats?.viciadoRanking);
-          modalData = toModalRanking(phase2Stats?.viciadoRanking || [], (entry) => entry.total_rounds);
-          break;
-        }
-        case 'francotirador': {
-          console.log('>>> DATOS FRANCOTIRADOR:', phase2Stats?.francotiradorRanking);
-          modalData = toModalRanking(phase2Stats?.francotiradorRanking || [], (entry) => entry.total_eagles);
-          break;
-        }
-        case 'maquina': {
-          console.log('>>> DATOS MAQUINA:', phase2Stats?.maquinaRanking);
-          modalData = toModalRanking(phase2Stats?.maquinaRanking || [], (entry) => entry.total_birdies);
-          break;
-        }
-        case 'amigoDelMasUno': {
-          console.log('>>> DATOS AMIGO DEL +1:', phase2Stats?.amigoDelMasUnoRanking);
-          modalData = toModalRanking(phase2Stats?.amigoDelMasUnoRanking || [], (entry) => entry.total_bogeys);
-          break;
-        }
-        case 'reyDelBosque': {
-          console.log('>>> DATOS REY DEL BOSQUE:', phase2Stats?.reyDelBosqueRanking);
-          modalData = toModalRanking(phase2Stats?.reyDelBosqueRanking || [], (entry) => entry.total_double_bogeys_plus);
-          break;
-        }
-      }
-
-      console.log('>>> 4. DATOS MAPEADOS FINALES PARA EL MODAL:', modalData);
-      setRankingModal({ isOpen: true, type, data: modalData });
+      // Los rankings ya cargados con las tarjetas; los de cervezas y rojas se piden si aún no están.
+      const rows: Record<AwardType, () => Promise<RankingRpcRow[]> | RankingRpcRow[]> = {
+        patrocinador: () => divendRankings?.patrocinador ?? golfService.getPatrocinadorRanking(currentGroup.id),
+        barraLibre: () => divendRankings?.barraLibre ?? golfService.getBarraLibreRanking(currentGroup.id),
+        corto: () => divendRankings?.corto ?? golfService.getCortoRanking(currentGroup.id),
+        driverOro: () => divendRankings?.driverOro ?? golfService.getDriverOroRanking(currentGroup.id),
+        shark: () => phase2Stats?.sharkRanking || [],
+        viciado: () => phase2Stats?.viciadoRanking || [],
+        francotirador: () => phase2Stats?.francotiradorRanking || [],
+        maquina: () => phase2Stats?.maquinaRanking || [],
+        amigoDelMasUno: () => phase2Stats?.amigoDelMasUnoRanking || [],
+        reyDelBosque: () => phase2Stats?.reyDelBosqueRanking || [],
+      };
+      setRankingModal({ isOpen: true, type, data: toModalRanking(await rows[type](), awardValue[type]) });
     } catch (err) {
-      console.error('>>> ERROR DENTRO DE openRankingModal:', err);
+      console.error('Error abriendo el ranking completo:', err);
     }
   };
 
@@ -784,11 +789,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       <p className="text-xs text-accent-ink mt-1">Click para ver historial</p>
                     </button>
 
-                    {isDivend && divendStats && (
+                    {isDivend && divendRankings && (
                       <div>
                         <h3 className="text-lg font-bold text-ink mb-4">Premios Especiales Partideta dels divendres</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {divendStats.patrocinador && (
+                          {divendRankings.patrocinador.length > 0 && (
                             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-5 border-2 border-red-300 shadow-soft">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -804,12 +809,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más cervezas pagadas</p>
-                              <p className="text-2xl font-bold text-red-800">{divendStats.patrocinador.name}</p>
-                              <p className="text-lg text-red-600">{divendStats.patrocinador.value} cervezas</p>
+                              <AwardChampions rows={divendRankings.patrocinador} type="patrocinador" unit="cervezas" tone="text-red-800" />
                             </div>
                           )}
 
-                          {divendStats.barraLibre && (
+                          {divendRankings.barraLibre.length > 0 && (
                             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-5 border-2 border-blue-300 shadow-soft">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -825,12 +829,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más cervezas recibidas</p>
-                              <p className="text-2xl font-bold text-blue-800">{divendStats.barraLibre.name}</p>
-                              <p className="text-lg text-blue-600">{divendStats.barraLibre.value} cervezas</p>
+                              <AwardChampions rows={divendRankings.barraLibre} type="barraLibre" unit="cervezas" tone="text-blue-800" />
                             </div>
                           )}
 
-                          {divendStats.corto && (
+                          {divendRankings.corto.length > 0 && (
                             <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-5 border-2 border-orange-300 shadow-soft">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -846,15 +849,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" más veces</p>
-                              <p className="text-2xl font-bold text-orange-800">{divendStats.corto.name}</p>
-                              <p className="text-lg text-orange-600">{divendStats.corto.value} veces</p>
-                              {divendStats.corto.rounds_played !== undefined && (
-                                <p className="text-xs text-ink-3 mt-1">en {divendStats.corto.rounds_played} partidas</p>
-                              )}
+                              <AwardChampions rows={divendRankings.corto} type="corto" unit="veces" tone="text-orange-800" />
                             </div>
                           )}
 
-                          {divendStats.driverOro && (
+                          {divendRankings.driverOro.length > 0 && (
                             <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-5 border-2 border-yellow-400 shadow-soft">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-3">
@@ -870,11 +869,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" menos veces</p>
-                              <p className="text-2xl font-bold text-yellow-800">{divendStats.driverOro.name}</p>
-                              <p className="text-lg text-yellow-800">{divendStats.driverOro.value} veces</p>
-                              {divendStats.driverOro.rounds_played !== undefined && (
-                                <p className="text-xs text-ink-3 mt-1">en {divendStats.driverOro.rounds_played} partidas</p>
-                              )}
+                              <AwardChampions rows={divendRankings.driverOro} type="driverOro" unit="veces" tone="text-yellow-800" lowerIsBetter />
                             </div>
                           )}
                         </div>
@@ -930,9 +925,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más partidas ganadas</p>
-                              <p className="text-2xl font-bold text-blue-800">{phase2Stats.shark.player_name}</p>
-                              <p className="text-lg text-blue-600">{phase2Stats.shark.total_wins} victorias</p>
-                              <p className="text-xs text-ink-3 mt-1">{phase2Stats.shark.win_percentage}% de éxito en {phase2Stats.shark.total_rounds} partidas</p>
+                              <AwardChampions rows={phase2Stats.sharkRanking} type="shark" unit="victorias" tone="text-blue-800" />
                             </div>
                           )}
 
@@ -974,9 +967,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más eagles</p>
-                              <p className="text-2xl font-bold text-red-800">{phase2Stats.francotirador.player_name}</p>
-                              <p className="text-lg text-red-600">{phase2Stats.francotirador.total_eagles} eagles totales</p>
-                              <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.francotirador.best_single_day} eagles</p>
+                              <AwardChampions rows={phase2Stats.francotiradorRanking} type="francotirador" unit="eagles" tone="text-red-800" />
+                              <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.francotirador.player_name}: {phase2Stats.francotirador.best_single_day} eagles</p>
                             </div>
                           )}
 
@@ -996,9 +988,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más birdies</p>
-                              <p className="text-2xl font-bold text-cyan-800">{phase2Stats.maquina.player_name}</p>
-                              <p className="text-lg text-cyan-600">{phase2Stats.maquina.total_birdies} birdies totales</p>
-                              <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.maquina.best_single_day} birdies</p>
+                              <AwardChampions rows={phase2Stats.maquinaRanking} type="maquina" unit="birdies" tone="text-cyan-800" />
+                              <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.maquina.player_name}: {phase2Stats.maquina.best_single_day} birdies</p>
                             </div>
                           )}
 
@@ -1018,9 +1009,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más bogeys</p>
-                              <p className="text-2xl font-bold text-amber-800">{phase2Stats.amigoDelMasUno.player_name}</p>
-                              <p className="text-lg text-amber-700">{phase2Stats.amigoDelMasUno.total_bogeys} bogeys totales</p>
-                              <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.amigoDelMasUno.best_single_day} bogeys</p>
+                              <AwardChampions rows={phase2Stats.amigoDelMasUnoRanking} type="amigoDelMasUno" unit="bogeys" tone="text-amber-800" />
+                              <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.amigoDelMasUno.player_name}: {phase2Stats.amigoDelMasUno.best_single_day} bogeys</p>
                             </div>
                           )}
 
@@ -1040,9 +1030,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más doble bogeys y peores</p>
-                              <p className="text-2xl font-bold text-rose-800">{phase2Stats.reyDelBosque.player_name}</p>
-                              <p className="text-lg text-rose-600">{phase2Stats.reyDelBosque.total_double_bogeys_plus} doble bogeys+</p>
-                              <p className="text-xs text-ink-3 mt-1">Mejor día: {phase2Stats.reyDelBosque.best_single_day} doble bogeys+</p>
+                              <AwardChampions rows={phase2Stats.reyDelBosqueRanking} type="reyDelBosque" unit="doble bogeys+" tone="text-rose-800" />
+                              <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.reyDelBosque.player_name}: {phase2Stats.reyDelBosque.best_single_day} doble bogeys+</p>
                             </div>
                           )}
 
@@ -1064,9 +1053,18 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                     )}
 
                     <div>
-                      <h3 className="text-lg font-bold text-ink mb-4">Clasificación General</h3>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-lg font-bold text-ink">Clasificación General</h3>
+                        <RankingModeToggle mode={generalMode} onChange={setGeneralMode} />
+                      </div>
+                      <p className="mb-4 text-xs text-ink-3">
+                        {generalMode === 'fair' ? 'Ordenada por puntos de media por partida, para no premiar solo a quien más juega.' : 'Ordenada por puntos totales.'}
+                      </p>
                       <div className="space-y-3">
-                        {groupStats.playerStats.map((player, index) => (
+                        {[...groupStats.playerStats].sort((a, b) => generalMode === 'fair'
+                          ? b.averagePoints - a.averagePoints || b.totalRounds - a.totalRounds
+                          : b.totalPoints - a.totalPoints || b.averagePoints - a.averagePoints
+                        ).map((player, index) => (
                           <div
                             key={player.name}
                             className={`p-4 rounded-lg border ${
@@ -1103,9 +1101,12 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </div>
                               </div>
                               <div className="text-right">
-                                <p className="text-3xl font-bold text-accent-ink">{player.totalPoints}</p>
+                                {/* Los dos números siempre a la vista; el del orden elegido, destacado. */}
+                                <p className="text-3xl font-bold text-accent-ink">
+                                  {generalMode === 'fair' ? formatAverage(player.averagePoints) : player.totalPoints}
+                                </p>
                                 <p className="text-xs text-ink-3">
-                                  {player.averagePoints.toFixed(1)} promedio
+                                  {generalMode === 'fair' ? `de media · ${player.totalPoints} pts totales` : `pts totales · ${formatAverage(player.averagePoints)} de media`}
                                 </p>
                                 {isDivend && (
                                   <div className="flex items-center gap-1 justify-end mt-1">
@@ -1250,6 +1251,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
         {rankingModal.isOpen && rankingModal.type && (
           <AwardRankingModal
+            key={rankingModal.type}
+            allowFair={rankingModal.type !== 'viciado'}
+            lowerIsBetter={rankingModal.type === 'driverOro'}
             isOpen={rankingModal.isOpen}
             onClose={closeRankingModal}
             title={

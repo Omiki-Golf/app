@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { formatAverage, sortRanking, toFairEntries, type RankingMode } from '../utils/fairRanking';
 
 interface RankingEntry {
   player_name: string;
@@ -16,6 +17,10 @@ interface AwardRankingModalProps {
   description: string;
   ranking: RankingEntry[];
   valueLabel: string;
+  /** Si el premio admite la clasificación justa (promedio por partida). Por defecto, sí. */
+  allowFair?: boolean;
+  /** Gana el valor más bajo (p. ej. «Driver de Oro»). */
+  lowerIsBetter?: boolean;
   colorScheme: {
     bg: string;
     border: string;
@@ -24,6 +29,24 @@ interface AwardRankingModalProps {
   };
 }
 
+/** Conmutador entre la clasificación justa (promedio por partida) y la absoluta (total). */
+export const RankingModeToggle: React.FC<{ mode: RankingMode; onChange: (mode: RankingMode) => void }> = ({ mode, onChange }) => (
+  <div role="radiogroup" aria-label="Tipo de clasificación" className="inline-flex rounded-lg border border-line bg-card-2 p-0.5 text-sm font-semibold">
+    {([['fair', 'Justa (por partida)'], ['absolute', 'Absoluta (total)']] as const).map(([value, label]) => (
+      <button
+        key={value}
+        type="button"
+        role="radio"
+        aria-checked={mode === value}
+        onClick={() => onChange(value)}
+        className={`rounded-md px-3 py-1.5 transition-colors ${mode === value ? 'bg-accent text-on-accent shadow-soft' : 'text-ink-2 hover:text-ink'}`}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+);
+
 export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
   isOpen,
   onClose,
@@ -31,9 +54,20 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
   description,
   ranking,
   valueLabel,
+  allowFair = true,
+  lowerIsBetter = false,
   colorScheme,
 }) => {
+  // Por defecto, la clasificación justa: total ÷ partidas jugadas.
+  const [mode, setMode] = useState<RankingMode>(allowFair ? 'fair' : 'absolute');
   if (!isOpen) return null;
+
+  const entries = sortRanking(
+    toFairEntries(ranking.map((entry) => ({ ...entry, total_rounds: entry.rounds_played })), (entry) => entry.value),
+    allowFair ? mode : 'absolute',
+    lowerIsBetter,
+  );
+  const showFair = allowFair && mode === 'fair';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -51,17 +85,29 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
               <X size={24} />
             </button>
           </div>
+          {allowFair && (
+            <div className="mt-4">
+              <RankingModeToggle mode={mode} onChange={setMode} />
+            </div>
+          )}
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
-          {ranking.length === 0 ? (
+        <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(80vh-190px)]">
+          {entries.length === 0 ? (
             <p className="text-center text-ink-3 py-8">No hay datos disponibles</p>
           ) : (
             <div className="space-y-3">
-              {ranking.map((entry, index) => (
+              {allowFair && (
+                <div className="grid grid-cols-[1fr_3.25rem_3.75rem] sm:grid-cols-[1fr_4.5rem_4.5rem] gap-2 px-3 sm:px-4 text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-ink-3">
+                  <span>Jugador</span>
+                  <span className="text-right">Total</span>
+                  <span className="text-right">Por partida</span>
+                </div>
+              )}
+              {entries.map((entry, index) => (
                 <div
-                  key={entry.player_id || `${entry.player_name}-${index}`}
-                  className={`p-4 rounded-lg border flex items-center justify-between transition-all ${
+                  key={entry.key}
+                  className={`p-3 sm:p-4 rounded-lg border flex items-center justify-between gap-2 transition-all ${
                     index === 0
                       ? `${colorScheme.bg} ${colorScheme.border} border-2 shadow-card`
                       : index === 1
@@ -71,9 +117,9 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                       : 'bg-card border-line hover:bg-card-2'
                   }`}
                 >
-                  <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                     <div
-                      className={`text-xl font-bold w-10 h-10 flex items-center justify-center rounded-full ${
+                      className={`text-base sm:text-xl font-bold w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center rounded-full ${
                         index === 0
                           ? `${colorScheme.accent} ${colorScheme.text}`
                           : index === 1
@@ -85,22 +131,36 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                     >
                       {index + 1}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-lg text-ink">{entry.player_name}</p>
-                      <div className="flex gap-4 text-sm text-ink-3 mt-1">
-                        <span>{entry.rounds_played} partidas</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-base sm:text-lg leading-tight text-ink break-words">{entry.name}</p>
+                      <p className="mt-1 text-xs sm:text-sm text-ink-3">
+                        <span className="whitespace-nowrap">{entry.rounds} partidas</span>
                         {entry.handicap !== null && entry.handicap !== undefined && (
-                          <span>HCP Medio: {Number(entry.handicap).toFixed(1)}</span>
+                          <span className="whitespace-nowrap"> · HCP {Number(entry.handicap).toFixed(1)}</span>
                         )}
-                      </div>
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`text-3xl font-bold ${index === 0 ? colorScheme.text : 'text-ink-2'}`}>
-                      {entry.value}
-                    </p>
-                    <p className="text-xs text-ink-3 mt-1">{valueLabel}</p>
-                  </div>
+                  {allowFair ? (
+                    // Dos columnas: el total y el promedio; la del orden elegido va destacada.
+                    <div className="grid shrink-0 grid-cols-[3.25rem_3.75rem] sm:grid-cols-[4.5rem_4.5rem] gap-2 text-right">
+                      <div>
+                        <p className={`font-bold ${!showFair ? `text-2xl sm:text-3xl ${index === 0 ? colorScheme.text : 'text-ink-2'}` : 'text-base sm:text-xl text-ink-3'}`}>{entry.total}</p>
+                        <p className="text-[10px] sm:text-xs text-ink-3 mt-1">{valueLabel}</p>
+                      </div>
+                      <div>
+                        <p className={`font-bold ${showFair ? `text-2xl sm:text-3xl ${index === 0 ? colorScheme.text : 'text-ink-2'}` : 'text-base sm:text-xl text-ink-3'}`}>{formatAverage(entry.average)}</p>
+                        <p className="text-[10px] sm:text-xs text-ink-3 mt-1">por partida</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-right">
+                      <p className={`text-3xl font-bold ${index === 0 ? colorScheme.text : 'text-ink-2'}`}>
+                        {entry.total}
+                      </p>
+                      <p className="text-xs text-ink-3 mt-1">{valueLabel}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
