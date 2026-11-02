@@ -580,7 +580,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     const { data: rounds, error: roundsError } = await supabase.rpc('list_my_quick_rounds', { p_statuses: ['completed', 'archived'] });
     if (roundsError) throw roundsError;
     const roundList = (rounds ?? []) as import('../utils/careerStats').CareerRound[];
-    if (roundList.length === 0) return { rounds: [], players: [], scores: [], courseNames: {} as Record<string, string> };
+    if (roundList.length === 0) return { rounds: [], players: [], scores: [], holes: [], courseNames: {} as Record<string, string> };
 
     // Por lotes, para no superar la longitud máxima de la URL con muchas partidas.
     const inChunks = async <T,>(table: string, columns: string, column: string, ids: string[]): Promise<T[]> => {
@@ -594,15 +594,18 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     };
     const roundIds = roundList.map(round => round.id);
     const courseIds = [...new Set(roundList.map(round => round.course_id))];
-    const [players, scores, courses] = await Promise.all([
+    // El hoyo, los golpes netos y el par permiten separar dobles de triples en la distribución acumulada.
+    const [players, scores, courses, holes] = await Promise.all([
       inChunks<import('../utils/careerStats').CareerPlayer>('round_players', 'id, round_id, user_id, name, playing_handicap, created_at', 'round_id', roundIds),
-      inChunks<import('../utils/careerStats').CareerScore>('round_scores', 'round_id, player_id, gross_strokes, stableford_points, mode_points, no_paso_rojas, spanish_hands, abandoned', 'round_id', roundIds),
+      inChunks<import('../utils/careerStats').CareerScore>('round_scores', 'round_id, player_id, hole_number, gross_strokes, net_strokes, strokes_received, stableford_points, mode_points, no_paso_rojas, spanish_hands, abandoned', 'round_id', roundIds),
       inChunks<{ id: string; name: string }>('golf_courses', 'id, name', 'id', courseIds),
+      inChunks<import('../utils/careerStats').CareerHole>('golf_holes', 'course_id, hole_number, par', 'course_id', courseIds),
     ]);
     return {
       rounds: roundList as import('../utils/careerStats').CareerRound[],
       players,
       scores,
+      holes,
       courseNames: Object.fromEntries(courses.map(course => [course.id, course.name])) as Record<string, string>,
     };
   },

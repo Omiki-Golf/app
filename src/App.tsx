@@ -149,6 +149,7 @@ function App() {
   const [statisticsReturnView, setStatisticsReturnView] = useState<ViewType | null>(null);
   // Partida elegida en Mis partidas al abrir sus estadísticas: se recupera al volver.
   const [myRoundsSelectedId, setMyRoundsSelectedId] = useState<string | null>(null);
+  const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
 
@@ -1191,7 +1192,13 @@ function App() {
             initialRoundId={myRoundsSelectedId}
             onBack={() => {
               setMyRoundsSelectedId(null);
-              backFromProfileSection('profile');
+              // Abierta desde Mis estadísticas acumuladas, vuelve allí; si no, al perfil.
+              if (myRoundsReturnView) {
+                setCurrentView(myRoundsReturnView);
+                setMyRoundsReturnView(null);
+              } else {
+                backFromProfileSection('profile');
+              }
             }}
             onViewRoundStatistics={(roundId) => {
               setMyRoundsSelectedId(roundId);
@@ -1213,8 +1220,12 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <Suspense fallback={<p role="status" className="p-6 text-center text-ink">Cargando estadísticas…</p>}><CareerStatistics
             account={{ userId: user.id, nick: profile?.nick ?? '', displayName: profile?.display_name }}
-            showMoments={activePlanType !== 'player'}
             onBack={() => setCurrentView('profile')}
+            onOpenMyRounds={(roundId) => {
+              setMyRoundsSelectedId(roundId ?? null);
+              setMyRoundsReturnView('career-statistics');
+              setCurrentView('my-round-statistics');
+            }}
             messagesButton={inlineMessagesButton}
           /></Suspense>
         </div>

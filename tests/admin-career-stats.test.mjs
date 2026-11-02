@@ -43,6 +43,52 @@ test('career totals only count rounds where the account played', () => {
   assert.equal(stats.recent[0].roundId, 'r2', 'most recent first');
 });
 
+test('cumulative stats: podiums, 9/18 averages, courses split by holes, net results with triples and moments', () => {
+  const holePars = [
+    ...[1, 2, 3].map(hole_number => ({ course_id: 'c1', hole_number, par: 4 })),
+    ...[1, 2, 3].map(hole_number => ({ course_id: 'c2', hole_number, par: 3 })),
+  ];
+  const rounds = [
+    round('r1', { num_holes: 9, course_id: 'c1', created_at: '2026-10-01T10:00:00Z' }),
+    round('r2', { num_holes: 18, course_id: 'c1', created_at: '2026-10-02T10:00:00Z' }),
+    round('r3', { num_holes: 9, course_id: 'c2', created_at: '2026-10-03T10:00:00Z' }),
+  ];
+  const players = [
+    player('me1', 'r1', 'FedePlayer', { playing_handicap: 10 }), player('ana1', 'r1', 'Ana', { playing_handicap: 5 }),
+    player('me2', 'r2', 'FedePlayer', { playing_handicap: 12 }), player('ana2', 'r2', 'Ana', { playing_handicap: 5 }),
+    player('me3', 'r3', 'FedePlayer', { playing_handicap: 8 }), player('ana3', 'r3', 'Ana'), player('bob3', 'r3', 'Bob'), player('cy3', 'r3', 'Cy'),
+  ];
+  const hole = (round_id, player_id, hole_number, gross_strokes, net_strokes, stableford_points) =>
+    ({ round_id, player_id, hole_number, gross_strokes, net_strokes, stableford_points, mode_points: 0 });
+  const scores = [
+    hole('r1', 'me1', 1, 4, 3, 3), hole('r1', 'me1', 2, 7, 7, 0), hole('r1', 'me1', 3, 5, 5, 1), // birdie, triple, bogey: 4 pts
+    ...holes('r1', 'ana1', [2, 2, 2]),
+    hole('r2', 'me2', 1, 4, 4, 2), hole('r2', 'me2', 2, 6, 6, 0), // par y doble: 2 pts
+    ...holes('r2', 'ana2', [1, 0]),
+    hole('r3', 'me3', 1, 1, 1, 4), // hoyo en uno en un par 3: eagle neto
+    ...holes('r3', 'ana3', [6]), ...holes('r3', 'bob3', [5]), ...holes('r3', 'cy3', [1]),
+  ];
+  const stats = computeCareerStats(account, rounds, players, scores, { c1: 'La Coma', c2: 'Costa Azahar' }, holePars);
+
+  assert.deepEqual(stats.podiums, [1, 1, 1, 0], 'won r2, second in r1, third in r3');
+  assert.deepEqual(stats.stableford9, { rounds: 2, average: 4 });
+  assert.deepEqual(stats.stableford18, { rounds: 1, average: 2 });
+  assert.deepEqual(stats.courses.map(course => [course.courseName, course.numHoles, course.rounds, course.best, course.worst, course.average]),
+    [['Costa Azahar', 9, 1, 4, 4, 4], ['La Coma', 9, 1, 4, 4, 4], ['La Coma', 18, 1, 2, 2, 2]]);
+  assert.deepEqual(stats.mostPlayedCourse, { name: 'La Coma', rounds: 2 });
+  assert.deepEqual(stats.results, { eagle: 1, birdie: 1, par: 1, bogey: 1, double: 1, triplePlus: 1 });
+  assert.equal(stats.resultHoles, 6);
+  assert.equal(stats.birdiesPerRound, 0.3);
+  assert.equal(stats.bogeysPlusPerRound, 1);
+  assert.equal(stats.birdieBogeyRatio, 0.67, 'eagle + birdie against bogey, double and triple');
+  assert.equal(stats.bestRound?.roundId, 'r3');
+  assert.equal(stats.worstRound?.roundId, 'r2');
+  assert.deepEqual([stats.bestHole?.courseName, stats.bestHole?.holeNumber, stats.bestHole?.points], ['Costa Azahar', 1, 4]);
+  assert.deepEqual([stats.worstHole?.courseName, stats.worstHole?.holeNumber, stats.worstHole?.grossStrokes], ['La Coma', 2, 7], 'the triple beats the double as worst hole');
+  assert.deepEqual(stats.trend.map(item => [item.roundId, item.handicap18]), [['r1', 20], ['r2', 12], ['r3', 16]], '9-hole playing handicap doubled');
+  assert.deepEqual([stats.recent[0].roundId, stats.recent[0].position, stats.recent[0].totalPlayers], ['r3', 3, 4]);
+});
+
 test('ties go to the lower handicap and frozen decisions win over totals', () => {
   const rounds = [round('r1'), round('r2', { game_mode: 'match', decided_result: { winner_player_ids: ['me2'] } })];
   const players = [
