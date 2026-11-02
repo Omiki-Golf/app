@@ -60,6 +60,14 @@ test('the full standings keep the official order with HCP, Stableford points and
   ]);
 });
 
+test('a new account object from App does not reload the screen or reset the selected round', () => {
+  // App pasa account={{ ... }} en cada render (avisos, comprobaciones periódicas): depender del objeto recargaba la lista y volvía a la primera partida.
+  assert.doesNotMatch(screen, /\}, \[account\]\)/);
+  assert.match(screen, /const \{ userId, nick, displayName \} = account;/);
+  assert.match(screen, /\}, \[userId, nick, displayName\]\);/);
+  assert.match(screen, /if \(request !== latestRequest\.current\) return;/, 'late answers from a previous selection are ignored');
+});
+
 test('Mis partidas opens the personal screen and the full standings start collapsed', () => {
   assert.match(app, /onShowRoundStats=\{\(\) => openFromProfile\(currentGroup \? 'statistics' : 'my-round-statistics'\)\}/);
   assert.match(app, /currentView === 'my-round-statistics' && user[\s\S]*?<MyRoundStatistics\s+account=\{\{ userId: user\.id/);

@@ -1,6 +1,6 @@
 import { NavigationButton } from './NavigationButton';
 import { OmikiLoadingScreen } from './OmikiSpinner';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { ThemeToggle } from './ThemeToggle';
 import { Activity, Award, Calendar, ChevronDown, Flame, Target, TrendingDown, Trophy } from 'lucide-react';
@@ -69,15 +69,20 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
   const [myStats, setMyStats] = useState<MyRoundStats | null>(null);
   const [showStandings, setShowStandings] = useState(false);
   const [error, setError] = useState('');
+  // App crea el objeto account en cada render: solo sus valores deben recargar la pantalla.
+  const { userId, nick, displayName } = account;
+  const latestRequest = useRef(0);
 
   const loadRound = useCallback(async (roundId: string) => {
+    const request = ++latestRequest.current;
     setLoading(true);
     setError('');
     setShowStandings(false);
     try {
       const data = await golfService.getQuickPlayCompletedRound(roundId);
+      if (request !== latestRequest.current) return;
       setRoundData(data);
-      const me = data ? findAccountPlayer(data.players, account) : null;
+      const me = data ? findAccountPlayer(data.players, { userId, nick, displayName }) : null;
       const player = me ? data?.players.find((item) => item.id === me.id) ?? null : null;
       if (data && player) {
         const summary = golfService.calculateQuickPlayAwards(
@@ -92,14 +97,15 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
         setMyStats(null);
       }
     } catch (err) {
+      if (request !== latestRequest.current) return;
       console.error('Error cargando mis estadísticas de la partida:', err);
       setRoundData(null);
       setMyStats(null);
       setError('No se han podido cargar las estadísticas de esta partida.');
     } finally {
-      setLoading(false);
+      if (request === latestRequest.current) setLoading(false);
     }
-  }, [account]);
+  }, [userId, nick, displayName]);
 
   useEffect(() => {
     const init = async () => {
