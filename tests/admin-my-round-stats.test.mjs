@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { computeMyRoundStats } from '../src/utils/myRoundStats.ts';
+import { buildEvolution, computeMyRoundStats } from '../src/utils/myRoundStats.ts';
 
 const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
 const screen = await readFile(new URL('../src/components/MyRoundStatistics.tsx', import.meta.url), 'utf8');
+const charts = await readFile(new URL('../src/components/MyRoundCharts.tsx', import.meta.url), 'utf8');
 
 // Hándicap de hoyo 1, 3 y 2: con HCP 2 se recibe un golpe en los hoyos 1 y 3, como en la tarjeta.
 const holes = [[1, 1], [2, 3], [3, 2]].map(([hole_number, stroke_index]) => ({ hole_number, par: 4, stroke_index }));
@@ -43,6 +44,24 @@ test('my round stats describe only how the account player played', () => {
   assert.deepEqual(stats.distribution, { eagle: 0, birdie: 1, par: 0, bogey: 0, double: 1, triplePlus: 1 });
   assert.deepEqual(stats.holes.map(hole => [hole.holeNumber, hole.par, hole.strokeIndex, hole.points, hole.grossStrokes, hole.abandoned, hole.strokesReceived]),
     [[1, 4, 1, 3, 4, false, 1], [2, 4, 3, 0, 8, false, 0], [3, 4, 2, 0, 7, true, 1]]);
+});
+
+test('the evolution accumulates my points against 2 points per hole and skips unplayed holes', () => {
+  const evolution = buildEvolution([
+    { holeNumber: 1, par: 4, strokeIndex: 1, played: true, abandoned: false, points: 3, grossStrokes: 4, strokesReceived: 1 },
+    { holeNumber: 2, par: 5, strokeIndex: 7, played: false, abandoned: false, points: 0, grossStrokes: 0, strokesReceived: 0 },
+    { holeNumber: 3, par: 3, strokeIndex: 5, played: true, abandoned: true, points: 0, grossStrokes: 6, strokesReceived: 0 },
+    { holeNumber: 4, par: 4, strokeIndex: 3, played: true, abandoned: false, points: 4, grossStrokes: 3, strokesReceived: 1 },
+  ]);
+  assert.deepEqual(evolution.map(point => [point.holeNumber, point.played, point.cumulativePoints, point.handicapLine]),
+    [[1, true, 3, 2], [2, false, 3, 4], [3, true, 3, 6], [4, true, 7, 8]]);
+});
+
+test('Mis partidas shows both evolution charts after Mi tarjeta, one Y axis each', () => {
+  assert.ok(screen.indexOf('id="my-card"') < screen.indexOf('<CumulativePointsChart evolution={evolution} />'));
+  assert.ok(screen.indexOf('<CumulativePointsChart evolution={evolution} />') < screen.indexOf('<StrokesPointsChart evolution={evolution} />'));
+  assert.match(charts, /var\(--chart-quick\)[\s\S]*var\(--chart-group\)/, 'validated colour pair');
+  assert.match(charts, /const yStrokes = [\s\S]*const yPoints = /, 'strokes and points are stacked charts, not a dual axis');
 });
 
 test('Mi tarjeta shows P•H above each hole and the hole points under the dots', () => {

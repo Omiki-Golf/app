@@ -133,6 +133,35 @@ const summarizePlayer = (player: RoundPlayer, scores: RoundScore[], holes: GolfH
   };
 };
 
+export interface MyRoundEvolutionPoint {
+  holeNumber: number;
+  played: boolean;
+  par: number;
+  points: number;
+  grossStrokes: number;
+  /** Puntos sumados hasta este hoyo (incluido). */
+  cumulativePoints: number;
+  /** Jugar a tu hándicap: 2 puntos por hoyo. */
+  handicapLine: number;
+}
+
+/** Evolución hoyo a hoyo para las gráficas de Mis partidas. */
+export const buildEvolution = (holes: MyRoundHole[]): MyRoundEvolutionPoint[] => {
+  let cumulativePoints = 0;
+  return holes.map((hole, index) => {
+    if (hole.played) cumulativePoints += hole.points;
+    return {
+      holeNumber: hole.holeNumber,
+      played: hole.played,
+      par: hole.par,
+      points: hole.points,
+      grossStrokes: hole.grossStrokes,
+      cumulativePoints,
+      handicapLine: 2 * (index + 1),
+    };
+  });
+};
+
 /** Como en la pantalla de estadísticas: gana el primero con el valor más alto (o más bajo). */
 const leaderBy = (summaries: PlayerSummary[], value: (summary: PlayerSummary) => number, lowest = false) =>
   summaries.reduce((leader, summary) => (lowest ? value(summary) < value(leader) : value(summary) > value(leader)) ? summary : leader, summaries[0]);

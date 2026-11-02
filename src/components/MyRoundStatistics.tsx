@@ -6,7 +6,8 @@ import { ThemeToggle } from './ThemeToggle';
 import { Activity, Award, BarChart3, Calendar, ChevronDown, Flame, Target, TrendingDown, Trophy } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { findAccountPlayer, type CareerAccount } from '../utils/careerStats';
-import { computeMyRoundStats, type MyRoundDistribution, type MyRoundStats } from '../utils/myRoundStats';
+import { buildEvolution, computeMyRoundStats, type MyRoundDistribution, type MyRoundStats } from '../utils/myRoundStats';
+import { CumulativePointsChart, StrokesPointsChart } from './MyRoundCharts';
 import { scoreResultBar, scoreResultChip, scoreResultFromPoints, scoreResultLabel } from '../utils/scoreColors';
 import type { GolfCourse, QuickPlayCompletedRound } from '../types';
 
@@ -186,6 +187,8 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
     );
   }
 
+  const evolution = myStats ? buildEvolution(myStats.holes) : [];
+
   const emptyMessage = error
     || (availableRounds.length === 0 ? 'Todavía no tienes partidas finalizadas. Cuando termines una, aquí verás cómo jugaste.' : '')
     || (!myStats ? 'No te hemos encontrado entre los jugadores de esta partida.' : '');
@@ -332,6 +335,15 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                   );
                 })}
               </ol>
+            </section>
+
+            {/* Evolución de la partida: dos propuestas para comparar antes de quedarnos con una. */}
+            <section aria-labelledby="my-evolution" className="statistics-panel rounded-2xl p-3 md:p-5">
+              <h2 id="my-evolution" className="statistics-table-title mb-3 text-xl font-black">Evolución de la partida</h2>
+              <h3 className="statistics-table-text mb-1 text-sm font-bold">Puntos acumulados frente a tu hándicap</h3>
+              <CumulativePointsChart evolution={evolution} />
+              <h3 className="statistics-table-text mt-5 mb-1 text-sm font-bold">Golpes y puntos por hoyo</h3>
+              <StrokesPointsChart evolution={evolution} />
             </section>
 
             {/* D. CLASIFICACIÓN COMPLETA (colapsada por defecto) */}
