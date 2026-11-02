@@ -1007,11 +1007,15 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           </div>
 
           <div className="text-center flex flex-col items-center gap-2">
-            <h1 className="text-3xl md:text-5xl font-black text-title">GAME OVER</h1>
+            <h1 className="text-3xl md:text-5xl font-black text-title">Estadísticas</h1>
+
+            {availableRounds.length > 0 && (
+              <p className="mt-2 whitespace-nowrap text-sm font-semibold text-ink">Selecciona la partida a consultar</p>
+            )}
 
             {availableRounds.length > 0 && (
               <SelectMenu
-                className="mt-2 max-w-md"
+                className="max-w-md"
                 value={selectedRoundId || availableRounds[0].id}
                 onChange={(roundId) => void handleSelectRound(roundId)}
                 ariaLabel="Partida a mostrar"
@@ -1235,92 +1239,92 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
           {/* HIGHLIGHTS CARDS */}
           <div
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8 transition-all duration-1000 delay-300 ${
+            className={`grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6 transition-all duration-1000 delay-300 ${
               animateIn ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
             }`}
           >
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <Target size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <Target size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Mejor Hoyo</p>
-                  <p className="text-white font-black text-sm">Individual</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Mejor Hoyo</p>
+                  <p className="text-white font-black text-xs leading-tight">Individual</p>
                 </div>
               </div>
-              <p className="text-white text-xl font-black mb-1">{bestIndividualHole?.playerName}</p>
-              <p className="text-blue-100 text-lg font-bold">Hoyo {bestIndividualHole?.bestHole.holeNumber}: {bestIndividualHole?.bestHole.points} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{bestIndividualHole?.playerName}</p>
+              <p className="text-blue-100 text-sm font-semibold">Hoyo {bestIndividualHole?.bestHole.holeNumber}: {bestIndividualHole?.bestHole.points} pts</p>
             </div>
 
-            <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <TrendingDown size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <TrendingDown size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Peor Hoyo</p>
-                  <p className="text-white font-black text-sm">Momento Difícil</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Peor Hoyo</p>
+                  <p className="text-white font-black text-xs leading-tight">Momento Difícil</p>
                 </div>
               </div>
-              <p className="text-white text-xl font-black mb-1">{worstIndividualHole?.playerName}</p>
-              <p className="text-rose-100 text-lg font-bold">Hoyo {worstIndividualHole?.worstHole.holeNumber}: {worstIndividualHole?.worstHole.points} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{worstIndividualHole?.playerName}</p>
+              <p className="text-rose-100 text-sm font-semibold">Hoyo {worstIndividualHole?.worstHole.holeNumber}: {worstIndividualHole?.worstHole.points} pts</p>
             </div>
 
-            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <Flame size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <Flame size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Máquina</p>
-                  <p className="text-white font-black text-sm">Birdie King</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Máquina</p>
+                  <p className="text-white font-black text-xs leading-tight">Birdie King</p>
                 </div>
               </div>
-              <p className="text-white text-2xl font-black mb-1">{birdieKing?.playerName}</p>
-              <p className="text-amber-100 text-lg font-bold">{birdieKing?.birdies} birdies</p>
+              <p className="text-white text-base font-black leading-tight break-words">{birdieKing?.playerName}</p>
+              <p className="text-amber-100 text-sm font-semibold">{birdieKing?.birdies} birdies</p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <Activity size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <Activity size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Montaña Rusa</p>
-                  <p className="text-white font-black text-sm">Mayor Variación</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Montaña Rusa</p>
+                  <p className="text-white font-black text-xs leading-tight">Mayor Variación</p>
                 </div>
               </div>
-              <p className="text-white text-2xl font-black mb-1">{rollerCoaster?.playerName}</p>
-              <p className="text-purple-100 text-lg font-bold">Diferencia: {rollerCoaster?.variability} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{rollerCoaster?.playerName}</p>
+              <p className="text-purple-100 text-sm font-semibold">Diferencia: {rollerCoaster?.variability} pts</p>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <TrendingDown size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <TrendingDown size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Más Bogeys</p>
-                  <p className="text-white font-black text-sm">Rey de +1</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Más Bogeys</p>
+                  <p className="text-white font-black text-xs leading-tight">Rey de +1</p>
                 </div>
               </div>
-              <p className="text-white text-2xl font-black mb-1">{bogeyKing?.playerName}</p>
-              <p className="text-orange-100 text-lg font-bold">{bogeyKing?.bogeys} bogeys</p>
+              <p className="text-white text-base font-black leading-tight break-words">{bogeyKing?.playerName}</p>
+              <p className="text-orange-100 text-sm font-semibold">{bogeyKing?.bogeys} bogeys</p>
             </div>
 
-            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-5 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="bg-white/20 p-3 rounded-lg">
-                  <TrendingDown size={24} className="text-white" />
+            <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="bg-white/20 p-1.5 rounded-lg">
+                  <TrendingDown size={18} className="text-white" />
                 </div>
                 <div>
-                  <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">Más Doble Bogeys</p>
-                  <p className="text-white font-black text-sm">Rey del Bosque</p>
+                  <p className="text-white/80 text-[11px] leading-tight font-semibold uppercase tracking-wide">Más Doble Bogeys</p>
+                  <p className="text-white font-black text-xs leading-tight">Rey del Bosque</p>
                 </div>
               </div>
-              <p className="text-white text-2xl font-black mb-1">{doubleBogeyKing?.playerName}</p>
-              <p className="text-red-100 text-lg font-bold">{doubleBogeyKing?.doubleBogeyPlus} doble bogeys+</p>
+              <p className="text-white text-base font-black leading-tight break-words">{doubleBogeyKing?.playerName}</p>
+              <p className="text-red-100 text-sm font-semibold">{doubleBogeyKing?.doubleBogeyPlus} doble bogeys+</p>
             </div>
           </div>
 
@@ -1342,7 +1346,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             {/* Cabecera del Reporte Dinámica */}
             <div className="text-center mb-8 border-b border-white/10 pb-4">
               <h1 className="text-4xl font-black text-white tracking-wider">
-                GAME OVER · {getModeLabel(gameMode).toUpperCase()}
+                ESTADÍSTICAS · {getModeLabel(gameMode).toUpperCase()}
               </h1>
               <p className="text-emerald-400 font-bold text-lg mt-1">
                 {course?.name} · {new Date(roundData?.round?.created_at || Date.now()).toLocaleDateString('es-ES')}
