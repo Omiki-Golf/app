@@ -664,7 +664,10 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                 const total = allHoles.reduce((sum, h) => sum + (allHoleScores[p.id]?.[h.hole_number]?.mode_points ?? 0), 0);
                 return <React.Fragment key={p.id}>
                   {index > 0 && <span className="font-black text-ink-3">-</span>}
-                  <span className="inline-flex items-center gap-1.5"><CompactPlayer name={p.name} colorIndex={index} /><strong className="text-accent-ink">{total}</strong></span>
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm border border-line">
+                    <CompactPlayer name={p.name} colorIndex={index} />
+                    <strong className="text-accent-ink">{total.toLocaleString('es-ES')}</strong>
+                  </span>
                 </React.Fragment>;
               })}
               {gameMode === 'sindicato' && [...players].sort((a, b) => {
@@ -684,9 +687,9 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                 }, 0);
                 const colorIndex = players.findIndex((player) => player.id === p.id);
                 return (
-                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm">
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm border border-line">
                     <CompactPlayer name={p.name} colorIndex={colorIndex} />
-                    <strong className="text-accent-ink">{total}</strong>
+                    <strong className="text-accent-ink">{total.toLocaleString('es-ES')}</strong>
                   </span>
                 );
               })}
@@ -703,23 +706,28 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   const ps = allHoleScores[team1[0].id]?.[h.hole_number];
                   return ps ? s + (ps.mode_points ?? 0) : s;
                 }, 0) : 0;
+                const badgeClass = team0Pts > team1Pts
+                  ? 'bg-blue-600 text-white border-blue-400'
+                  : team1Pts > team0Pts
+                  ? 'bg-orange-500 text-slate-950 border-orange-300'
+                  : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                 return (
                   <div className="flex flex-wrap items-center justify-center gap-1.5 font-bold">
                     {team0.map((p) => <CompactPlayer key={p.id} name={p.name} colorIndex={0} />)}
-                    <span className={`px-2 py-0.5 rounded-lg ${team0Pts > team1Pts ? 'bg-accent text-on-accent' : team0Pts < team1Pts ? 'bg-neutral-hover text-ink-3' : 'bg-neutral text-ink-2'}`}>
-                      {team0Pts} - {team1Pts}
+                    <span className={`px-2.5 py-0.5 rounded-lg border shadow-sm ${badgeClass}`}>
+                      {team0Pts.toLocaleString('es-ES')} - {team1Pts.toLocaleString('es-ES')}
                     </span>
                     {team1.map((p) => <CompactPlayer key={p.id} name={p.name} colorIndex={1} />)}
                   </div>
                 );
               })()}
               {gameMode !== 'match' && gameMode !== 'sindicato' && gameMode !== 'parejas' && (
-                <div className={`px-3 py-1 rounded-lg font-bold text-sm ${
+                <div className={`px-3 py-1 rounded-lg font-bold text-sm border shadow-sm ${
                   matchStatus.diff > 0
-                    ? 'bg-accent text-on-accent'
+                    ? 'bg-accent text-on-accent border-accent-ring'
                     : matchStatus.diff < 0
-                    ? 'bg-ink-4 text-white'
-                    : 'bg-neutral text-ink-2'
+                    ? 'bg-slate-700 text-white border-slate-600 dark:bg-slate-800 dark:text-slate-100'
+                    : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600'
                 }`}>
                   {matchStatus.label}
                 </div>

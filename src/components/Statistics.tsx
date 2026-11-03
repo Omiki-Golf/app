@@ -4,7 +4,7 @@ import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { golfService } from '../services/golfService';
-import { User, Users, MapPin, TrendingUp, Trophy, Award, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine } from 'lucide-react';
+import { User, Users, MapPin, TrendingUp, TrendingDown, Trophy, Award, Medal, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine, Flag, Hand } from 'lucide-react';
 import {
   Group,
   ArchivedRound,
@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { AwardRankingModal, RankingModeToggle } from './AwardRankingModal';
 import { awardChampions, formatAverage, toFairEntries, type FairRankingEntry, type RankingMode } from '../utils/fairRanking';
+import { scoreResultBar, scoreResultLabel } from '../utils/scoreColors';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
 
@@ -474,12 +475,15 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     if (playerRounds.length === 0) return null;
 
     return (
-      <div className="bg-gradient-to-r from-sky-50 to-sky-100 rounded-lg p-6 border border-sky-200">
-        <h3 className="text-xl font-bold text-sky-900 mb-4">Spanish Hands</h3>
+      <div className="bg-gradient-to-r from-sky-50 to-blue-100 dark:from-sky-950/40 dark:to-blue-900/30 rounded-2xl p-6 border border-sky-200 dark:border-sky-800">
+        <div className="flex items-center gap-3 mb-4">
+          <Hand size={30} className="text-sky-600 dark:text-sky-400" />
+          <h3 className="text-xl font-bold text-sky-950 dark:text-sky-200">Spanish Hands</h3>
+        </div>
         <div className="text-center">
-          <p className="text-5xl font-bold text-sky-700">{totalSpanishHands}</p>
-          <p className="text-sm text-ink-3 mt-2">
-            en {roundsWithSpanishHands} de {playerRounds.length} partidas
+          <p className="text-5xl font-black text-sky-600 dark:text-sky-400">{totalSpanishHands}</p>
+          <p className="text-sm text-ink-3 mt-2 font-medium">
+            en {roundsWithSpanishHands} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
           </p>
         </div>
       </div>
@@ -509,11 +513,14 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     const percentage = (totalNoPasoRojas / totalHoles) * 100;
 
     return (
-      <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg p-6 border border-orange-200">
-        <h3 className="text-xl font-bold text-orange-900 mb-4">No pasó de Rojas</h3>
+      <div className="bg-gradient-to-r from-rose-50 to-red-100 dark:from-rose-950/40 dark:to-red-900/30 rounded-2xl p-6 border border-rose-200 dark:border-rose-800">
+        <div className="flex items-center gap-3 mb-4">
+          <Flag size={30} className="text-rose-600 dark:text-rose-400" />
+          <h3 className="text-xl font-bold text-rose-950 dark:text-rose-200">No pasó de Rojas</h3>
+        </div>
         <div className="text-center">
-          <p className="text-5xl font-bold text-orange-700">{percentage.toFixed(1)}%</p>
-          <p className="text-sm text-ink-3 mt-2">
+          <p className="text-5xl font-black text-rose-600 dark:text-rose-400">{percentage.toFixed(1)}%</p>
+          <p className="text-sm text-ink-3 mt-2 font-medium">
             {totalNoPasoRojas} de {totalHoles} hoyos
           </p>
         </div>
@@ -618,26 +625,48 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                 {playerStats && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <StatCard
-                        icon={<Trophy className="text-yellow-800" />}
+                      <MetricCard
+                        icon={<Trophy size={18} />}
                         label="Partidas"
                         value={playerStats.totalRounds}
+                        gradient="bg-gradient-to-br from-emerald-600 to-teal-700"
+                        border="border-emerald-400/30"
                       />
-                      <StatCard
-                        icon={<Award className="text-accent-ink" />}
+                      <MetricCard
+                        icon={<Award size={18} />}
                         label="Victorias"
                         value={playerStats.wins}
+                        gradient="bg-gradient-to-br from-amber-600 to-orange-600"
+                        border="border-amber-400/30"
                       />
-                      <StatCard
-                        icon={<TrendingUp className="text-blue-600" />}
-                        label="Puntos Totales"
-                        value={playerStats.totalPoints}
-                        subtitle={groupStats ? `Posición: ${groupStats.playerStats.findIndex((p) => p.name === selectedPlayer) + 1}º` : undefined}
-                      />
-                      <StatCard
-                        icon={<TrendingUp className="text-blue-600" />}
+                      {(() => {
+                        const playerRank = groupStats ? groupStats.playerStats.findIndex((p) => p.name === selectedPlayer) + 1 : 0;
+                        const pointsDisplay = playerRank > 0 ? (
+                          <span className="inline-flex items-baseline justify-center gap-1 text-2xl sm:text-3xl md:text-4xl">
+                            <span>{playerStats.totalPoints}</span>
+                            <span className="text-sm md:text-base font-bold text-blue-100/90 whitespace-nowrap">
+                              <span className="hidden sm:inline">- {playerRank}ª Posición</span>
+                              <span className="sm:hidden">- {playerRank}ª Pos.</span>
+                            </span>
+                          </span>
+                        ) : playerStats.totalPoints;
+
+                        return (
+                          <MetricCard
+                            icon={<TrendingUp size={18} />}
+                            label="Puntos Totales"
+                            value={pointsDisplay}
+                            gradient="bg-gradient-to-br from-blue-600 to-indigo-700"
+                            border="border-blue-400/30"
+                          />
+                        );
+                      })()}
+                      <MetricCard
+                        icon={<Target size={18} />}
                         label="Puntos Promedio"
                         value={playerStats.averagePoints.toFixed(1)}
+                        gradient="bg-gradient-to-br from-purple-600 to-indigo-700"
+                        border="border-purple-400/30"
                       />
                     </div>
 
@@ -675,67 +704,52 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                           </div>
                         )}
 
-                        {playerStats.detailed.hole_results && (
-                          <>
-                            <div>
-                              <h3 className="text-lg font-bold text-ink mb-4">
-                                Distribución de Resultados
-                                <span className="text-sm font-normal text-ink-3 ml-2">
-                                  ({playerStats.detailed.total_holes_played || 0} hoyos jugados en {playerStats.totalRounds} partidas)
-                                </span>
-                              </h3>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                                  <p className="text-sm font-semibold text-purple-900">Eagles</p>
-                                  <p className="text-3xl font-bold text-purple-700">
-                                    {playerStats.detailed.hole_results.eagles || 0}
-                                  </p>
-                                </div>
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-                                  <p className="text-sm font-semibold text-blue-900">Birdies</p>
-                                  <p className="text-3xl font-bold text-blue-700">
-                                    {playerStats.detailed.hole_results.birdies || 0}
-                                  </p>
-                                </div>
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-accent-ring">
-                                  <p className="text-sm font-semibold text-title">Pares</p>
-                                  <p className="text-3xl font-bold text-accent-ink">
-                                    {playerStats.detailed.hole_results.pars || 0}
-                                  </p>
-                                </div>
-                                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-4 border border-yellow-200">
-                                  <p className="text-sm font-semibold text-yellow-900">Bogeys</p>
-                                  <p className="text-3xl font-bold text-yellow-700">
-                                    {playerStats.detailed.hole_results.bogeys || 0}
-                                  </p>
-                                </div>
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
-                                  <p className="text-sm font-semibold text-orange-900">Doble Bogeys</p>
-                                  <p className="text-3xl font-bold text-orange-700">
-                                    {playerStats.detailed.hole_results.double_bogeys || 0}
-                                  </p>
-                                </div>
-                                <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
-                                  <p className="text-sm font-semibold text-red-900">Triple Bogey+</p>
-                                  <p className="text-3xl font-bold text-red-700">
-                                    {playerStats.detailed.hole_results.triple_bogeys_plus || 0}
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
+                        {playerStats.detailed.hole_results && (() => {
+                          const distributionItems = [
+                            { key: 'eagle', label: scoreResultLabel.eagle, color: scoreResultBar.eagle, value: playerStats.detailed.hole_results.eagles || 0 },
+                            { key: 'birdie', label: scoreResultLabel.birdie, color: scoreResultBar.birdie, value: playerStats.detailed.hole_results.birdies || 0 },
+                            { key: 'par', label: scoreResultLabel.par, color: scoreResultBar.par, value: playerStats.detailed.hole_results.pars || 0 },
+                            { key: 'bogey', label: scoreResultLabel.bogey, color: scoreResultBar.bogey, value: playerStats.detailed.hole_results.bogeys || 0 },
+                            { key: 'double', label: 'Doble bogey', color: scoreResultBar.double, value: playerStats.detailed.hole_results.double_bogeys || 0 },
+                            { key: 'triplePlus', label: 'Triple o peor', color: 'bg-black ring-1 ring-inset ring-red-500', value: playerStats.detailed.hole_results.triple_bogeys_plus || 0 },
+                          ];
+                          const maxBar = Math.max(1, ...distributionItems.map((entry) => entry.value));
 
-                            {renderAnalysisStats()}
-                          </>
-                        )}
+                          return (
+                            <>
+                              <section aria-labelledby="player-to-par" className="statistics-panel rounded-2xl p-3 md:p-5">
+                                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 mb-3">
+                                  <h3 id="player-to-par" className="statistics-table-title text-xl font-black">Detalle contra par</h3>
+                                  <span className="text-sm font-normal text-ink-3">
+                                    ({playerStats.detailed.total_holes_played || 0} hoyos jugados en {playerStats.totalRounds} partidas)
+                                  </span>
+                                </div>
+                                <ul className="space-y-2">
+                                  {distributionItems.map((item) => (
+                                    <li key={item.key} className="grid grid-cols-[6.5rem_1fr_2.5rem] items-center gap-2 text-sm">
+                                      <span className="statistics-table-text">{item.label}</span>
+                                      <span className="h-2.5 overflow-hidden rounded-full bg-card-2">
+                                        <span className={`block h-full rounded-full ${item.color}`} style={{ width: `${(item.value / maxBar) * 100}%` }} />
+                                      </span>
+                                      <span className="statistics-table-text text-right font-semibold">{item.value}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </section>
+
+                              {renderAnalysisStats()}
+                            </>
+                          );
+                        })()}
                       </>
                     )}
 
                     {isDivend && (
                       <>
-                        <div className="bg-gradient-to-r from-amber-50 to-amber-100 rounded-lg p-6 border border-amber-200">
+                        <div className="bg-gradient-to-r from-amber-50 to-amber-100 dark:from-amber-950/40 dark:to-amber-900/30 rounded-2xl p-6 border border-amber-200 dark:border-amber-800">
                           <div className="flex items-center gap-3 mb-4">
-                            <Beer size={32} className="text-amber-700" />
-                            <h3 className="text-xl font-bold text-amber-900">Balance de Cervezas</h3>
+                            <Beer size={30} className="text-amber-700 dark:text-amber-400" />
+                            <h3 className="text-xl font-bold text-amber-950 dark:text-amber-200">Balance de Cervezas</h3>
                           </div>
                           <div className="grid grid-cols-3 gap-4">
                             <div className="text-center">
@@ -1064,67 +1078,54 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                         {[...groupStats.playerStats].sort((a, b) => generalMode === 'fair'
                           ? b.averagePoints - a.averagePoints || b.totalRounds - a.totalRounds
                           : b.totalPoints - a.totalPoints || b.averagePoints - a.averagePoints
-                        ).map((player, index) => (
-                          <div
-                            key={player.name}
-                            className={`p-4 rounded-lg border ${
-                              index === 0
-                                ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-yellow-400'
-                                : index === 1
-                                ? 'bg-card-2 border-line-2'
-                                : index === 2
-                                ? 'bg-gradient-to-r from-orange-100 to-orange-50 border-orange-400'
-                                : 'bg-card border-line'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-full ${
-                                    index === 0
-                                      ? 'bg-yellow-400 text-yellow-900'
-                                      : index === 1
-                                      ? 'bg-ink-4 text-ink'
-                                      : index === 2
-                                      ? 'bg-orange-400 text-orange-900'
-                                      : 'bg-neutral-hover text-ink-2'
-                                  }`}
-                                >
-                                  {index + 1}
-                                </div>
-                                <div>
-                                  <p className="font-bold text-lg text-ink">{player.name}</p>
-                                  <div className="flex gap-4 text-sm text-ink-3">
-                                    <span>{player.totalRounds} partidas</span>
-                                    <span>{player.wins} victorias</span>
+                        ).map((player, index) => {
+                          const rankStyle = getPodiumRankStyle(index, 'text-accent-ink');
+                          return (
+                            <div
+                              key={player.name}
+                              className={`p-4 rounded-xl transition-all ${rankStyle.card}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4 min-w-0">
+                                  <div
+                                    className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full text-lg ${rankStyle.badge}`}
+                                  >
+                                    {index + 1}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-lg text-ink truncate">{player.name}</p>
+                                    <div className="flex gap-4 text-sm text-ink-3">
+                                      <span>{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</span>
+                                      <span>{player.wins} {player.wins === 1 ? 'victoria' : 'victorias'}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                              <div className="text-right">
-                                {/* Los dos números siempre a la vista; el del orden elegido, destacado. */}
-                                <p className="text-3xl font-bold text-accent-ink">
-                                  {generalMode === 'fair' ? formatAverage(player.averagePoints) : player.totalPoints}
-                                </p>
-                                <p className="text-xs text-ink-3">
-                                  {generalMode === 'fair' ? `de media · ${player.totalPoints} pts totales` : `pts totales · ${formatAverage(player.averagePoints)} de media`}
-                                </p>
-                                {isDivend && (
-                                  <div className="flex items-center gap-1 justify-end mt-1">
-                                    <Beer size={16} className="text-amber-700" />
-                                    <p
-                                      className={`text-sm font-semibold ${
-                                        player.beerBalance >= 0 ? 'text-accent-ink' : 'text-red-600'
-                                      }`}
-                                    >
-                                      {player.beerBalance >= 0 ? '+' : ''}
-                                      {player.beerBalance}
-                                    </p>
-                                  </div>
-                                )}
+                                <div className="text-right shrink-0 ml-3">
+                                  {/* Los dos números siempre a la vista; el del orden elegido, destacado. */}
+                                  <p className={`text-3xl font-black ${rankStyle.score}`}>
+                                    {generalMode === 'fair' ? formatAverage(player.averagePoints) : player.totalPoints}
+                                  </p>
+                                  <p className="text-xs text-ink-3">
+                                    {generalMode === 'fair' ? `de media · ${player.totalPoints} pts totales` : `pts totales · ${formatAverage(player.averagePoints)} de media`}
+                                  </p>
+                                  {isDivend && (
+                                    <div className="flex items-center gap-1 justify-end mt-1">
+                                      <Beer size={16} className="text-amber-700" />
+                                      <p
+                                        className={`text-sm font-semibold ${
+                                          player.beerBalance >= 0 ? 'text-accent-ink' : 'text-red-600'
+                                        }`}
+                                      >
+                                        {player.beerBalance >= 0 ? '+' : ''}
+                                        {player.beerBalance}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -1150,57 +1151,74 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                 {courseStats && courseStats.totalRounds > 0 && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <StatCard
-                        icon={<MapPin className="text-accent-ink" />}
+                      <MetricCard
+                        icon={<MapPin size={18} />}
                         label="Partidas"
                         value={courseStats.totalRounds}
+                        gradient="bg-gradient-to-br from-emerald-600 to-teal-700"
+                        border="border-emerald-400/30"
                       />
-                      <StatCard
-                        icon={<TrendingUp className="text-blue-600" />}
+                      <MetricCard
+                        icon={<TrendingUp size={18} />}
                         label="Promedio Ganador"
                         value={courseStats.averageWinningScore.toFixed(1)}
+                        gradient="bg-gradient-to-br from-blue-600 to-indigo-700"
+                        border="border-blue-400/30"
                       />
-                      <StatCard
-                        icon={<Award className="text-accent-ink" />}
-                        label="Puntaje Más Alto"
+                      <MetricCard
+                        icon={<Award size={18} />}
+                        label="Puntuación Más Alta"
                         value={courseStats.highestScore}
+                        gradient="bg-gradient-to-br from-amber-600 to-orange-600"
+                        border="border-amber-400/30"
                       />
-                      <StatCard
-                        icon={<TrendingUp className="text-red-600" />}
-                        label="Puntaje Más Bajo"
+                      <MetricCard
+                        icon={<TrendingDown size={18} />}
+                        label="Puntuación Más Baja"
                         value={courseStats.lowestScore}
+                        gradient="bg-gradient-to-br from-rose-600 to-red-700"
+                        border="border-rose-400/30"
                       />
                     </div>
 
                     <div>
                       <h3 className="text-lg font-bold text-ink mb-4">Top 5 Jugadores</h3>
-                      <div className="space-y-2">
-                        {courseStats.topPlayers.map((player, index) => (
-                          <div
-                            key={player.name}
-                            className="p-4 rounded-lg bg-card border border-line flex items-center justify-between"
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-ink-3">{index + 1}.</span>
-                              <div>
-                                <p className="font-semibold text-ink">{player.name}</p>
-                                <p className="text-sm text-ink-3">{player.totalRounds} partidas</p>
+                      <div className="space-y-2.5">
+                        {courseStats.topPlayers.map((player, index) => {
+                          const rankStyle = getPodiumRankStyle(index, 'text-ink-2');
+
+                          return (
+                            <div
+                              key={player.name}
+                              className={`p-3.5 md:p-4 rounded-xl flex items-center justify-between transition-all ${rankStyle.card}`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm ${rankStyle.badge}`}>
+                                  {index + 1}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-ink truncate">{player.name}</p>
+                                  <p className="text-xs text-ink-3">{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0 ml-3">
+                                <p className={`text-2xl font-black ${rankStyle.score}`}>
+                                  {player.averageScore.toFixed(1)}
+                                </p>
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-3">promedio</p>
                               </div>
                             </div>
-                            <p className="text-2xl font-bold text-accent-ink">
-                              {player.averageScore.toFixed(1)}
-                            </p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                       {courseStats.hoyoMuerte && (
-                        <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-5 border-2 border-red-300 shadow-soft">
-                          <h4 className="text-lg font-bold text-red-900 mb-2">Hoyo de la Muerte</h4>
+                        <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/40 dark:to-red-900/30 rounded-lg p-5 border-2 border-red-300 dark:border-red-800 shadow-soft">
+                          <h4 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Hoyo de la Muerte</h4>
                           <p className="text-sm text-ink-2 mb-3">Más bogeys y dobles</p>
-                          <p className="text-3xl font-bold text-red-800">Hoyo #{courseStats.hoyoMuerte.hole_number}</p>
+                          <p className="text-3xl font-bold text-red-800 dark:text-red-400">Hoyo #{courseStats.hoyoMuerte.hole_number}</p>
                           <p className="text-sm text-ink-3 mt-2">Par {courseStats.hoyoMuerte.par}</p>
                           <div className="mt-3 space-y-1">
                             <p className="text-xs text-ink-2">
@@ -1214,10 +1232,10 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       )}
 
                       {courseStats.hoyoGloria && (
-                        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-5 border-2 border-yellow-300 shadow-soft">
-                          <h4 className="text-lg font-bold text-yellow-900 mb-2">Hoyo de la Gloria</h4>
+                        <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/40 dark:to-yellow-900/30 rounded-lg p-5 border-2 border-yellow-300 dark:border-yellow-700 shadow-soft">
+                          <h4 className="text-lg font-bold text-yellow-900 dark:text-yellow-300 mb-2">Hoyo de la Gloria</h4>
                           <p className="text-sm text-ink-2 mb-3">Más birdies y eagles</p>
-                          <p className="text-3xl font-bold text-yellow-800">Hoyo #{courseStats.hoyoGloria.hole_number}</p>
+                          <p className="text-3xl font-bold text-yellow-800 dark:text-yellow-400">Hoyo #{courseStats.hoyoGloria.hole_number}</p>
                           <p className="text-sm text-ink-3 mt-2">Par {courseStats.hoyoGloria.par}</p>
                           <div className="mt-3 space-y-1">
                             <p className="text-xs text-ink-2">
@@ -1231,7 +1249,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       )}
 
                       {courseStats.mejorRonda && (
-                        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-lg p-5 border-2 border-accent-ring shadow-soft">
+                        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/40 dark:to-emerald-900/30 rounded-lg p-5 border-2 border-accent-ring dark:border-emerald-700 shadow-soft">
                           <h4 className="text-lg font-bold text-title mb-2">Mejor Ronda</h4>
                           <p className="text-sm text-ink-2 mb-3">Record del campo</p>
                           <p className="text-2xl font-bold text-accent-ink">{courseStats.mejorRonda.player_name}</p>
@@ -1379,20 +1397,68 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   );
 };
 
-interface StatCardProps {
+interface MetricCardProps {
   icon: React.ReactNode;
   label: string;
-  value: number | string;
-  subtitle?: string;
+  value: React.ReactNode;
+  gradient: string;
+  border?: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ icon, label, value, subtitle }) => {
+const MetricCard: React.FC<MetricCardProps> = ({
+  icon,
+  label,
+  value,
+  gradient,
+  border = 'border-white/20',
+}) => {
   return (
-    <div className="bg-card border border-line rounded-lg p-4 shadow-soft">
-      <div className="flex items-center gap-2 mb-2">{icon}</div>
-      <p className="text-sm text-ink-3 mb-1">{label}</p>
-      <p className="text-2xl font-bold text-ink">{value}</p>
-      {subtitle && <p className="text-xs text-ink-3 mt-1">{subtitle}</p>}
+    <div className={`rounded-2xl ${gradient} p-4 md:p-5 text-white shadow-soft border ${border} flex flex-col justify-between`}>
+      {/* Fila 1: Icono y texto en camelcase */}
+      <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+        <span className="shrink-0 opacity-90">{icon}</span>
+        <span className="truncate">{label}</span>
+      </div>
+
+      {/* Fila 2: El valor numerico centrado en la fila */}
+      <div className="mt-2.5 text-center flex items-center justify-center">
+        <div className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none">
+          {value}
+        </div>
+      </div>
     </div>
   );
+};
+
+const getPodiumRankStyle = (rank: number, defaultScoreColor = 'text-accent-ink') => {
+  if (rank === 0) {
+    // 1º Dorado / Naranja
+    return {
+      card: 'border-2 border-amber-400 bg-gradient-to-r from-amber-100/70 via-yellow-50/50 to-amber-50/30 dark:from-amber-950/40 dark:via-yellow-950/25 dark:to-transparent dark:border-amber-400/80 shadow-soft',
+      badge: 'bg-gradient-to-br from-amber-400 to-yellow-500 text-amber-950 ring-2 ring-amber-300 dark:ring-amber-500/50 shadow font-black',
+      score: 'text-amber-800 dark:text-amber-300',
+    };
+  }
+  if (rank === 1) {
+    // 2º Gris plata
+    return {
+      card: 'border-2 border-slate-300 bg-gradient-to-r from-slate-100 via-slate-50/70 to-transparent dark:from-slate-800/60 dark:via-slate-800/30 dark:to-transparent dark:border-slate-500/80 shadow-soft',
+      badge: 'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-900 dark:from-slate-300 dark:to-slate-400 dark:text-slate-950 ring-2 ring-slate-300 dark:ring-slate-500/50 shadow font-black',
+      score: 'text-slate-700 dark:text-slate-200',
+    };
+  }
+  if (rank === 2) {
+    // 3º Color bronce
+    return {
+      card: 'border-2 border-amber-600/50 bg-gradient-to-r from-orange-100/60 via-amber-50/40 to-transparent dark:from-amber-950/40 dark:via-orange-950/30 dark:to-transparent dark:border-amber-600/80 shadow-soft',
+      badge: 'bg-gradient-to-br from-amber-700 to-orange-800 text-white ring-2 ring-amber-600/60 dark:ring-amber-500/50 shadow font-black',
+      score: 'text-amber-900 dark:text-amber-400',
+    };
+  }
+  // 4º en adelante
+  return {
+    card: 'bg-card border border-line',
+    badge: 'bg-card-2 border border-line text-ink-3 font-bold',
+    score: defaultScoreColor,
+  };
 };

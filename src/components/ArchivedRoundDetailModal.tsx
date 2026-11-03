@@ -275,7 +275,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               <div className="flex items-center justify-center gap-1">
                                 {index === 0 && <Trophy size={16} className="text-amber-700" />}
                                 {gameMode === 'parejas' && roundData.final_ranking.length === 4 && (
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${index < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${index < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-100 dark:border dark:border-orange-700'}`}>
                                     {index < 2 ? 'P1' : 'P2'}
                                   </span>
                                 )}

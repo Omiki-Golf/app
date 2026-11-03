@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Award, BarChart3, ChevronRight, Flag, MapPin, Target, TrendingUp, Trophy } from 'lucide-react';
+import { Activity, Award, BarChart3, Calendar, ChevronRight, Flag, MapPin, Target, TrendingUp, Trophy } from 'lucide-react';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import { TrendLineChart } from './CareerCharts';
@@ -97,22 +97,76 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
         {stats && stats.roundsPlayed > 0 && (
           <>
             {/* A. CABECERO COMPACTO */}
-            <section aria-label="Resumen" className="grid grid-cols-2 gap-2 rounded-2xl bg-card p-3 shadow-card">
-              <MiniStat label="Partidas"><span className="text-2xl">{stats.roundsPlayed}</span></MiniStat>
-              <MiniStat label="Golpes por hoyo"><span className="text-2xl">{formatNumber(stats.grossPerHole)}</span></MiniStat>
-              <MiniStat label="Podios">
-                <span className="flex justify-center gap-2 text-sm">
-                  {stats.podiums.map((count, index) => (
-                    <span key={index} className="leading-tight"><span className="block text-lg">{count}</span><span className="text-[10px] font-semibold text-ink-3">{index + 1}.º</span></span>
-                  ))}
-                </span>
-              </MiniStat>
-              <MiniStat label="Stableford medio">
-                <span className="flex justify-center gap-3 text-sm">
-                  <span className="leading-tight"><span className="block text-lg">{formatNumber(stats.stableford9.average)}</span><span className="text-[10px] font-semibold text-ink-3">9 hoyos</span></span>
-                  <span className="leading-tight"><span className="block text-lg">{formatNumber(stats.stableford18.average)}</span><span className="text-[10px] font-semibold text-ink-3">18 hoyos</span></span>
-                </span>
-              </MiniStat>
+            <section aria-label="Resumen" className="grid grid-cols-2 gap-3">
+              {/* Partidas */}
+              <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 p-3.5 md:p-4 text-white shadow-soft border border-emerald-400/30 flex flex-col justify-between">
+                <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                  <Calendar size={18} className="shrink-0 opacity-90" />
+                  <span className="truncate">Partidas</span>
+                </div>
+                <div className="mt-2.5 text-center">
+                  <p className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none">
+                    {stats.roundsPlayed}
+                  </p>
+                </div>
+              </div>
+
+              {/* Golpes por hoyo */}
+              <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3.5 md:p-4 text-white shadow-soft border border-blue-400/30 flex flex-col justify-between">
+                <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                  <Activity size={18} className="shrink-0 opacity-90" />
+                  <span className="truncate">Golpes por hoyo</span>
+                </div>
+                <div className="mt-2.5 text-center">
+                  <p className="text-3xl md:text-4xl font-black text-white tracking-tight leading-none">
+                    {formatNumber(stats.grossPerHole)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Podios */}
+              <div className="rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 p-3.5 md:p-4 text-white shadow-soft border border-amber-400/30 flex flex-col justify-between">
+                {/* Fila 1: Icono + Texto */}
+                <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                  <Trophy size={18} className="shrink-0 opacity-90" />
+                  <span className="truncate">Podios</span>
+                </div>
+                <div className="mt-2 text-center">
+                  {/* Fila 2: 1º 2º 3º */}
+                  <div className="grid grid-cols-3 gap-1 text-center text-xs font-bold text-amber-100/90">
+                    <span>1º</span>
+                    <span>2º</span>
+                    <span>3º</span>
+                  </div>
+                  {/* Fila 3: Valores */}
+                  <div className="grid grid-cols-3 gap-1 text-center text-xl md:text-2xl font-black text-white mt-0.5">
+                    {stats.podiums.slice(0, 3).map((count, index) => (
+                      <span key={index}>{count}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Stableford medio */}
+              <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-indigo-700 p-3.5 md:p-4 text-white shadow-soft border border-purple-400/30 flex flex-col justify-between">
+                {/* Fila 1: Icono + Texto */}
+                <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                  <TrendingUp size={18} className="shrink-0 opacity-90" />
+                  <span className="truncate">Stableford medio</span>
+                </div>
+                <div className="mt-2 text-center">
+                  {/* Fila 2: 9 hoyos 18 hoyos */}
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold text-purple-100/90">
+                    <span>9 hoyos</span>
+                    <span>18 hoyos</span>
+                  </div>
+                  {/* Fila 3: Valores */}
+                  <div className="grid grid-cols-2 gap-2 text-center text-xl md:text-2xl font-black text-white mt-0.5">
+                    <span>{formatNumber(stats.stableford9.average)}</span>
+                    <span>{formatNumber(stats.stableford18.average)}</span>
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* B. TENDENCIA DE STABLEFORD Y HÁNDICAP */}
@@ -207,11 +261,58 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
                   </li>
                 ))}
               </ul>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <MiniStat label="Birdies por partida"><span className="text-lg">{formatNumber(stats.birdiesPerRound)}</span></MiniStat>
-                <MiniStat label="Pares por partida"><span className="text-lg">{formatNumber(stats.parsPerRound)}</span></MiniStat>
-                <MiniStat label="Bogeys+ por partida"><span className="text-lg">{formatNumber(stats.bogeysPlusPerRound)}</span></MiniStat>
-                <MiniStat label="Birdies / bogeys+"><span className="text-lg">{formatNumber(stats.birdieBogeyRatio)}</span></MiniStat>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                {/* Birdies por partida */}
+                <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 p-3.5 md:p-4 text-white shadow-soft border border-blue-400/30 flex flex-col justify-between">
+                  <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                    <Target size={16} className="shrink-0 opacity-90" />
+                    <span className="truncate">Birdies por partida</span>
+                  </div>
+                  <div className="mt-2 text-center">
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none">
+                      {formatNumber(stats.birdiesPerRound)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pares por partida */}
+                <div className="rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 p-3.5 md:p-4 text-white shadow-soft border border-emerald-400/30 flex flex-col justify-between">
+                  <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                    <Award size={16} className="shrink-0 opacity-90" />
+                    <span className="truncate">Pares por partida</span>
+                  </div>
+                  <div className="mt-2 text-center">
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none">
+                      {formatNumber(stats.parsPerRound)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bogeys+ por partida */}
+                <div className="rounded-2xl bg-gradient-to-br from-rose-600 to-red-700 p-3.5 md:p-4 text-white shadow-soft border border-rose-400/30 flex flex-col justify-between">
+                  <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                    <TrendingUp size={16} className="shrink-0 opacity-90 rotate-180" />
+                    <span className="truncate">Bogeys+ por partida</span>
+                  </div>
+                  <div className="mt-2 text-center">
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none">
+                      {formatNumber(stats.bogeysPlusPerRound)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Birdies / bogeys+ */}
+                <div className="rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 p-3.5 md:p-4 text-white shadow-soft border border-amber-400/30 flex flex-col justify-between">
+                  <div className="flex items-center justify-center gap-1.5 text-xs md:text-sm font-bold text-white/95 text-center min-w-0">
+                    <Activity size={16} className="shrink-0 opacity-90" />
+                    <span className="truncate">Birdies / bogeys+</span>
+                  </div>
+                  <div className="mt-2 text-center">
+                    <p className="text-2xl md:text-3xl font-black text-white tracking-tight leading-none">
+                      {formatNumber(stats.birdieBogeyRatio)}
+                    </p>
+                  </div>
+                </div>
               </div>
               <p className="mt-2 text-xs text-ink-3">El ratio cuenta los birdies o mejor por cada bogey o peor: cuanto más alto, mejor juego.</p>
             </Section>

@@ -469,7 +469,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                         <td className="p-2 font-medium text-ink">
                           <div className="flex items-center gap-2">
                             {gameMode === 'parejas' && players.length === 4 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-100 dark:border dark:border-orange-700'}`}>
                                 {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                               </span>
                             )}
@@ -591,10 +591,14 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                           });
                           const diff = firstWins - secondWins;
                           const label = diff === 0 ? 'AS' : `${firstWins}-${secondWins}`;
-                          const color = diff > 0 ? 'bg-emerald-200 text-title' : diff < 0 ? 'bg-neutral text-ink-2' : 'bg-card-2 text-ink-3';
+                          const color = diff > 0
+                            ? 'bg-blue-600 text-white border-blue-400'
+                            : diff < 0
+                            ? 'bg-orange-500 text-slate-950 border-orange-300'
+                            : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
-                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
+                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1.5 py-0.5 rounded border shadow-sm ${color}`}>{label}</span>
                             </td>
                           );
                         }
@@ -616,10 +620,14 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             }
                           });
                           const label = `${t0Accum.toLocaleString('es-ES')}-${t1Accum.toLocaleString('es-ES')}`;
-                          const color = t0Accum > t1Accum ? 'bg-emerald-200 text-title' : t0Accum < t1Accum ? 'bg-neutral text-ink-2' : 'bg-card-2 text-ink-3';
+                          const color = t0Accum > t1Accum
+                            ? 'bg-blue-600 text-white border-blue-400'
+                            : t1Accum > t0Accum
+                            ? 'bg-orange-500 text-slate-950 border-orange-300'
+                            : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
-                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1 py-0.5 rounded ${color}`}>{label}</span>
+                              <span className={`inline-block whitespace-nowrap text-[10px] leading-tight tabular-nums font-bold px-1.5 py-0.5 rounded border shadow-sm ${color}`}>{label}</span>
                             </td>
                           );
                         }
@@ -643,8 +651,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             });
                             const diff = p0Won - p1Won;
                             const label = diff > 0 ? `${diff}UP` : diff < 0 ? `${Math.abs(diff)}UP` : 'AS';
-                            const color = diff > 0 ? 'bg-accent text-on-accent' : diff < 0 ? 'bg-gray-500 text-white' : 'bg-neutral text-ink-2';
-                            return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{label}</span>;
+                            const color = diff > 0
+                              ? 'bg-blue-600 text-white border-blue-400'
+                              : diff < 0
+                              ? 'bg-orange-500 text-slate-950 border-orange-300'
+                              : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
+                            return <span className={`text-xs font-bold px-2 py-1 rounded border shadow-sm ${color}`}>{label}</span>;
                           }
                           if (gameMode === 'parejas' && players.length === 4) {
                             let t0 = 0, t1 = 0;
@@ -657,9 +669,13 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                 t1 += scoresForHole[2]?.mode_points ?? 0;
                               }
                             });
-                            const label = `${t0}-${t1}`;
-                            const color = t0 > t1 ? 'bg-accent text-on-accent' : t0 < t1 ? 'bg-gray-500 text-white' : 'bg-neutral text-ink-2';
-                            return <span className={`text-xs font-bold px-2 py-1 rounded ${color}`}>{label}</span>;
+                            const label = `${t0.toLocaleString('es-ES')}-${t1.toLocaleString('es-ES')}`;
+                            const color = t0 > t1
+                              ? 'bg-blue-600 text-white border-blue-400'
+                              : t1 > t0
+                              ? 'bg-orange-500 text-slate-950 border-orange-300'
+                              : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
+                            return <span className={`text-xs font-bold px-2 py-1 rounded border shadow-sm ${color}`}>{label}</span>;
                           }
                           return <span className="text-ink-4 text-xs">-</span>;
                         })()}
@@ -786,7 +802,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {gameMode === 'parejas' && players.length === 4 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-100 dark:border dark:border-orange-700'}`}>
                                 {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                               </span>
                             )}
