@@ -646,13 +646,13 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   ];
 
   const renderPodiumGrid = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
       {ranking.slice(0, 3).map((entry, index) => {
         const style = podiumStyles[index];
         const toPar = getPlayerScoreToPar(entry.player.id);
         return (
-          <div key={entry.player.id} className="transform transition-all duration-700 hover:scale-105" style={{ animationDelay: `${index * 200}ms` }}>
-            <div className={`${style.card} rounded-2xl border-2 p-3 shadow-xl`}>
+          <div key={entry.player.id} className="h-full transform transition-all duration-700 hover:scale-105" style={{ animationDelay: `${index * 200}ms` }}>
+            <div className={`${style.card} rounded-2xl border-2 p-3 shadow-xl h-full flex flex-col justify-between`}>
               <div className="mb-2 flex items-center gap-2">
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-black shadow ${style.badge}`}>
                   {index + 1}
@@ -660,7 +660,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <p className={`min-w-0 truncate text-lg font-black ${style.name}`}>{entry.player.name}</p>
                 <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>HCP {entry.player.playing_handicap}</span>
               </div>
-              <div className={`grid gap-2 text-center ${gameMode === 'stableford' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              <div className={`grid gap-2 text-center mt-auto ${gameMode === 'stableford' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div className={`rounded-lg p-2 ${style.box}`}>
                   <p className={`text-3xl font-black leading-none ${style.points}`}>{entry.totalPoints}</p>
                   <p className={`mt-1 text-xs font-semibold ${style.detail}`}>puntos · {getPlayerGrossStrokes(entry.player.id)} golpes</p>
@@ -692,22 +692,34 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
           <span className="text-xs text-white/60">{difference.label}</span>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 md:gap-4 text-center">
-        <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl border-2 border-yellow-300 p-3 shadow-xl">
-          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-yellow-900">
-            <Trophy size={12} /> {winner.label}
-          </span>
-          <p className="mt-1 break-words text-base font-black leading-tight text-yellow-900">{winner.name}</p>
-          <p className="mt-1 text-3xl font-black leading-none text-yellow-900">{winner.points}</p>
-          <p className="mt-1 text-xs font-semibold text-yellow-800">puntos</p>
+      <div className="grid grid-cols-2 gap-2 md:gap-4 text-center items-stretch">
+        <div className="gold-card bg-gradient-to-br from-yellow-400 to-amber-500 rounded-2xl border-2 border-yellow-300 p-3 shadow-xl flex flex-col justify-between h-full">
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-yellow-300 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-yellow-900">
+              <Trophy size={12} /> {winner.label}
+            </span>
+            <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
+              <p className="break-words text-sm sm:text-base font-black leading-tight text-yellow-900 line-clamp-2">{winner.name}</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-1 border-t border-yellow-300/40">
+            <p className="text-3xl font-black leading-none text-yellow-900">{winner.points}</p>
+            <p className="mt-1 text-xs font-semibold text-yellow-800">puntos</p>
+          </div>
         </div>
-        <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl border-2 border-slate-500 p-3 shadow-xl">
-          <span className="inline-flex items-center gap-1 rounded-full bg-slate-500 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-white">
-            <TrendingDown size={12} /> {loser.label}
-          </span>
-          <p className="mt-1 break-words text-base font-black leading-tight text-white">{loser.name}</p>
-          <p className="mt-1 text-3xl font-black leading-none text-white">{loser.points}</p>
-          <p className="mt-1 text-xs font-semibold text-slate-300">puntos</p>
+        <div className="bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl border-2 border-slate-500 p-3 shadow-xl flex flex-col justify-between h-full">
+          <div>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-500 px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-white">
+              <TrendingDown size={12} /> {loser.label}
+            </span>
+            <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
+              <p className="break-words text-sm sm:text-base font-black leading-tight text-white line-clamp-2">{loser.name}</p>
+            </div>
+          </div>
+          <div className="mt-2 pt-1 border-t border-slate-500/40">
+            <p className="text-3xl font-black leading-none text-white">{loser.points}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-300">puntos</p>
+          </div>
         </div>
       </div>
     </>
@@ -1302,30 +1314,38 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             )}
 
             {isParejasMode && teamResult && (
-              <div className="flex items-center justify-between gap-6 mb-8 bg-slate-800/80 p-6 rounded-2xl border border-blue-500/30">
-                <div className="flex-1 text-center bg-amber-500/20 p-6 rounded-xl border-2 border-amber-400">
-                  <span className="text-amber-300 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Ganadora'}</span>
-                  <h2 className="text-2xl font-black text-white mt-1">
-                    {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
-                      : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
-                  </h2>
-                  <p className="text-5xl font-black text-amber-400 mt-2">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
+              <div className="flex items-stretch justify-between gap-6 mb-8 bg-slate-800/80 p-6 rounded-2xl border border-blue-500/30">
+                <div className="flex-1 text-center bg-amber-500/20 p-6 rounded-xl border-2 border-amber-400 flex flex-col justify-between">
+                  <div>
+                    <span className="text-amber-300 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Ganadora'}</span>
+                    <div className="min-h-[3.5rem] flex items-center justify-center my-2">
+                      <h2 className="text-2xl font-black text-white leading-tight line-clamp-2">
+                        {teamResult.isTie
+                          ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
+                      </h2>
+                    </div>
+                  </div>
+                  <p className="text-5xl font-black text-amber-400 mt-auto">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
 
-                <div className="text-center px-4">
+                <div className="text-center px-4 flex flex-col justify-center items-center">
                   <div className="bg-blue-600 text-white font-black text-2xl px-6 py-2 rounded-xl">VS</div>
                   <p className="text-white font-bold text-lg mt-2">{teamResult.isTie ? '0' : `+${teamResult.margin}`} <span className="text-xs text-white/60">{teamResult.isTie ? 'emp' : 'dif'}</span></p>
                 </div>
 
-                <div className="flex-1 text-center bg-slate-700/40 p-6 rounded-xl border border-slate-600">
-                  <span className="text-slate-400 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Perdedora'}</span>
-                  <h2 className="text-2xl font-black text-white mt-1">
-                    {teamResult.isTie
-                      ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
-                      : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
-                  </h2>
-                  <p className="text-5xl font-black text-white mt-2">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
+                <div className="flex-1 text-center bg-slate-700/40 p-6 rounded-xl border border-slate-600 flex flex-col justify-between">
+                  <div>
+                    <span className="text-slate-400 text-xs font-black uppercase">{teamResult.isTie ? 'Empate' : 'Pareja Perdedora'}</span>
+                    <div className="min-h-[3.5rem] flex items-center justify-center my-2">
+                      <h2 className="text-2xl font-black text-white leading-tight line-clamp-2">
+                        {teamResult.isTie
+                          ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
+                          : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
+                      </h2>
+                    </div>
+                  </div>
+                  <p className="text-5xl font-black text-white mt-auto">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
                 </div>
               </div>
             )}

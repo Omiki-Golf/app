@@ -329,15 +329,12 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
 
   return (
     <div className="bg-card rounded-lg shadow-soft border-2 border-line overflow-hidden">
-      <div className="bg-accent-deep p-4">
+      <div className="bg-accent-deep px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-white">Hoyo {hole.hole_number}</h3>
-            <div className="flex gap-4 mt-1 text-on-deep">
-              <span className="font-semibold">Par {hole.par}</span>
-              <span>HCP {hole.stroke_index}</span>
-            </div>
-          </div>
+          <h3 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+            <span>Hoyo {hole.hole_number}:</span>
+            <span className="font-semibold text-on-deep text-base sm:text-lg">Par {hole.par} / HCP {hole.stroke_index}</span>
+          </h3>
         </div>
       </div>
 

@@ -88,25 +88,37 @@ const awardValue: Record<AwardType, (entry: RankingRpcRow) => number | undefined
   reyDelBosque: (entry) => entry.total_double_bogeys_plus,
 };
 
-/** Campeón absoluto (total) y justo (promedio por partida); si coinciden, uno solo. */
-const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean }> = ({ rows, type, unit, tone, lowerIsBetter = false }) => {
+/** Campeón absoluto (total) y justo (promedio por partida); si coinciden, ambos con su desglose en 2 columnas estilo tarjeta. */
+const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean }> = ({ rows, type, unit: _unit, tone, lowerIsBetter = false }) => {
   const { absolute, fair } = awardChampions(toFairEntries(rows, awardValue[type]), lowerIsBetter);
   if (!absolute) return null;
-  const line = (label: string, entry: FairRankingEntry) => (
-    <div key={label}>
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-3">{label}</p>
-      <p className={`text-xl font-bold leading-tight ${tone}`}>{entry.name}</p>
-      <p className="text-sm text-ink-2">
-        {entry.total} {unit} · <span className="font-semibold">{formatAverage(entry.average)}</span> por partida
-        <span className="text-ink-3"> ({entry.rounds} partidas)</span>
-      </p>
+
+  const renderCard = (label: string, entry: FairRankingEntry, isFair: boolean) => (
+    <div
+      key={label}
+      className="bg-white/75 dark:bg-black/35 border border-black/10 dark:border-white/10 rounded-xl p-2.5 sm:p-3 shadow-soft flex flex-col justify-between min-w-0"
+    >
+      <div>
+        <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">{label}</span>
+        <p className={`font-bold text-sm sm:text-base leading-tight truncate mt-0.5 ${tone}`} title={entry.name}>
+          {entry.name}
+        </p>
+      </div>
+      <div className="mt-1">
+        <p className="text-2xl sm:text-3xl font-black text-ink leading-none my-1">
+          {isFair ? formatAverage(entry.average) : entry.total}
+        </p>
+        <p className="text-[11px] text-ink-2 truncate">
+          {isFair ? `${entry.total} en ${entry.rounds} partidas` : `en ${entry.rounds} partidas`}
+        </p>
+      </div>
     </div>
   );
+
   return (
-    <div className="space-y-2">
-      {!fair || fair.key === absolute.key
-        ? line('Absoluto y por partida', absolute)
-        : [line('Absoluto (total)', absolute), line('Justo (por partida)', fair)]}
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-2">
+      {renderCard('Absoluto', absolute, false)}
+      {renderCard('Por partida', fair ?? absolute, true)}
     </div>
   );
 };
@@ -902,10 +914,12 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 <h4 className="text-lg font-bold text-yellow-900">"Killer"</h4>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Mejor vuelta histórica</p>
-                              <p className="text-2xl font-bold text-yellow-800">{phase2Stats.killer.player_name}</p>
-                              <p className="text-lg text-yellow-800">{phase2Stats.killer.best_score} puntos</p>
-                              <p className="text-xs text-ink-3 mt-1">{phase2Stats.killer.course_name}</p>
-                              <p className="text-xs text-ink-3">{typeof phase2Stats.killer.played_at === 'string' || typeof phase2Stats.killer.played_at === 'number' ? new Date(phase2Stats.killer.played_at).toLocaleDateString('es-ES') : ''}</p>
+                              <div className="bg-white/70 dark:bg-black/30 border border-black/5 dark:border-white/10 rounded-xl p-3 shadow-soft">
+                                <p className="text-xl sm:text-2xl font-bold text-yellow-800 truncate">{phase2Stats.killer.player_name}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-ink my-1">{phase2Stats.killer.best_score} <span className="text-sm font-semibold text-ink-2">puntos</span></p>
+                                <p className="text-xs text-ink-3">{phase2Stats.killer.course_name}</p>
+                                <p className="text-xs text-ink-3">{typeof phase2Stats.killer.played_at === 'string' || typeof phase2Stats.killer.played_at === 'number' ? new Date(phase2Stats.killer.played_at).toLocaleDateString('es-ES') : ''}</p>
+                              </div>
                             </div>
                           )}
 
@@ -916,10 +930,12 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 <h4 className="text-lg font-bold text-ink">"Paquete"</h4>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Peor vuelta histórica</p>
-                              <p className="text-2xl font-bold text-ink">{phase2Stats.paquete.player_name}</p>
-                              <p className="text-lg text-ink-3">{phase2Stats.paquete.worst_score} puntos</p>
-                              <p className="text-xs text-ink-3 mt-1">{phase2Stats.paquete.course_name}</p>
-                              <p className="text-xs text-ink-3">{typeof phase2Stats.paquete.played_at === 'string' || typeof phase2Stats.paquete.played_at === 'number' ? new Date(phase2Stats.paquete.played_at).toLocaleDateString('es-ES') : ''}</p>
+                              <div className="bg-white/70 dark:bg-black/30 border border-black/5 dark:border-white/10 rounded-xl p-3 shadow-soft">
+                                <p className="text-xl sm:text-2xl font-bold text-ink truncate">{phase2Stats.paquete.player_name}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-ink my-1">{phase2Stats.paquete.worst_score} <span className="text-sm font-semibold text-ink-2">puntos</span></p>
+                                <p className="text-xs text-ink-3">{phase2Stats.paquete.course_name}</p>
+                                <p className="text-xs text-ink-3">{typeof phase2Stats.paquete.played_at === 'string' || typeof phase2Stats.paquete.played_at === 'number' ? new Date(phase2Stats.paquete.played_at).toLocaleDateString('es-ES') : ''}</p>
+                              </div>
                             </div>
                           )}
 
@@ -959,9 +975,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más partidas jugadas</p>
-                              <p className="text-2xl font-bold text-purple-800">{phase2Stats.viciado.player_name}</p>
-                              <p className="text-lg text-purple-600">{phase2Stats.viciado.total_rounds} partidas</p>
-                              <p className="text-xs text-ink-3 mt-1">{phase2Stats.viciado.average_score} puntos promedio</p>
+                              <div className="bg-white/70 dark:bg-black/30 border border-black/5 dark:border-white/10 rounded-xl p-3 shadow-soft">
+                                <p className="text-xl sm:text-2xl font-bold text-purple-800 truncate">{phase2Stats.viciado.player_name}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-ink my-1">{phase2Stats.viciado.total_rounds} <span className="text-sm font-semibold text-ink-2">partidas</span></p>
+                                <p className="text-xs text-ink-3 mt-1">{phase2Stats.viciado.average_score} puntos promedio</p>
+                              </div>
                             </div>
                           )}
 
@@ -1056,10 +1074,12 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 <h4 className="text-lg font-bold text-indigo-900">Paliza</h4>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Mayor victoria</p>
-                              <p className="text-xl font-bold text-indigo-800">{phase2Stats.laPaliza.winner_name}</p>
-                              <p className="text-lg text-indigo-600">{phase2Stats.laPaliza.point_difference} puntos de diferencia</p>
-                              <p className="text-xs text-ink-3 mt-1">{phase2Stats.laPaliza.winner_points} vs {phase2Stats.laPaliza.second_place_points} ({phase2Stats.laPaliza.second_place_name})</p>
-                              <p className="text-xs text-ink-3">{phase2Stats.laPaliza.course_name}</p>
+                              <div className="bg-white/70 dark:bg-black/30 border border-black/5 dark:border-white/10 rounded-xl p-3 shadow-soft">
+                                <p className="text-xl sm:text-2xl font-bold text-indigo-800 truncate">{phase2Stats.laPaliza.winner_name}</p>
+                                <p className="text-2xl sm:text-3xl font-black text-ink my-1">{phase2Stats.laPaliza.point_difference} <span className="text-sm font-semibold text-ink-2">puntos de diferencia</span></p>
+                                <p className="text-xs text-ink-3 mt-1">{phase2Stats.laPaliza.winner_points} vs {phase2Stats.laPaliza.second_place_points} ({phase2Stats.laPaliza.second_place_name})</p>
+                                <p className="text-xs text-ink-3">{phase2Stats.laPaliza.course_name}</p>
+                              </div>
                             </div>
                           )}
                         </div>

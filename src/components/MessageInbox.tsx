@@ -1,5 +1,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Trash2 } from "lucide-react";
+import { Copy, Trash2, Flag, Hand, Trophy, Target, Users, Mail } from "lucide-react";
+
+function getMessageIcon(title: string, body?: string) {
+  const text = `${title} ${body || ''}`.toLowerCase();
+  if (text.includes('rojas')) {
+    return { icon: Flag, color: 'text-red-600 bg-red-600/10' };
+  }
+  if (text.includes('spanish hands') || text.includes('spanish')) {
+    return { icon: Hand, color: 'text-sky-500 bg-sky-500/10' };
+  }
+  if (text.includes('hoyo en uno') || text.includes('hole in one')) {
+    return { icon: Trophy, color: 'text-amber-500 bg-amber-500/10' };
+  }
+  if (text.includes('partida')) {
+    return { icon: Target, color: 'text-blue-500 bg-blue-500/10' };
+  }
+  if (text.includes('grupo') || text.includes('team')) {
+    return { icon: Users, color: 'text-indigo-500 bg-indigo-500/10' };
+  }
+  return { icon: Mail, color: 'text-accent-ink bg-accent-soft' };
+}
 import {
   messageService,
   type Inbox,
@@ -173,46 +193,54 @@ export function MessageInbox({
           {loading ? (
             <p role="status">Cargando mensajes…</p>
           ) : (
-            inbox.messages.map((m) => (
-              <article key={m.id} className="flex items-stretch overflow-hidden rounded-xl border border-line bg-card">
-                <button
-                  disabled={busy}
-                  className="min-w-0 flex-1 p-4 text-left"
-                  onClick={async () => {
-                  if (busy) return;
-                  setBusy(true);
-                  try {
-                    const data = await messageService.open(userId, m.id);
-                    if (!alive.current || identity.current !== userId) return;
-                    setOpened(data);
-                    onRead();
-                    await load();
-                  } catch {
-                    if (alive.current && identity.current === userId)
-                      setError(
-                        "No se pudo abrir el mensaje. Inténtalo de nuevo.",
-                      );
-                  } finally {
-                    if (alive.current) setBusy(false);
-                  }
-                }}
-                >
-                <span className="block text-xs text-ink-3">
-                  {m.sender_label || "Administración"} · {new Date(m.sent_at).toLocaleString("es-ES")}
-                </span>
-                <span className="block font-semibold break-words">
-                  {!m.read_at ? "● " : ""}
-                  {m.title}
-                </span>
-                <span className="text-xs">
-                  {m.read_at ? "Leído" : "No leído"}
-                </span>
-                </button>
+            inbox.messages.map((m) => {
+              const { icon: MsgIcon, color: iconColor } = getMessageIcon(m.title, m.body);
+              return (
+                <article key={m.id} className="flex items-stretch overflow-hidden rounded-xl border border-line bg-card shadow-sm">
+                  <button
+                    disabled={busy}
+                    className="min-w-0 flex-1 p-4 text-left flex items-start gap-3"
+                    onClick={async () => {
+                    if (busy) return;
+                    setBusy(true);
+                    try {
+                      const data = await messageService.open(userId, m.id);
+                      if (!alive.current || identity.current !== userId) return;
+                      setOpened(data);
+                      onRead();
+                      await load();
+                    } catch {
+                      if (alive.current && identity.current === userId)
+                        setError(
+                          "No se pudo abrir el mensaje. Inténtalo de nuevo.",
+                        );
+                    } finally {
+                      if (alive.current) setBusy(false);
+                    }
+                  }}
+                  >
+                  <div className={`p-2 rounded-xl shrink-0 mt-0.5 ${iconColor}`}>
+                    <MsgIcon size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-xs text-ink-3">
+                      {m.sender_label || "Administración"} · {new Date(m.sent_at).toLocaleString("es-ES")}
+                    </span>
+                    <span className="block font-semibold break-words text-ink">
+                      {!m.read_at ? "● " : ""}
+                      {m.title}
+                    </span>
+                    <span className="text-xs text-ink-3">
+                      {m.read_at ? "Leído" : "No leído"}
+                    </span>
+                  </div>
+                  </button>
                 <button type="button" disabled={busy} title="Eliminar mensaje" aria-label={`Eliminar ${m.title}`} onClick={() => void removeOne(m.id)} className="flex w-12 shrink-0 items-center justify-center border-l border-line text-red-600 hover:bg-red-50 disabled:opacity-50">
                   <Trash2 size={18} />
                 </button>
               </article>
-            ))
+              );
+            })
           )}
           {!loading && !inbox.messages.length && !error && (
             <p className="text-ink-3">No tienes mensajes.</p>

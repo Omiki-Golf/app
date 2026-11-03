@@ -3,7 +3,7 @@ import { GroupMessages } from './messages/GroupMessages';
 import { messageService } from '../services/messageService';
 import { WriteButton } from '../context/ReadOnlyContext';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, Check, X, Trophy, Flag, Hand } from 'lucide-react';
+import { Bell, Check, X, Trophy, Flag, Hand, Target, Users } from 'lucide-react';
 import { userService } from '../services/userService';
 import { GroupInvitation, QuickRoundInvitation } from '../types';
 import type { ActivityEvent, ActivityScope } from '../services/messageService';
@@ -144,11 +144,32 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
           {activityError && <p role="alert" className="text-red-600">{activityError}</p>}
           {!activityError && activity.length === 0 && <p className="text-sm text-ink-3">{t('activity.empty')}</p>}
           {activity.map((event) => {
-            const Icon = event.event_type === 'hole_in_one' ? Trophy : event.event_type === 'no_paso_rojas' ? Flag : Hand;
-            return <article key={event.id} className="flex gap-3 rounded-xl border border-line bg-card p-4">
-              <Icon className="mt-0.5 shrink-0 text-accent-ink" size={20} />
-              <div><p className="font-semibold">{event.player_name} · {t(`activity.events.${event.event_type}`)} · {t('activity.hole', { number: event.hole_number })}</p><p className="text-xs text-ink-3">{new Date(event.created_at).toLocaleString()}</p></div>
-            </article>;
+            const isNoPasoRojas = event.event_type === 'no_paso_rojas' || event.event_type?.includes('rojas');
+            const isHoleInOne = event.event_type === 'hole_in_one';
+            const isSpanishHands = event.event_type === 'spanish_hands';
+
+            const Icon = isHoleInOne ? Trophy : isNoPasoRojas ? Flag : isSpanishHands ? Hand : Bell;
+            const iconColor = isHoleInOne
+              ? 'text-amber-500 bg-amber-500/10'
+              : isNoPasoRojas
+              ? 'text-red-600 bg-red-600/10'
+              : isSpanishHands
+              ? 'text-sky-500 bg-sky-500/10'
+              : 'text-accent-ink bg-accent-soft';
+
+            return (
+              <article key={event.id} className="flex items-start gap-3 rounded-xl border border-line bg-card p-4 shadow-sm">
+                <div className={`p-2 rounded-xl shrink-0 ${iconColor}`}>
+                  <Icon size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-ink">
+                    {event.player_name} · {t(`activity.events.${event.event_type}`) || (isNoPasoRojas ? 'No pasó de rojas' : event.event_type)} · {t('activity.hole', { number: event.hole_number })}
+                  </p>
+                  <p className="text-xs text-ink-3 mt-0.5">{new Date(event.created_at).toLocaleString()}</p>
+                </div>
+              </article>
+            );
           })}
         </section>}
 
@@ -156,11 +177,18 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
         {managesGroups && <button className="w-full bg-card border border-line rounded-xl p-3 text-ink mb-5" onClick={() => setShowGroupMessages(true)}>Mensajes de mis grupos</button>}
         <MessageInbox key={userId || 'express'} userId={userId} onRead={onInvitationResolved} />
         {quickRoundInvitations.length > 0 && <div className="mb-5 space-y-3">
-          {quickRoundInvitations.map(invitation => <div key={invitation.id} className="rounded-2xl bg-card p-5 shadow-card">
-            <p className="mb-1 text-base font-semibold text-ink">
-              {invitation.inviter_nick} te ha añadido a una partida en <strong>{invitation.course_name}</strong>.
-            </p>
-            <p className="mb-4 text-sm text-ink-3">¿Quieres guardar los resultados en Mis partidas y Mis estadísticas?</p>
+          {quickRoundInvitations.map(invitation => <div key={invitation.id} className="rounded-2xl bg-card p-5 shadow-card border border-line">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+                <Target size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="mb-1 text-base font-semibold text-ink">
+                  {invitation.inviter_nick} te ha añadido a una partida en <strong>{invitation.course_name}</strong>.
+                </p>
+                <p className="text-sm text-ink-3">¿Quieres guardar los resultados en Mis partidas y Mis estadísticas?</p>
+              </div>
+            </div>
             <div className="flex gap-2">
               <WriteButton onClick={() => void handleQuickRoundRespond(invitation.id, 'accepted')} disabled={responding !== null} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-accent py-2.5 font-semibold text-on-accent disabled:opacity-50"><Check size={16} />Aceptar</WriteButton>
               <WriteButton onClick={() => void handleQuickRoundRespond(invitation.id, 'rejected')} disabled={responding !== null} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-card-2 py-2.5 font-semibold text-ink-2 disabled:opacity-50"><X size={16} />Rechazar</WriteButton>
@@ -183,10 +211,17 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
         )) : (
           <div className="space-y-3">
             {invitations.map(inv => (
-              <div key={inv.id} className="bg-card rounded-2xl shadow-card p-5">
-                <p className="mb-4 text-base font-semibold text-ink">
-                  ¿Quieres aceptar la invitación de {inv.inviter_profile?.nick || 'alguien'} al grupo <strong>{inv.group?.name}</strong>?
-                </p>
+              <div key={inv.id} className="bg-card rounded-2xl shadow-card p-5 border border-line">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 shrink-0">
+                    <Users size={22} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-semibold text-ink">
+                      ¿Quieres aceptar la invitación de {inv.inviter_profile?.nick || 'alguien'} al grupo <strong>{inv.group?.name}</strong>?
+                    </p>
+                  </div>
+                </div>
 
                 <div className="flex gap-2">
                   <WriteButton

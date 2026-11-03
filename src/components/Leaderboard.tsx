@@ -136,6 +136,53 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         ],
       }));
 
+  const getPodiumRankStyle = (index: number, totalEntries: number) => {
+    const maxPodium = totalEntries <= 2 || gameMode === 'match' || (gameMode === 'parejas' && isTeamView) ? 2 : 3;
+    if (index >= maxPodium) {
+      return {
+        card: 'bg-card border-line hover:border-line-2',
+        badge: 'bg-neutral text-ink-3 border border-line',
+        text: 'text-ink',
+        points: 'text-accent-ink',
+        icon: <span className="text-ink-3 font-bold text-xl">{index + 1}</span>,
+      };
+    }
+    if (index === 0) {
+      return {
+        card: 'bg-gradient-to-r from-amber-500/15 via-yellow-500/10 to-amber-500/5 border-amber-400 dark:border-amber-500/60 shadow-sm',
+        badge: 'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 shadow-sm border border-amber-300 font-black',
+        text: 'text-amber-950 dark:text-amber-200 font-bold',
+        points: 'text-amber-600 dark:text-amber-400 font-black',
+        icon: <Trophy size={26} className="text-amber-500 drop-shadow-sm" />,
+      };
+    }
+    if (index === 1) {
+      return {
+        card: 'bg-gradient-to-r from-slate-400/15 via-slate-300/10 to-slate-400/5 border-slate-300 dark:border-slate-500 shadow-sm',
+        badge: 'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-950 shadow-sm border border-slate-300 font-black',
+        text: 'text-slate-900 dark:text-slate-200 font-bold',
+        points: 'text-slate-700 dark:text-slate-300 font-black',
+        icon: <Medal size={26} className="text-slate-400 drop-shadow-sm" />,
+      };
+    }
+    if (index === 2) {
+      return {
+        card: 'bg-gradient-to-r from-amber-700/15 via-amber-600/10 to-amber-700/5 border-amber-600/40 dark:border-amber-700 shadow-sm',
+        badge: 'bg-gradient-to-br from-amber-600 to-amber-700 text-white shadow-sm border border-amber-500 font-black',
+        text: 'text-amber-900 dark:text-amber-300 font-bold',
+        points: 'text-amber-700 dark:text-amber-400 font-black',
+        icon: <Medal size={26} className="text-amber-700 drop-shadow-sm" />,
+      };
+    }
+    return {
+      card: 'bg-card border-line hover:border-line-2',
+      badge: 'bg-neutral text-ink-3 border border-line',
+      text: 'text-ink',
+      points: 'text-accent-ink',
+      icon: <span className="text-ink-3 font-bold text-xl">{index + 1}</span>,
+    };
+  };
+
   const getMedalIcon = (position: number) => {
     if (position === 0) return <Trophy size={24} className="text-yellow-500" />;
     if (position === 1) return <Medal size={24} className="text-ink-4" />;
@@ -212,61 +259,50 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
             {!showAllRounds ? (
               <>
                 <div className="space-y-3">
-                  {entries.map((entry, index) => (
-                    <div
-                      key={entry.key}
-                      className={`border-2 rounded-lg p-4 flex items-center gap-4 transition-all ${
-                        index === 0
-                          ? 'bg-gradient-to-r from-yellow-50 to-yellow-100 border-yellow-400'
-                          : 'bg-card border-line hover:border-line-2'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg">
-                        {getMedalIcon(index) || (
-                          <span className="text-ink-3 font-bold text-xl">{index + 1}</span>
-                        )}
-                      </div>
-
-                      <div className="flex-1">
-                        <p
-                          className={`font-bold text-lg ${
-                            index === 0 ? 'text-title' : 'text-ink'
-                          }`}
-                        >
-                          {entry.name}{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
-                        </p>
-                        <div className="flex gap-4 text-sm text-ink-3">
-                          <span>HCP: {entry.handicapText}</span>
-                          <span>Hoyos: {entry.holesCompleted}</span>
+                  {entries.map((entry, index) => {
+                    const style = getPodiumRankStyle(index, entries.length);
+                    return (
+                      <div
+                        key={entry.key}
+                        className={`border-2 rounded-lg p-4 flex items-center gap-4 transition-all ${style.card}`}
+                      >
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full font-bold text-lg shrink-0">
+                          {style.icon}
                         </div>
-                        {hasGroup && entry.badges.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {entry.badges.map(badge => (
-                              <span
-                                key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
-                                className={`${badge.kind === 'red' ? 'bg-red-600 text-white' : 'bg-accent text-on-accent'} text-[10px] font-bold rounded-full px-2 py-0.5`}
-                              >
-                                {badge.kind === 'red' ? 'Rojas' : 'Spanish Hands'} H{badge.holeNumber}{badge.owner ? ` · ${badge.owner}` : ''}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
 
-                      <div className="text-right">
-                        <p
-                          className={`text-3xl font-bold ${
-                            index === 0 ? 'text-yellow-800' : 'text-accent-ink'
-                          }`}
-                        >
-                          {entry.totalPoints}
-                        </p>
-                        <p className="text-xs text-ink-3">
-                          {isModeScoring ? 'Puntos' : 'Puntos Obtenidos'}
-                        </p>
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-bold text-lg truncate ${style.text}`}>
+                            {entry.name}{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
+                          </p>
+                          <div className="flex gap-4 text-sm text-ink-3">
+                            <span>HCP: {entry.handicapText}</span>
+                            <span>Hoyos: {entry.holesCompleted}</span>
+                          </div>
+                          {hasGroup && entry.badges.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {entry.badges.map(badge => (
+                                <span
+                                  key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
+                                  className={`${badge.kind === 'red' ? 'bg-red-600 text-white' : 'bg-accent text-on-accent'} text-[10px] font-bold rounded-full px-2 py-0.5`}
+                                >
+                                  {badge.kind === 'red' ? 'Rojas' : 'Spanish Hands'} H{badge.holeNumber}{badge.owner ? ` · ${badge.owner}` : ''}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p className={`text-3xl font-bold ${style.points}`}>
+                            {entry.totalPoints}
+                          </p>
+                          <p className="text-xs text-ink-3">
+                            {isModeScoring ? 'Puntos' : 'Puntos Obtenidos'}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {entries.length === 0 && (
@@ -382,34 +418,28 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                           </div>
 
                           <div className="p-4 space-y-2">
-                            {sortedPlayers.map((item, index) => (
-                              <div
-                                key={item.player.id}
-                                className={`p-3 rounded-lg flex items-center justify-between ${
-                                  index === 0
-                                    ? 'bg-yellow-100 border border-yellow-400'
-                                    : 'bg-card-2 border border-line'
-                                }`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <span className="font-bold text-ink-3 w-6">{index + 1}</span>
-                                  <div>
-                                    <p className="font-semibold text-ink">{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                                    <p className="text-xs text-ink-3">
-                                      HCP {item.player.playing_handicap} • {item.stats.scoresEntered}{' '}
-                                      hoyos
-                                    </p>
-                                  </div>
-                                </div>
-                                <p
-                                  className={`text-2xl font-bold ${
-                                    index === 0 ? 'text-yellow-800' : 'text-accent-ink'
-                                  }`}
+                            {sortedPlayers.map((item, index) => {
+                              const style = getPodiumRankStyle(index, sortedPlayers.length);
+                              return (
+                                <div
+                                  key={item.player.id}
+                                  className={`p-3 rounded-lg flex items-center justify-between border ${style.card}`}
                                 >
-                                  {item.stats.totalPoints}
-                                </p>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-3">
+                                    <span className="w-7 flex justify-center shrink-0">{style.icon}</span>
+                                    <div>
+                                      <p className={`font-semibold ${style.text}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                                      <p className="text-xs text-ink-3">
+                                        HCP {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <p className={`text-2xl font-bold ${style.points}`}>
+                                    {item.stats.totalPoints}
+                                  </p>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

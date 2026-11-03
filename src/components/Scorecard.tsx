@@ -285,31 +285,28 @@ export const Scorecard: React.FC<ScorecardProps> = ({
           </div>
 
           {accessCode && hasEditAccess && (
-            <div className="mb-4 bg-card border-2 border-accent-ring rounded-lg p-4 shadow-soft">
-              <div className="flex items-center gap-2 justify-between">
-                <div className="flex items-center gap-2">
-                  <Lock className="text-accent-ink" size={20} />
-                  <span className="text-sm font-medium text-ink-2">
-                    Código de Acceso:
+            <div className="mb-4 bg-card border-2 border-accent-ring rounded-lg p-3 shadow-soft">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock className="text-accent-ink shrink-0" size={18} />
+                  <span className="text-xs sm:text-sm font-medium text-ink-2 shrink-0">
+                    Acceso:
                   </span>
-                  <code className="text-2xl font-bold text-accent-ink tracking-[0.5em] ml-2">
-                    {showAccessCode ? accessCode : <span className="text-base">••••</span>}
+                  <code className="text-lg sm:text-xl font-bold text-accent-ink tracking-widest truncate">
+                    {showAccessCode ? accessCode : '••••'}
                   </code>
                 </div>
                 <button
                   onClick={() => setShowAccessCode(!showAccessCode)}
-                  className="p-2 hover:bg-accent-soft rounded-lg transition-colors"
+                  className="p-1.5 hover:bg-accent-soft rounded-lg transition-colors text-accent-ink shrink-0"
                   aria-label={showAccessCode ? 'Ocultar código' : 'Mostrar código'}
+                  title={showAccessCode ? 'Ocultar código' : 'Mostrar código'}
                 >
-                  {showAccessCode ? (
-                    <EyeOff className="text-accent-ink" size={20} />
-                  ) : (
-                    <Eye className="text-accent-ink" size={20} />
-                  )}
+                  {showAccessCode ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <p className="text-xs text-ink-3 mt-2">
-                Comparte este código con otros jugadores para que puedan ver y editar puntuaciones
+              <p className="text-[11px] sm:text-xs text-ink-3 mt-1.5 truncate">
+                Comparte el código para ver y editar la partida
               </p>
             </div>
           )}
@@ -686,26 +683,26 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </table>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-ink-3">
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 border border-line-2"></div>
+            <div className="mt-3 flex items-center justify-center gap-x-2.5 sm:gap-x-4 text-[11px] sm:text-xs text-ink-3 whitespace-nowrap overflow-x-auto py-1">
+              <div className="flex items-center gap-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 border border-line-2 shrink-0"></div>
                 <span>Eagle</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-red-500 border border-line-2"></div>
+              <div className="flex items-center gap-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-red-500 border border-line-2 shrink-0"></div>
                 <span>Birdie</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-white border-2 border-line-2"></div>
+              <div className="flex items-center gap-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-white border-2 border-line-2 shrink-0"></div>
                 <span>Par</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-blue-500 border border-line-2"></div>
+              <div className="flex items-center gap-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-blue-500 border border-line-2 shrink-0"></div>
                 <span>Bogey</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 rounded-full bg-black border border-line-2"></div>
-                <span>Doble bogey+</span>
+              <div className="flex items-center gap-1">
+                <div className="w-3.5 h-3.5 rounded-full bg-black border border-line-2 shrink-0"></div>
+                <span>Peor</span>
               </div>
             </div>
 
