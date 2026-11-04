@@ -182,19 +182,19 @@ const ShopRow: React.FC<{
   const locked = item.free || item.comingSoon;
   const inputId = `shop-${item.id}`;
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'} ${item.comingSoon ? 'opacity-70' : ''}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'}`}>
       <input
         id={inputId}
         type="checkbox"
         checked={checked && !item.comingSoon}
         disabled={locked}
         onChange={onToggle}
-        className="h-5 w-5 shrink-0 accent-[var(--accent)] disabled:cursor-not-allowed"
+        className={`h-5 w-5 shrink-0 accent-[var(--accent)] disabled:cursor-not-allowed ${item.comingSoon ? 'opacity-60' : ''}`}
       />
-      <item.icon size={18} className="shrink-0 text-accent-ink" />
+      <item.icon size={18} className={`shrink-0 text-accent-ink ${item.comingSoon ? 'opacity-60' : ''}`} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <label htmlFor={inputId} className={`truncate font-semibold text-ink ${locked ? '' : 'cursor-pointer'}`}>{item.name}</label>
+          <label htmlFor={inputId} className={`truncate font-semibold text-ink ${locked ? '' : 'cursor-pointer'} ${item.comingSoon ? 'opacity-70' : ''}`}>{item.name}</label>
           <InfoTrigger title={item.name} text={item.info} />
         </div>
         {note && <p className="text-xs text-ink-3">{note}</p>}
@@ -229,14 +229,20 @@ const InfoTrigger: React.FC<{ title: string; text: string }> = ({ title, text })
         onClick={() => setShow(current => !current)}
         aria-expanded={show}
         aria-label={`Qué es ${title}`}
-        className="rounded-full p-0.5 text-ink-3 hover:text-ink"
+        className="rounded-full p-0.5 text-ink-3 hover:text-ink transition-colors"
       >
         <Info size={15} />
       </button>
       {show && (
-        <span role="tooltip" className="absolute left-1/2 top-6 z-50 w-64 max-w-[80vw] -translate-x-1/2 rounded-xl border border-line bg-card p-3 text-xs leading-5 text-ink shadow-2xl">
-          {text}
-        </span>
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShow(false)} />
+          <span
+            role="tooltip"
+            className="absolute left-1/2 top-6 z-50 w-64 max-w-[80vw] -translate-x-1/2 rounded-xl border border-slate-700 bg-slate-900 p-3 text-xs leading-relaxed text-slate-100 shadow-2xl backdrop-blur-sm font-normal"
+          >
+            {text}
+          </span>
+        </>
       )}
     </span>
   );

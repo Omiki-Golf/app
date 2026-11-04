@@ -32,7 +32,7 @@ interface AwardRankingModalProps {
 /** Conmutador entre la clasificación justa (promedio por partida) y la absoluta (total). */
 export const RankingModeToggle: React.FC<{ mode: RankingMode; onChange: (mode: RankingMode) => void }> = ({ mode, onChange }) => (
   <div role="radiogroup" aria-label="Tipo de clasificación" className="inline-flex rounded-lg border border-line bg-card-2 p-0.5 text-sm font-semibold">
-    {([['fair', 'Por partida'], ['absolute', 'Absoluto']] as const).map(([value, label]) => (
+    {([['absolute', 'Absoluto'], ['fair', 'Por partida']] as const).map(([value, label]) => (
       <button
         key={value}
         type="button"

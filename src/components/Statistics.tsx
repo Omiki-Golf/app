@@ -820,7 +820,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
                     {isDivend && divendRankings && (
                       <div>
-                        <h3 className="text-lg font-bold text-ink mb-4">Premios Especiales Partideta dels divendres</h3>
+                        <h3 className="text-lg font-bold text-ink mb-4">Premios Especiales</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {divendRankings.patrocinador.length > 0 && (
                             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-5 border-2 border-red-300 shadow-soft">
