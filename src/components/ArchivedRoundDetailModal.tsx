@@ -409,7 +409,12 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
         </div>
 
         <div className="p-4 border-t bg-card-2 flex gap-3">
-
+          <button
+            onClick={onBack}
+            className="flex-1 bg-neutral hover:bg-neutral-hover text-ink font-semibold py-3 rounded-lg transition-colors"
+          >
+            Volver a lista
+          </button>
           <button
             onClick={onClose}
             className="flex-1 bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-lg transition-colors"

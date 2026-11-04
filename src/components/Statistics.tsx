@@ -4,7 +4,7 @@ import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect, useCallback } from 'react';
 import { SelectMenu } from './SelectMenu';
 import { golfService } from '../services/golfService';
-import { User, Users, MapPin, TrendingUp, TrendingDown, Trophy, Award, Medal, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine, Flag, Hand } from 'lucide-react';
+import { User, Users, MapPin, TrendingUp, TrendingDown, Trophy, Award, Medal, Beer, ChevronRight, Euro, Zap, ThumbsDown, Calendar, Target, Activity, TreePine, Flag, Hand, Info } from 'lucide-react';
 import {
   Group,
   ArchivedRound,
@@ -442,7 +442,10 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
         <h3 className="text-lg font-bold text-ink mb-4">Análisis de Juego</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-gradient-to-br from-teal-50 to-teal-100 rounded-lg p-5 border border-teal-200">
-            <h4 className="text-sm font-semibold text-teal-900 mb-2">Ratio Birdies/Bogeys+</h4>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h4 className="text-sm font-semibold text-teal-900">Ratio Birdies/Bogeys+</h4>
+              <StatTooltip text="Mide cuántos birdies logras por cada bogey que cometes: a mayor cifra, mayor precisión y solidez." />
+            </div>
             <p className="text-4xl font-bold text-teal-700">{ratio.toFixed(2)}</p>
             <p className="text-xs text-ink-3 mt-2">
               {birdies || 0} birdies / {totalBogeyPlus} bogeys+
@@ -583,42 +586,42 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
           <div className="flex border-b">
             <button
               onClick={() => setActiveTab('player')}
-              className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-2 sm:px-4 md:px-6 font-semibold flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base transition-colors ${
                 activeTab === 'player'
                   ? 'bg-accent text-on-accent'
                   : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
-              <User size={20} />
-              Jugador
+              <User size={18} className="shrink-0" />
+              <span>Jugador</span>
             </button>
 
             <button
               onClick={() => setActiveTab('group')}
-              className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-2 sm:px-4 md:px-6 font-semibold flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base transition-colors ${
                 activeTab === 'group'
                   ? 'bg-accent text-on-accent'
                   : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
-              <Users size={20} />
-              Grupo
+              <Users size={18} className="shrink-0" />
+              <span>Grupo</span>
             </button>
 
             <button
               onClick={() => setActiveTab('course')}
-              className={`flex-1 py-4 px-6 font-semibold flex items-center justify-center gap-2 transition-colors ${
+              className={`flex-1 py-3 sm:py-4 px-2 sm:px-4 md:px-6 font-semibold flex items-center justify-center gap-1.5 sm:gap-2 text-sm sm:text-base transition-colors ${
                 activeTab === 'course'
                   ? 'bg-accent text-on-accent'
                   : 'bg-card-2 text-ink-2 hover:bg-neutral-hover'
               }`}
             >
-              <MapPin size={20} />
-              Campo
+              <MapPin size={18} className="shrink-0" />
+              <span>Campo</span>
             </button>
           </div>
 
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {activeTab === 'player' && (
               <div>
                 <div className="mb-6">
@@ -1103,36 +1106,37 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                           return (
                             <div
                               key={player.name}
-                              className={`p-4 rounded-xl transition-all ${rankStyle.card}`}
+                              className={`p-3.5 sm:p-4 rounded-xl transition-all ${rankStyle.card}`}
                             >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                                   <div
-                                    className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full text-lg ${rankStyle.badge}`}
+                                    className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center rounded-full text-base sm:text-lg ${rankStyle.badge}`}
                                   >
                                     {index + 1}
                                   </div>
-                                  <div className="min-w-0">
-                                    <p className="font-bold text-lg text-ink truncate">{player.name}</p>
-                                    <div className="flex gap-4 text-sm text-ink-3">
-                                      <span>{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</span>
-                                      <span>{player.wins} {player.wins === 1 ? 'victoria' : 'victorias'}</span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-bold text-base sm:text-lg text-ink truncate">{player.name}</p>
+                                    <div className="flex items-center gap-1.5 text-xs text-ink-3 mt-0.5">
+                                      <span className="whitespace-nowrap">{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</span>
+                                      <span>·</span>
+                                      <span className="whitespace-nowrap">{player.wins} {player.wins === 1 ? 'victoria' : 'victorias'}</span>
                                     </div>
                                   </div>
                                 </div>
-                                <div className="text-right shrink-0 ml-3">
+                                <div className="text-right shrink-0">
                                   {/* Los dos números siempre a la vista; el del orden elegido, destacado. */}
-                                  <p className={`text-3xl font-black ${rankStyle.score}`}>
+                                  <p className={`text-2xl sm:text-3xl font-black ${rankStyle.score}`}>
                                     {generalMode === 'fair' ? formatAverage(player.averagePoints) : player.totalPoints}
                                   </p>
-                                  <p className="text-xs text-ink-3">
-                                    {generalMode === 'fair' ? `de media · ${player.totalPoints} pts totales` : `pts totales · ${formatAverage(player.averagePoints)} de media`}
+                                  <p className="text-xs text-ink-3 whitespace-nowrap">
+                                    {generalMode === 'fair' ? `Total: ${player.totalPoints} pts` : `Media: ${formatAverage(player.averagePoints)}`}
                                   </p>
                                   {isDivend && (
-                                    <div className="flex items-center gap-1 justify-end mt-1">
-                                      <Beer size={16} className="text-amber-700" />
+                                    <div className="flex items-center gap-1 justify-end mt-0.5">
+                                      <Beer size={15} className="text-amber-700" />
                                       <p
-                                        className={`text-sm font-semibold ${
+                                        className={`text-xs sm:text-sm font-semibold ${
                                           player.beerBalance >= 0 ? 'text-accent-ink' : 'text-red-600'
                                         }`}
                                       >
@@ -1413,6 +1417,49 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
           />
         )}
       </div>
+    </div>
+  );
+};
+
+interface StatTooltipProps {
+  text: string;
+}
+
+const StatTooltip: React.FC<StatTooltipProps> = ({ text }) => {
+  const [show, setShow] = useState(false);
+
+  return (
+    <div className="relative inline-flex items-center">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShow((prev) => !prev);
+        }}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        className="p-1 text-teal-800 dark:text-teal-200 hover:text-teal-950 dark:hover:text-white transition-colors rounded-full focus:outline-none"
+        aria-label="Más información"
+      >
+        <Info size={16} />
+      </button>
+      {show && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShow(false);
+            }}
+          />
+          <div
+            role="tooltip"
+            className="fixed sm:absolute z-50 left-4 right-4 sm:left-auto sm:right-0 top-1/2 -translate-y-1/2 sm:top-7 sm:translate-y-0 sm:w-64 bg-slate-900/95 text-slate-100 text-xs p-3 rounded-xl shadow-2xl border border-slate-700/80 leading-relaxed font-normal normal-case pointer-events-auto backdrop-blur-sm"
+          >
+            {text}
+          </div>
+        </>
+      )}
     </div>
   );
 };
