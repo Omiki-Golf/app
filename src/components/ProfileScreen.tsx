@@ -95,33 +95,62 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
 
         {/* Profile header */}
-        <div className="bg-card rounded-2xl shadow-card p-6 mb-5">
-          <div className="flex items-center gap-4">
-            <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-[3px] ${avatarPlanClasses[planType]}`}>
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="avatar" className="h-14 w-14 rounded-full bg-white object-cover ring-1 ring-white/80" />
-              ) : (
-                <Settings className="text-white" size={24} />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className={`whitespace-nowrap font-bold leading-tight text-ink ${nickSize}`}>{nick}</h2>
-              <p className="break-words text-sm text-ink-3">{profile?.display_name || ''}</p>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full uppercase ${isTeam ? 'bg-amber-100 text-amber-700' : 'bg-accent-soft text-accent-ink'}`}>
-                  {isTeam && <Crown size={13} fill="currentColor" aria-hidden="true" />}
+        <div className="bg-card rounded-2xl shadow-card p-5 sm:p-6 mb-5">
+          <div className="flex items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+              {/* Avatar + Tipo de jugador (plan) debajo */}
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full border-[3px] ${avatarPlanClasses[planType]}`}>
+                  {profile?.avatar_url ? (
+                    <img src={profile.avatar_url} alt="avatar" className="h-14 w-14 rounded-full bg-white object-cover ring-1 ring-white/80" />
+                  ) : (
+                    <Settings className="text-white" size={24} />
+                  )}
+                </div>
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${isTeam ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400' : 'bg-accent-soft text-accent-ink'}`}>
+                  {isTeam && <Crown size={11} fill="currentColor" aria-hidden="true" />}
                   {planType}
                 </span>
-                {handicap18 !== undefined && (
-                  <span className="inline-flex items-center gap-1 text-xs text-ink-3">
-                    HCP 18: {handicap18}
-                    <button type="button" onClick={() => setShowHandicapInfo(true)} className="inline-flex h-5 w-5 items-center justify-center rounded-full text-accent-ink hover:bg-accent-soft" aria-label={t('profile.handicapInfo')}>
-                      <Info size={15} aria-hidden="true" />
-                    </button>
-                  </span>
+              </div>
+
+              {/* Nombre y Nick del jugador */}
+              <div className="min-w-0 flex-1">
+                <h2 className={`whitespace-nowrap font-bold leading-tight text-ink ${nickSize}`}>{nick}</h2>
+                {profile?.display_name && (
+                  <p className="break-words text-sm text-ink-3 mt-0.5">{profile.display_name}</p>
                 )}
               </div>
             </div>
+
+            {/* Hándicap en números grandes a la derecha */}
+            {handicap18 !== undefined && (
+              <div
+                className="shrink-0 text-right pl-3 sm:pl-4 border-l border-line flex flex-col items-end justify-center"
+                aria-label={`HCP 18: ${handicap18}, HCP 9: ${handicap9}`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">HCP</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowHandicapInfo(true)}
+                    className="inline-flex h-4 w-4 items-center justify-center rounded-full text-accent-ink hover:bg-accent-soft transition-colors"
+                    aria-label={t('profile.handicapInfo')}
+                    title={t('profile.handicapInfo')}
+                  >
+                    <Info size={13} aria-hidden="true" />
+                  </button>
+                </div>
+                <p className="text-2xl sm:text-3xl font-black text-ink leading-tight mt-0.5 tracking-tight">
+                  <span className="text-amber-700 dark:text-amber-400">{handicap9}</span>
+                  <span className="text-ink-4 text-xl sm:text-2xl font-light mx-0.5 sm:mx-1">/</span>
+                  <span className="text-accent-ink">{handicap18}</span>
+                </p>
+                <span className="sr-only">HCP 18: {handicap18}</span>
+                <p className="text-[10px] text-ink-3 font-semibold uppercase tracking-wider">
+                  9h <span className="text-ink-4">/</span> 18h
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

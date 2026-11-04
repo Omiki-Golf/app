@@ -95,7 +95,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div className="flex shrink-0 items-center gap-2">
               <div className="min-w-0 text-right">
                 <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
-                <p className="text-xs text-ink-3">HCP {profile?.exact_handicap ?? 0}</p>
+                <p className="text-xs text-ink-3">HCP {Math.round((profile?.exact_handicap ?? 0) / 2)}/{profile?.exact_handicap ?? 0}</p>
               </div>
               <button
                 onClick={onShowProfile}
