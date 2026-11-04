@@ -2785,93 +2785,200 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return data?.[0] || null;
   },
 
-  async getHoyoMuerte(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
-    const { data, error } = await supabase.rpc('get_hoyo_muerte', {
-      p_group_id: groupId,
-      p_course_name: courseName,
-    });
-    if (error) throw error;
-    return data?.[0] || null;
-  },
-
-  async getHoyoGloria(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
-    const { data, error } = await supabase.rpc('get_hoyo_gloria', {
-      p_group_id: groupId,
-      p_course_name: courseName,
-    });
-    if (error) throw error;
-    return data?.[0] || null;
-  },
-
-  async getHoyoRegular(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
+  async getCourseRoundRows(groupId: string, courseName: string): Promise<any[]> {
     try {
       const { data, error } = await supabase
         .from('group_statistics_rounds')
-        .select('hole_scores')
+        .select('id, course_name, hole_scores, final_ranking, played_at, created_at')
         .eq('group_id', groupId)
         .eq('course_name', courseName);
 
-      const rows = !error && data && data.length > 0 ? data : null;
-      let finalRows = rows;
+      if (!error && data && data.length > 0) return data;
 
-      if (!finalRows) {
-        const { data: arData } = await supabase
-          .from('archived_rounds')
-          .select('hole_scores')
-          .eq('group_id', groupId)
-          .eq('course_name', courseName);
-        if (arData && arData.length) finalRows = arData;
-      }
+      const { data: arData } = await supabase
+        .from('archived_rounds')
+        .select('id, course_name, hole_scores, final_ranking, played_at, created_at')
+        .eq('group_id', groupId)
+        .eq('course_name', courseName);
 
-      if (!finalRows || !finalRows.length) return null;
-
-      const holeMap = new Map<number, { hole_number: number; par: number; pars: number; total_plays: number }>();
-
-      for (const round of finalRows) {
-        const scores = Array.isArray(round.hole_scores) ? round.hole_scores : [];
-        for (const s of scores) {
-          const gross = Number((s as any)?.gross_strokes);
-          const par = Number((s as any)?.par);
-          const holeNum = Number((s as any)?.hole_number);
-          if (!gross || gross <= 0 || !par || !holeNum) continue;
-
-          let entry = holeMap.get(holeNum);
-          if (!entry) {
-            entry = { hole_number: holeNum, par, pars: 0, total_plays: 0 };
-            holeMap.set(holeNum, entry);
-          }
-          entry.total_plays += 1;
-          if (gross === par) {
-            entry.pars += 1;
-          }
-        }
-      }
-
-      if (holeMap.size === 0) return null;
-
-      const sorted = Array.from(holeMap.values()).sort((a, b) => b.pars - a.pars || b.total_plays - a.total_plays);
-      const best = sorted[0];
-      if (!best || best.pars === 0) return null;
-
-      return {
-        hole_number: best.hole_number,
-        par: best.par,
-        pars: best.pars,
-        total_plays: best.total_plays,
-      };
-    } catch (err) {
-      console.warn('Error fetching Hoyo Regular:', err);
-      return null;
+      return arData || [];
+    } catch {
+      return [];
     }
   },
 
+  async getHoyoMuerte(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
+    try {
+      const { data, error } = await supabase.rpc('get_hoyo_muerte', {
+        p_group_id: groupId,
+        p_course_name: courseName,
+      });
+      if (!error && data && data.length > 0) return data[0];
+    } catch {}
+
+    const rows = await this.getCourseRoundRows(groupId, courseName);
+    if (!rows.length) return null;
+
+    const holeMap = new Map<number, HolePerformanceStatistics>();
+    for (const round of rows) {
+      const scores = Array.isArray(round.hole_scores) ? round.hole_scores : [];
+      for (const s of scores) {
+        const gross = Number((s as any)?.gross_strokes);
+        const par = Number((s as any)?.par);
+        const holeNum = Number((s as any)?.hole_number);
+        if (!gross || gross <= 0 || !par || !holeNum) continue;
+
+        let m = holeMap.get(holeNum);
+        if (!m) {
+          m = {
+            hole_number: holeNum,
+            par,
+            total_bad_scores: 0,
+            bogeys: 0,
+            double_bogeys: 0,
+            triple_or_worse: 0,
+            total_plays: 0,
+          };
+          holeMap.set(holeNum, m);
+        }
+        m.total_plays++;
+        if (gross > par) {
+          m.total_bad_scores = (m.total_bad_scores || 0) + 1;
+          if (gross === par + 1) m.bogeys = (m.bogeys || 0) + 1;
+          else if (gross === par + 2) m.double_bogeys = (m.double_bogeys || 0) + 1;
+          else if (gross >= par + 3) m.triple_or_worse = (m.triple_or_worse || 0) + 1;
+        }
+      }
+    }
+
+    if (holeMap.size === 0) return null;
+    const sorted = Array.from(holeMap.values()).sort(
+      (a, b) =>
+        (b.total_bad_scores || 0) - (a.total_bad_scores || 0) ||
+        (b.triple_or_worse || 0) - (a.triple_or_worse || 0) ||
+        (b.double_bogeys || 0) - (a.double_bogeys || 0) ||
+        b.total_plays - a.total_plays
+    );
+    return sorted[0] || null;
+  },
+
+  async getHoyoGloria(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
+    try {
+      const { data, error } = await supabase.rpc('get_hoyo_gloria', {
+        p_group_id: groupId,
+        p_course_name: courseName,
+      });
+      if (!error && data && data.length > 0) return data[0];
+    } catch {}
+
+    const rows = await this.getCourseRoundRows(groupId, courseName);
+    if (!rows.length) return null;
+
+    const holeMap = new Map<number, HolePerformanceStatistics>();
+    for (const round of rows) {
+      const scores = Array.isArray(round.hole_scores) ? round.hole_scores : [];
+      for (const s of scores) {
+        const gross = Number((s as any)?.gross_strokes);
+        const par = Number((s as any)?.par);
+        const holeNum = Number((s as any)?.hole_number);
+        if (!gross || gross <= 0 || !par || !holeNum) continue;
+
+        let g = holeMap.get(holeNum);
+        if (!g) {
+          g = {
+            hole_number: holeNum,
+            par,
+            total_good_scores: 0,
+            eagles: 0,
+            birdies: 0,
+            total_plays: 0,
+          };
+          holeMap.set(holeNum, g);
+        }
+        g.total_plays++;
+        if (gross < par) {
+          g.total_good_scores = (g.total_good_scores || 0) + 1;
+          if (gross <= par - 2) g.eagles = (g.eagles || 0) + 1;
+          else if (gross === par - 1) g.birdies = (g.birdies || 0) + 1;
+        }
+      }
+    }
+
+    if (holeMap.size === 0) return null;
+    const sorted = Array.from(holeMap.values()).sort(
+      (a, b) =>
+        (b.total_good_scores || 0) - (a.total_good_scores || 0) ||
+        (b.eagles || 0) - (a.eagles || 0) ||
+        (b.birdies || 0) - (a.birdies || 0) ||
+        b.total_plays - a.total_plays
+    );
+    return sorted[0] || null;
+  },
+
+  async getHoyoRegular(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
+    const rows = await this.getCourseRoundRows(groupId, courseName);
+    if (!rows.length) return null;
+
+    const holeMap = new Map<number, HolePerformanceStatistics>();
+    for (const round of rows) {
+      const scores = Array.isArray(round.hole_scores) ? round.hole_scores : [];
+      for (const s of scores) {
+        const gross = Number((s as any)?.gross_strokes);
+        const par = Number((s as any)?.par);
+        const holeNum = Number((s as any)?.hole_number);
+        if (!gross || gross <= 0 || !par || !holeNum) continue;
+
+        let entry = holeMap.get(holeNum);
+        if (!entry) {
+          entry = {
+            hole_number: holeNum,
+            par,
+            pars: 0,
+            total_plays: 0,
+          };
+          holeMap.set(holeNum, entry);
+        }
+        entry.total_plays++;
+        if (gross === par) {
+          entry.pars = (entry.pars || 0) + 1;
+        }
+      }
+    }
+
+    if (holeMap.size === 0) return null;
+    const sorted = Array.from(holeMap.values()).sort(
+      (a, b) => (b.pars || 0) - (a.pars || 0) || b.total_plays - a.total_plays
+    );
+    return sorted[0] || null;
+  },
+
   async getMejorRondaCampo(groupId: string, courseName: string): Promise<BestCourseRoundStatistics | null> {
-    const { data, error } = await supabase.rpc('get_mejor_ronda_campo', {
-      p_group_id: groupId,
-      p_course_name: courseName,
-    });
-    if (error) throw error;
-    return data?.[0] || null;
+    try {
+      const { data, error } = await supabase.rpc('get_mejor_ronda_campo', {
+        p_group_id: groupId,
+        p_course_name: courseName,
+      });
+      if (!error && data && data.length > 0) return data[0];
+    } catch {}
+
+    const rows = await this.getCourseRoundRows(groupId, courseName);
+    if (!rows.length) return null;
+
+    let best: BestCourseRoundStatistics | null = null;
+    for (const round of rows) {
+      const rankings = Array.isArray(round.final_ranking) ? round.final_ranking : [];
+      for (const p of rankings) {
+        const pts = Number(p.points ?? p.total_points ?? p.stableford_points ?? 0);
+        if (!best || pts > best.best_score) {
+          best = {
+            player_name: p.player_name || 'Desconocido',
+            best_score: pts,
+            played_at: round.played_at || round.created_at || new Date().toISOString(),
+          };
+        }
+      }
+    }
+    return best;
   },
 
   async getDailyRankingForDate(groupId: string, date: Date): Promise<ArchivedDailyRanking[]> {
