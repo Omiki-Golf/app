@@ -35,6 +35,7 @@ import { getUserId } from '../utils/userId';
 import { storageUtils } from '../utils/storage';
 import { generateAccessCode } from '../utils/accessCode';
 import { ensureExpressIdentity } from './expressIdentity';
+import { findLatestPlayingHandicap, type CareerAccount } from '../utils/careerStats';
 
 const getRoundOwnerId = async (): Promise<string> => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -608,6 +609,76 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       holes,
       courseNames: Object.fromEntries(courses.map(course => [course.id, course.name])) as Record<string, string>,
     };
+  },
+
+  /**
+   * Obtiene el hándicap de juego de la última partida del jugador en cualquiera de las 4 modalidades
+   * (stableford, match, sindicato, parejas), sin tener en cuenta las partidas de Team.
+   * Devuelve { handicap9, handicap18 } o null si no se encuentra.
+   */
+  async getLatestNonTeamPlayingHandicap(account?: {
+    userId?: string | null;
+    nick?: string | null;
+    displayName?: string | null;
+  }): Promise<{ handicap9: number; handicap18: number } | null> {
+    try {
+      const sessionUser = (await supabase.auth.getSession()).data.session?.user;
+      let rounds: any[] = [];
+
+      if (sessionUser) {
+        const { data, error } = await supabase.rpc('list_my_quick_rounds', {
+          p_statuses: ['completed', 'archived'],
+        });
+        if (!error && data?.length) {
+          rounds = data;
+        } else {
+          const { data: activeData, error: activeErr } = await supabase.rpc('list_my_quick_rounds', {
+            p_statuses: ['active'],
+          });
+          if (!activeErr && activeData?.length) {
+            rounds = activeData;
+          }
+        }
+      }
+
+      if (!rounds.length) {
+        const targetUserId = account?.userId || sessionUser?.id || getUserId();
+        const { data, error } = await supabase
+          .from('golf_rounds')
+          .select('id, num_holes, game_mode, status, created_at')
+          .eq('user_id', targetUserId)
+          .is('group_id', null)
+          .in('status', ['completed', 'archived', 'active'])
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (!error && data) {
+          rounds = data;
+        }
+      }
+
+      if (!rounds.length) return null;
+
+      const candidateRounds = rounds.slice(0, 10);
+      const roundIds = candidateRounds.map((r: any) => r.id);
+
+      const { data: players, error: playersError } = await supabase
+        .from('round_players')
+        .select('id, round_id, user_id, name, playing_handicap')
+        .in('round_id', roundIds);
+
+      if (playersError || !players || !players.length) return null;
+
+      const careerAccount: CareerAccount = {
+        userId: account?.userId || sessionUser?.id || '',
+        nick: account?.nick || '',
+        displayName: account?.displayName || '',
+      };
+
+      return findLatestPlayingHandicap(careerAccount, candidateRounds, players);
+    } catch (err) {
+      console.warn('Error fetching latest non-team playing handicap:', err);
+      return null;
+    }
   },
 
   async archiveQuickPlayRound(roundId: string): Promise<void> {
@@ -2730,6 +2801,68 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     });
     if (error) throw error;
     return data?.[0] || null;
+  },
+
+  async getHoyoRegular(groupId: string, courseName: string): Promise<HolePerformanceStatistics | null> {
+    try {
+      const { data, error } = await supabase
+        .from('group_statistics_rounds')
+        .select('hole_scores')
+        .eq('group_id', groupId)
+        .eq('course_name', courseName);
+
+      const rows = !error && data && data.length > 0 ? data : null;
+      let finalRows = rows;
+
+      if (!finalRows) {
+        const { data: arData } = await supabase
+          .from('archived_rounds')
+          .select('hole_scores')
+          .eq('group_id', groupId)
+          .eq('course_name', courseName);
+        if (arData && arData.length) finalRows = arData;
+      }
+
+      if (!finalRows || !finalRows.length) return null;
+
+      const holeMap = new Map<number, { hole_number: number; par: number; pars: number; total_plays: number }>();
+
+      for (const round of finalRows) {
+        const scores = Array.isArray(round.hole_scores) ? round.hole_scores : [];
+        for (const s of scores) {
+          const gross = Number((s as any)?.gross_strokes);
+          const par = Number((s as any)?.par);
+          const holeNum = Number((s as any)?.hole_number);
+          if (!gross || gross <= 0 || !par || !holeNum) continue;
+
+          let entry = holeMap.get(holeNum);
+          if (!entry) {
+            entry = { hole_number: holeNum, par, pars: 0, total_plays: 0 };
+            holeMap.set(holeNum, entry);
+          }
+          entry.total_plays += 1;
+          if (gross === par) {
+            entry.pars += 1;
+          }
+        }
+      }
+
+      if (holeMap.size === 0) return null;
+
+      const sorted = Array.from(holeMap.values()).sort((a, b) => b.pars - a.pars || b.total_plays - a.total_plays);
+      const best = sorted[0];
+      if (!best || best.pars === 0) return null;
+
+      return {
+        hole_number: best.hole_number,
+        par: best.par,
+        pars: best.pars,
+        total_plays: best.total_plays,
+      };
+    } catch (err) {
+      console.warn('Error fetching Hoyo Regular:', err);
+      return null;
+    }
   },
 
   async getMejorRondaCampo(groupId: string, courseName: string): Promise<BestCourseRoundStatistics | null> {

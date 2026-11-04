@@ -208,46 +208,6 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
               </div>
             </Section>
 
-            {/* C. RENDIMIENTO POR CAMPO */}
-            <Section icon={MapPin} title="Rendimiento por campo">
-              <div className="mb-3 grid grid-cols-1 gap-2 text-sm">
-                {[
-                  stats.bestCourse && { label: 'Donde más rindo', value: `${courseLabel(stats.bestCourse)} · media ${formatNumber(stats.bestCourse.average)} pts` },
-                  stats.worstCourse && { label: 'Donde menos rindo', value: `${courseLabel(stats.worstCourse)} · media ${formatNumber(stats.worstCourse.average)} pts` },
-                  stats.mostPlayedCourse && { label: 'Donde más juego', value: `${stats.mostPlayedCourse.name} · ${stats.mostPlayedCourse.rounds} ${stats.mostPlayedCourse.rounds === 1 ? 'partida' : 'partidas'}` },
-                ].filter((item): item is { label: string; value: string } => Boolean(item)).map(item => (
-                  <p key={item.label} className="rounded-lg bg-card-2 px-3 py-2">
-                    <span className="block text-xs text-ink-3">{item.label}</span>
-                    <span className="block font-semibold text-ink">{item.value}</span>
-                  </p>
-                ))}
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-xs text-ink-3">
-                      <th className="py-1.5 text-left font-semibold">Campo</th>
-                      <th className="px-1 py-1.5 text-center font-semibold">Part.</th>
-                      <th className="px-1 py-1.5 text-center font-semibold">Mejor</th>
-                      <th className="px-1 py-1.5 text-center font-semibold">Peor</th>
-                      <th className="px-1 py-1.5 text-center font-semibold">Media</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.courses.map(course => (
-                      <tr key={courseLabel(course)} className="border-b border-line last:border-0">
-                        <td className="max-w-[9rem] truncate py-1.5 text-ink">{course.courseName} <span className="text-xs text-ink-3">· {course.numHoles}h</span></td>
-                        <td className="px-1 py-1.5 text-center text-ink-2">{course.rounds}</td>
-                        <td className="px-1 py-1.5 text-center font-semibold text-ink">{course.best}</td>
-                        <td className="px-1 py-1.5 text-center text-ink-2">{course.worst}</td>
-                        <td className="px-1 py-1.5 text-center font-semibold text-ink">{formatNumber(course.average)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Section>
-
             {/* D. DISTRIBUCIÓN DE RESULTADOS POR HOYO (ACUMULADO) */}
             <Section icon={Target} title="Resultados por hoyo (neto)">
               <ul className="space-y-2">
@@ -319,11 +279,6 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
 
             {/* E. MOMENTOS */}
             <Section icon={Award} title="Momentos">
-              <div className="mb-3 grid grid-cols-3 gap-2 text-center">
-                <div><p className="text-xl font-bold text-title">{stats.holeInOnes}</p><p className="text-xs text-ink-3">Hoyos en uno</p></div>
-                <div><p className="text-xl font-bold text-title">{stats.spanishHands}</p><p className="text-xs text-ink-3">Spanish Hands</p></div>
-                <div><p className="text-xl font-bold text-title">{stats.noPasoRojas}</p><p className="text-xs text-ink-3">No pasó de rojas</p></div>
-              </div>
               <ul className="divide-y divide-line text-sm">
                 {stats.bestRound && (
                   <li className="flex justify-between gap-3 py-2"><span className="text-ink-3">Mejor vuelta</span><span className="text-right"><span className="block font-semibold text-ink">{stats.bestRound.points} pts en {stats.bestRound.holes} hoyos</span><span className="text-xs text-ink-3">{stats.bestRound.courseName} · {shortDate.format(new Date(stats.bestRound.date))}</span></span></li>
@@ -350,6 +305,46 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
                 </ul>
               </Section>
             )}
+
+            {/* C. RENDIMIENTO POR CAMPO */}
+            <Section icon={MapPin} title="Rendimiento por campo">
+              <div className="mb-3 grid grid-cols-1 gap-2 text-sm">
+                {[
+                  stats.bestCourse && { label: 'Donde más rindo', value: `${courseLabel(stats.bestCourse)} · media ${formatNumber(stats.bestCourse.average)} pts` },
+                  stats.worstCourse && { label: 'Donde menos rindo', value: `${courseLabel(stats.worstCourse)} · media ${formatNumber(stats.worstCourse.average)} pts` },
+                  stats.mostPlayedCourse && { label: 'Donde más juego', value: `${stats.mostPlayedCourse.name} · ${stats.mostPlayedCourse.rounds} ${stats.mostPlayedCourse.rounds === 1 ? 'partida' : 'partidas'}` },
+                ].filter((item): item is { label: string; value: string } => Boolean(item)).map(item => (
+                  <p key={item.label} className="rounded-lg bg-card-2 px-3 py-2">
+                    <span className="block text-xs text-ink-3">{item.label}</span>
+                    <span className="block font-semibold text-ink">{item.value}</span>
+                  </p>
+                ))}
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-line text-xs text-ink-3">
+                      <th className="py-1.5 text-left font-semibold">Campo</th>
+                      <th className="px-1 py-1.5 text-center font-semibold">Part.</th>
+                      <th className="px-1 py-1.5 text-center font-semibold">Mejor</th>
+                      <th className="px-1 py-1.5 text-center font-semibold">Peor</th>
+                      <th className="px-1 py-1.5 text-center font-semibold">Media</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.courses.map(course => (
+                      <tr key={courseLabel(course)} className="border-b border-line last:border-0">
+                        <td className="max-w-[9rem] truncate py-1.5 text-ink">{course.courseName} <span className="text-xs text-ink-3">· {course.numHoles}h</span></td>
+                        <td className="px-1 py-1.5 text-center text-ink-2">{course.rounds}</td>
+                        <td className="px-1 py-1.5 text-center font-semibold text-ink">{course.best}</td>
+                        <td className="px-1 py-1.5 text-center text-ink-2">{course.worst}</td>
+                        <td className="px-1 py-1.5 text-center font-semibold text-ink">{formatNumber(course.average)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
 
             {/* G. ÚLTIMAS 3 PARTIDAS (acceso rápido a Mis partidas) */}
             <Section icon={Trophy} title="Últimas partidas">

@@ -38,6 +38,7 @@ interface PlayerStatisticsView extends PlayerStatisticsSummary {
 interface CourseStatisticsView extends CourseStatisticsSummary {
   hoyoMuerte: HolePerformanceStatistics | null;
   hoyoGloria: HolePerformanceStatistics | null;
+  hoyoRegular: HolePerformanceStatistics | null;
   mejorRonda: BestCourseRoundStatistics | null;
 }
 
@@ -246,10 +247,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
   const loadCourseStatistics = useCallback(async (courseName: string) => {
     try {
-      const [basicStats, hoyoMuerte, hoyoGloria, mejorRonda] = await Promise.all([
+      const [basicStats, hoyoMuerte, hoyoGloria, hoyoRegular, mejorRonda] = await Promise.all([
         golfService.getCourseStatistics(courseName, currentGroup.id),
         golfService.getHoyoMuerte(currentGroup.id, courseName).catch(() => null),
         golfService.getHoyoGloria(currentGroup.id, courseName).catch(() => null),
+        golfService.getHoyoRegular(currentGroup.id, courseName).catch(() => null),
         golfService.getMejorRondaCampo(currentGroup.id, courseName).catch(() => null),
       ]);
 
@@ -257,6 +259,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
         ...basicStats,
         hoyoMuerte,
         hoyoGloria,
+        hoyoRegular,
         mejorRonda,
       });
     } catch (err) {
@@ -1237,7 +1240,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
                       {courseStats.hoyoMuerte && (
                         <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/40 dark:to-red-900/30 rounded-lg p-5 border-2 border-red-300 dark:border-red-800 shadow-soft">
                           <h4 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Hoyo de la Muerte</h4>
@@ -1267,6 +1270,20 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                             </p>
                             <p className="text-xs text-ink-3">
                               {courseStats.hoyoGloria.eagles} eagles, {courseStats.hoyoGloria.birdies} birdies
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {courseStats.hoyoRegular && (
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/30 rounded-lg p-5 border-2 border-blue-300 dark:border-blue-700 shadow-soft">
+                          <h4 className="text-lg font-bold text-blue-900 dark:text-blue-300 mb-2">Hoyo Regular</h4>
+                          <p className="text-sm text-ink-2 mb-3">Más pares</p>
+                          <p className="text-3xl font-bold text-blue-800 dark:text-blue-400">Hoyo #{courseStats.hoyoRegular.hole_number}</p>
+                          <p className="text-sm text-ink-3 mt-2">Par {courseStats.hoyoRegular.par}</p>
+                          <div className="mt-3 space-y-1">
+                            <p className="text-xs text-ink-2">
+                              <span className="font-semibold">{courseStats.hoyoRegular.pars}</span> pares de <span className="font-semibold">{courseStats.hoyoRegular.total_plays}</span> jugadas
                             </p>
                           </div>
                         </div>

@@ -24,6 +24,8 @@ interface HomeScreenProps {
   onToggleSimulator: () => void;
   onCycleSimulatorPlan: () => void;
   messagesButton?: React.ReactNode;
+  handicap9?: number;
+  handicap18?: number;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -42,10 +44,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onToggleSimulator,
   onCycleSimulatorPlan,
   messagesButton,
+  handicap9,
+  handicap18,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
+  const fallbackHcp18 = profile?.exact_handicap !== undefined && profile?.exact_handicap !== null
+    ? Math.round(profile.exact_handicap)
+    : 0;
+  const fallbackHcp9 = Math.round(fallbackHcp18 / 2);
+  const displayHcp9 = handicap9 ?? fallbackHcp9;
+  const displayHcp18 = handicap18 ?? fallbackHcp18;
   const avatarPlanClasses: Record<PlanType, string> = {
     express: 'border-blue-500 bg-blue-500 hover:bg-blue-600',
     player: 'border-emerald-500 bg-emerald-500 hover:bg-emerald-600',
@@ -95,7 +105,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div className="flex shrink-0 items-center gap-2">
               <div className="min-w-0 text-right">
                 <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
-                <p className="text-xs text-ink-3">HCP {Math.round((profile?.exact_handicap ?? 0) / 2)}/{profile?.exact_handicap ?? 0}</p>
+                <p className="text-xs text-ink-3">HCP {displayHcp9}/{displayHcp18}</p>
               </div>
               <button
                 onClick={onShowProfile}

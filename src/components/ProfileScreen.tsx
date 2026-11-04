@@ -18,6 +18,8 @@ interface ProfileScreenProps {
   hasGroups?: boolean;
   onShowSettings: () => void;
   messagesButton?: React.ReactNode;
+  handicap9?: number;
+  handicap18?: number;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
@@ -33,14 +35,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   hasGroups = false,
   onShowSettings,
   messagesButton,
+  handicap9: propHandicap9,
+  handicap18: propHandicap18,
 }) => {
   const { t } = useTranslation();
   const [showHandicapInfo, setShowHandicapInfo] = useState(false);
   const isTeam = (planType === 'team' || planType === 'premium');
   const nick = profile?.nick || t('profile.player');
   const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
-  const handicap18 = profile?.exact_handicap;
-  const handicap9 = handicap18 === undefined ? undefined : Math.round(handicap18 / 2);
+  const fallbackHandicap18 = profile?.exact_handicap;
+  const handicap18 = propHandicap18 !== undefined ? propHandicap18 : fallbackHandicap18;
+  const handicap9 = propHandicap9 !== undefined ? propHandicap9 : (handicap18 === undefined ? undefined : Math.round(handicap18 / 2));
   const avatarPlanClasses: Record<PlanType, string> = {
     express: 'border-blue-500 bg-blue-500',
     player: 'border-emerald-500 bg-emerald-500',

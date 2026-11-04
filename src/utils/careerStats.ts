@@ -352,3 +352,29 @@ export const computeCareerStats = (
     worstHole: toMoment(worstHole),
   };
 };
+
+/**
+ * Encuentra el hándicap de juego de la última partida en cualquiera de las 4 modalidades
+ * (sin tener en cuenta las partidas de Team).
+ * Calcula el hándicap para 9 hoyos y para 18 hoyos a partir del playing_handicap de esa partida.
+ */
+export const findLatestPlayingHandicap = (
+  account: CareerAccount,
+  rounds: CareerRound[],
+  players: CareerPlayer[]
+): { handicap9: number; handicap18: number } | null => {
+  const sorted = [...rounds].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  for (const round of sorted) {
+    const roundPlayers = players.filter(p => p.round_id === round.id);
+    const me = findAccountPlayer(roundPlayers, account);
+    if (me && me.playing_handicap != null && !isNaN(Number(me.playing_handicap))) {
+      const ph = Number(me.playing_handicap);
+      const is9 = round.num_holes === 9;
+      return {
+        handicap9: is9 ? Math.round(ph) : Math.round(ph / 2),
+        handicap18: is9 ? Math.round(ph * 2) : Math.round(ph),
+      };
+    }
+  }
+  return null;
+};

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeCareerStats, findAccountPlayer } from '../src/utils/careerStats.ts';
+import { computeCareerStats, findAccountPlayer, findLatestPlayingHandicap } from '../src/utils/careerStats.ts';
 
 const account = { userId: 'acc-1', nick: 'FedePlayer', displayName: 'Federico Baeza' };
 const round = (id, extra = {}) => ({ id, created_at: `2026-10-0${id.slice(-1)}T10:00:00Z`, game_mode: 'stableford', num_holes: 9, course_id: 'c1', ...extra });
@@ -103,4 +103,28 @@ test('ties go to the lower handicap and frozen decisions win over totals', () =>
   const stats = computeCareerStats(account, rounds, players, scores, {});
   assert.equal(stats.wins, 2);
   assert.deepEqual(stats.byMode, { stableford: 1, match: 1, sindicato: 0, parejas: 0 });
+});
+
+test('findLatestPlayingHandicap returns 9h and 18h playing handicap from the newest round across any mode', () => {
+  // r1: older 18-hole round with playing handicap 16
+  // r2: newest 9-hole round with playing handicap 7
+  const rounds = [
+    round('r1', { created_at: '2026-10-01T10:00:00Z', num_holes: 18, game_mode: 'parejas' }),
+    round('r2', { created_at: '2026-10-05T10:00:00Z', num_holes: 9, game_mode: 'match' }),
+  ];
+  const players = [
+    player('p1', 'r1', 'FedePlayer', { playing_handicap: 16 }),
+    player('p2', 'r2', 'FedePlayer', { playing_handicap: 7 }),
+  ];
+
+  // Latest round is r2 (9 holes, playing_handicap: 7) -> 9h is 7, 18h is 14
+  const latest = findLatestPlayingHandicap(account, rounds, players);
+  assert.deepEqual(latest, { handicap9: 7, handicap18: 14 });
+
+  // If latest round is 18 holes (playing_handicap: 16) -> 18h is 16, 9h is 8
+  const latest18 = findLatestPlayingHandicap(account, [rounds[0]], [players[0]]);
+  assert.deepEqual(latest18, { handicap9: 8, handicap18: 16 });
+
+  // If no rounds played
+  assert.equal(findLatestPlayingHandicap(account, [], []), null);
 });

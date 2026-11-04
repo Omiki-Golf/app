@@ -37,6 +37,7 @@ import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
 import { PaymentSelector } from './components/PaymentSelector';
 import { useSubscription } from './hooks/useSubscription';
+import { useLatestPlayingHandicap } from './hooks/useLatestPlayingHandicap';
 import { userService } from './services/userService';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
@@ -152,6 +153,7 @@ function App() {
   const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+  const latestHandicap = useLatestPlayingHandicap(user?.id, profile, currentView);
 
   // Arranque: la app se muestra cuando ya se conocen la sesión, el perfil, el plan y sus imágenes
   // principales; así no aparece primero el avatar genérico ni las imágenes cargándose.
@@ -1160,6 +1162,8 @@ function App() {
           <ProfileScreen
             profile={profile}
             planType={activePlanType}
+            handicap9={latestHandicap.handicap9}
+            handicap18={latestHandicap.handicap18}
             onBack={() => {
               setReturnToProfile(false);
               setCurrentView('main');
@@ -1364,6 +1368,8 @@ function App() {
             planType={activePlanType}
             isAuthenticated={!!user}
             profile={profile}
+            handicap9={latestHandicap.handicap9}
+            handicap18={latestHandicap.handicap18}
             onQuickPlay={() => setCurrentView('setup')}
             onJoinQuickPlay={() => {
               setPendingRoundId(null);

@@ -12,7 +12,7 @@ test('career statistics show Moments for every plan, Player included', () => {
 });
 
 test('career statistics follow the A–G layout and open Mis partidas from the last rounds', () => {
-  const order = ['A. CABECERO COMPACTO', 'B. TENDENCIA DE STABLEFORD Y HÁNDICAP', 'C. RENDIMIENTO POR CAMPO', 'D. DISTRIBUCIÓN DE RESULTADOS', 'E. MOMENTOS', 'F. PARTIDAS POR MODALIDAD', 'G. ÚLTIMAS 3 PARTIDAS'];
+  const order = ['A. CABECERO COMPACTO', 'B. TENDENCIA DE STABLEFORD Y HÁNDICAP', 'D. DISTRIBUCIÓN DE RESULTADOS', 'E. MOMENTOS', 'F. PARTIDAS POR MODALIDAD', 'C. RENDIMIENTO POR CAMPO', 'G. ÚLTIMAS 3 PARTIDAS'];
   const positions = order.map(marker => statistics.indexOf(marker));
   assert.ok(positions.every(position => position > 0), 'every section is present');
   assert.deepEqual([...positions].sort((a, b) => a - b), positions, 'sections appear in order');

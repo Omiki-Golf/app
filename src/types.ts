@@ -405,6 +405,7 @@ export interface HolePerformanceStatistics {
   bogeys?: number;
   double_bogeys?: number;
   triple_or_worse?: number;
+  pars?: number;
   eagles?: number;
   birdies?: number;
 }
