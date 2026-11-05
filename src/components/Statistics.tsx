@@ -18,6 +18,7 @@ import {
 } from '../types';
 import { AwardRankingModal, RankingModeToggle } from './AwardRankingModal';
 import { awardChampions, formatAverage, toFairEntries, type FairRankingEntry, type RankingMode } from '../utils/fairRanking';
+import { groupSettingsService } from '../services/groupSettingsService';
 import { scoreResultBar, scoreResultLabel } from '../utils/scoreColors';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
@@ -90,9 +91,19 @@ const awardValue: Record<AwardType, (entry: RankingRpcRow) => number | undefined
 };
 
 /** Campeón absoluto (total) y justo (promedio por partida); si coinciden, ambos con su desglose en 2 columnas estilo tarjeta. */
-const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean }> = ({ rows, type, unit: _unit, tone, lowerIsBetter = false }) => {
-  const { absolute, fair } = awardChampions(toFairEntries(rows, awardValue[type]), lowerIsBetter);
-  if (!absolute) return null;
+const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean; minRounds?: number }> = ({ rows, type, unit: _unit, tone, lowerIsBetter = false, minRounds = 0 }) => {
+  const eligibleRows = minRounds > 0 ? rows.filter(r => (r.total_rounds ?? 0) >= minRounds) : rows;
+  const { absolute, fair } = awardChampions(toFairEntries(eligibleRows, awardValue[type]), lowerIsBetter);
+  if (!absolute) {
+    if (minRounds > 0 && rows.length > 0) {
+      return (
+        <div className="mt-2 p-2.5 rounded-xl bg-card border border-line text-xs text-ink-3 text-center">
+          Sin jugadores con el mínimo de {minRounds} {minRounds === 1 ? 'partida' : 'partidas'}
+        </div>
+      );
+    }
+    return null;
+  }
 
   const renderCard = (label: string, entry: FairRankingEntry, isFair: boolean) => (
     <div
@@ -127,12 +138,16 @@ const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: s
 const toModalRanking = (
   entries: RankingRpcRow[],
   getValue: (entry: RankingRpcRow) => number | undefined,
-): ModalRankingEntry[] => entries.map((entry) => ({
-  ...entry,
-  value: getValue(entry),
-  rounds_played: entry.total_rounds,
-  handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
-}));
+  minRounds: number = 0,
+): ModalRankingEntry[] => {
+  const eligible = minRounds > 0 ? entries.filter(e => (e.total_rounds ?? 0) >= minRounds) : entries;
+  return eligible.map((entry) => ({
+    ...entry,
+    value: getValue(entry),
+    rounds_played: entry.total_rounds,
+    handicap: entry.avg_handicap ?? entry.handicap ?? entry.player_handicap ?? null,
+  }));
+};
 
 export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination = 'back', currentGroup, messagesButton }) => {
   const [activeTab, setActiveTab] = useState<TabType>('player');
@@ -148,8 +163,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [courseStats, setCourseStats] = useState<CourseStatisticsView | null>(null);
   const [divendRankings, setDivendRankings] = useState<DivendRankings | null>(null);
-  // Clasificación general: justa (promedio por partida) por defecto, o absoluta (puntos totales).
-  const [generalMode, setGeneralMode] = useState<RankingMode>('fair');
+  // Clasificación general: absoluta (puntos totales) por defecto, o justa (promedio por partida).
+  const [generalMode, setGeneralMode] = useState<RankingMode>('absolute');
+  const [minRounds, setMinRounds] = useState<number>(0);
 
   const [uniquePlayers, setUniquePlayers] = useState<string[]>([]);
   const [uniqueCourses, setUniqueCourses] = useState<string[]>([]);
@@ -314,6 +330,23 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     void loadArchivedRounds();
   }, [loadArchivedRounds]);
 
+  useEffect(() => {
+    groupSettingsService.getGroupSettings(currentGroup.id).then((settings) => {
+      setMinRounds(settings.min_rounds_for_awards);
+    });
+
+    const handleSettingsUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ groupId: string; settings: { min_rounds_for_awards: number } }>;
+      if (custom.detail?.groupId === currentGroup.id && typeof custom.detail.settings?.min_rounds_for_awards === 'number') {
+        setMinRounds(custom.detail.settings.min_rounds_for_awards);
+      }
+    };
+    window.addEventListener('group_settings_updated', handleSettingsUpdate);
+    return () => {
+      window.removeEventListener('group_settings_updated', handleSettingsUpdate);
+    };
+  }, [currentGroup.id]);
+
   const handlePlayerChange = async (playerName: string) => {
     setSelectedPlayer(playerName);
     await loadPlayerStatistics(playerName);
@@ -339,7 +372,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
         amigoDelMasUno: () => phase2Stats?.amigoDelMasUnoRanking || [],
         reyDelBosque: () => phase2Stats?.reyDelBosqueRanking || [],
       };
-      setRankingModal({ isOpen: true, type, data: toModalRanking(await rows[type](), awardValue[type]) });
+      setRankingModal({ isOpen: true, type, data: toModalRanking(await rows[type](), awardValue[type], minRounds) });
     } catch (err) {
       console.error('Error abriendo el ranking completo:', err);
     }
@@ -841,7 +874,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más cervezas pagadas</p>
-                              <AwardChampions rows={divendRankings.patrocinador} type="patrocinador" unit="cervezas" tone="text-red-800" />
+                              <AwardChampions rows={divendRankings.patrocinador} type="patrocinador" minRounds={minRounds} unit="cervezas" tone="text-red-800" />
                             </div>
                           )}
 
@@ -861,7 +894,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más cervezas recibidas</p>
-                              <AwardChampions rows={divendRankings.barraLibre} type="barraLibre" unit="cervezas" tone="text-blue-800" />
+                              <AwardChampions rows={divendRankings.barraLibre} type="barraLibre" minRounds={minRounds} unit="cervezas" tone="text-blue-800" />
                             </div>
                           )}
 
@@ -881,7 +914,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" más veces</p>
-                              <AwardChampions rows={divendRankings.corto} type="corto" unit="veces" tone="text-orange-800" />
+                              <AwardChampions rows={divendRankings.corto} type="corto" minRounds={minRounds} unit="veces" tone="text-orange-800" />
                             </div>
                           )}
 
@@ -901,7 +934,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">"No pasó de Rojas" menos veces</p>
-                              <AwardChampions rows={divendRankings.driverOro} type="driverOro" unit="veces" tone="text-yellow-800" lowerIsBetter />
+                              <AwardChampions rows={divendRankings.driverOro} type="driverOro" minRounds={minRounds} unit="veces" tone="text-yellow-800" lowerIsBetter />
                             </div>
                           )}
                         </div>
@@ -961,7 +994,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más partidas ganadas</p>
-                              <AwardChampions rows={phase2Stats.sharkRanking} type="shark" unit="victorias" tone="text-blue-800" />
+                              <AwardChampions rows={phase2Stats.sharkRanking} type="shark" minRounds={minRounds} unit="victorias" tone="text-blue-800" />
                             </div>
                           )}
 
@@ -1005,7 +1038,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más eagles</p>
-                              <AwardChampions rows={phase2Stats.francotiradorRanking} type="francotirador" unit="eagles" tone="text-red-800" />
+                              <AwardChampions rows={phase2Stats.francotiradorRanking} type="francotirador" minRounds={minRounds} unit="eagles" tone="text-red-800" />
                               <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.francotirador.player_name}: {phase2Stats.francotirador.best_single_day} eagles</p>
                             </div>
                           )}
@@ -1026,7 +1059,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más birdies</p>
-                              <AwardChampions rows={phase2Stats.maquinaRanking} type="maquina" unit="birdies" tone="text-cyan-800" />
+                              <AwardChampions rows={phase2Stats.maquinaRanking} type="maquina" minRounds={minRounds} unit="birdies" tone="text-cyan-800" />
                               <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.maquina.player_name}: {phase2Stats.maquina.best_single_day} birdies</p>
                             </div>
                           )}
@@ -1047,7 +1080,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más bogeys</p>
-                              <AwardChampions rows={phase2Stats.amigoDelMasUnoRanking} type="amigoDelMasUno" unit="bogeys" tone="text-amber-800" />
+                              <AwardChampions rows={phase2Stats.amigoDelMasUnoRanking} type="amigoDelMasUno" minRounds={minRounds} unit="bogeys" tone="text-amber-800" />
                               <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.amigoDelMasUno.player_name}: {phase2Stats.amigoDelMasUno.best_single_day} bogeys</p>
                             </div>
                           )}
@@ -1068,7 +1101,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                 </button>
                               </div>
                               <p className="text-sm text-ink-2 mb-3">Más doble bogeys y peores</p>
-                              <AwardChampions rows={phase2Stats.reyDelBosqueRanking} type="reyDelBosque" unit="doble bogeys+" tone="text-rose-800" />
+                              <AwardChampions rows={phase2Stats.reyDelBosqueRanking} type="reyDelBosque" minRounds={minRounds} unit="doble bogeys+" tone="text-rose-800" />
                               <p className="text-xs text-ink-3 mt-2">Mejor día de {phase2Stats.reyDelBosque.player_name}: {phase2Stats.reyDelBosque.best_single_day} doble bogeys+</p>
                             </div>
                           )}
@@ -1094,14 +1127,23 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
                     <div>
                       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="text-lg font-bold text-ink">Clasificación General</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-ink">Clasificación General</h3>
+                          {minRounds > 0 && (
+                            <span className="text-[10px] bg-accent-soft text-accent-ink px-2 py-0.5 rounded-full font-bold">
+                              Mín. {minRounds} {minRounds === 1 ? 'partida' : 'partidas'}
+                            </span>
+                          )}
+                        </div>
                         <RankingModeToggle mode={generalMode} onChange={setGeneralMode} />
                       </div>
                       <p className="mb-4 text-xs text-ink-3">
                         {generalMode === 'fair' ? 'Ordenada por puntos de media por partida, para no premiar solo a quien más juega.' : 'Ordenada por puntos totales.'}
                       </p>
                       <div className="space-y-3">
-                        {[...groupStats.playerStats].sort((a, b) => generalMode === 'fair'
+                        {[...groupStats.playerStats]
+                          .filter((player) => minRounds <= 0 || player.totalRounds >= minRounds)
+                          .sort((a, b) => generalMode === 'fair'
                           ? b.averagePoints - a.averagePoints || b.totalRounds - a.totalRounds
                           : b.totalPoints - a.totalPoints || b.averagePoints - a.averagePoints
                         ).map((player, index) => {

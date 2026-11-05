@@ -3,12 +3,13 @@ import { NavigationButton } from './NavigationButton';
 import { OmikiLoadingScreen } from './OmikiSpinner';
 import { TopBar } from './TopBar';
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive } from 'lucide-react';
+import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive, Settings } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
 import { ConfirmModal } from './ConfirmModal';
 import { PremiumModal } from './PremiumModal';
 import { GroupMemberList } from './GroupMemberList';
+import { GroupSettingsPanel } from './GroupSettingsPanel';
 import { useSubscription } from '../hooks/useSubscription';
 import { useTranslation } from 'react-i18next';
 import type { User } from '@supabase/supabase-js';
@@ -55,6 +56,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [groupToArchive, setGroupToArchive] = useState<string | null>(null);
   const [openMembers, setOpenMembers] = useState<string | null>(null);
+  const [openSettings, setOpenSettings] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
 
   // ─── PREMIUM ───
@@ -258,35 +260,9 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     )}
                   </div>
 
-                  {!group.archived_at && <div className="flex items-center gap-3 mb-3">
-                    <div className="min-w-0 flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
-                      <p className="text-xs text-ink-3 mb-1">{t('groups.accessCode')}</p>
-                      <p className="truncate text-xl font-mono font-bold text-accent-ink tracking-wider">
-                        {group.group_code}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleCopyCode(group.group_code)}
-                      className="shrink-0 px-4 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors flex items-center gap-2"
-                      title={t('groups.copyCode')}
-                    >
-                      {copiedCode === group.group_code ? (
-                        <>
-                          <Check size={18} />
-                          {t('groups.copied')}
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={18} />
-                          {t('groups.copy')}
-                        </>
-                      )}
-                    </button>
-                  </div>}
-
                   <button
                     onClick={() => handleSelectGroup(group)}
-                    className="w-full bg-accent text-on-accent px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium"
+                    className="w-full bg-accent text-on-accent px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium mb-2"
                   >
                     {t('groups.select')}
                   </button>
@@ -307,6 +283,53 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   {!group.archived_at && openMembers === group.id && (
                     <div className="mt-4">
                       <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} archived={Boolean(group.archived_at)} />
+                    </div>
+                  )}
+
+                  {!group.archived_at && (group.access === 'owner' || group.access === 'admin') && (
+                    <button
+                      type="button"
+                      onClick={() => setOpenSettings(openSettings === group.id ? null : group.id)}
+                      aria-expanded={openSettings === group.id}
+                      className="mt-2 w-full flex items-center justify-center gap-2 border border-line bg-card text-ink-2 px-4 py-2 rounded-lg hover:bg-neutral-hover transition-colors font-medium"
+                    >
+                      <Settings size={18} aria-hidden="true" />
+                      Configuración
+                      {openSettings === group.id ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+                    </button>
+                  )}
+
+                  {!group.archived_at && (group.access === 'owner' || group.access === 'admin') && openSettings === group.id && (
+                    <div className="mt-4">
+                      <div className="bg-card rounded-xl p-4 border border-line space-y-4 shadow-sm">
+                        <h4 className="text-sm font-bold text-ink border-b border-line pb-2">Configuración del Grupo</h4>
+                        {!group.archived_at && <div className="flex items-center gap-3 mb-3">
+                          <div className="min-w-0 flex-1 bg-card rounded-lg px-4 py-3 border border-line-2">
+                            <p className="text-xs text-ink-3 mb-1">{t('groups.accessCode')}</p>
+                            <p className="truncate text-xl font-mono font-bold text-accent-ink tracking-wider">
+                              {group.group_code}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => handleCopyCode(group.group_code)}
+                            className="shrink-0 px-4 py-3 bg-accent text-on-accent rounded-lg hover:bg-accent-hover transition-colors flex items-center gap-2"
+                            title={t('groups.copyCode')}
+                          >
+                            {copiedCode === group.group_code ? (
+                              <>
+                                <Check size={18} />
+                                {t('groups.copied')}
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={18} />
+                                {t('groups.copy')}
+                              </>
+                            )}
+                          </button>
+                        </div>}
+                        <GroupSettingsPanel groupId={group.id} />
+                      </div>
                     </div>
                   )}
 

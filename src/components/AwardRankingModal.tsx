@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { formatAverage, sortRanking, toFairEntries, type RankingMode } from '../utils/fairRanking';
 
@@ -60,8 +60,14 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
   lowerIsBetter = false,
   colorScheme,
 }) => {
-  // Por defecto, la clasificación justa: total ÷ partidas jugadas.
-  const [mode, setMode] = useState<RankingMode>(allowFair ? 'fair' : 'absolute');
+  // Por defecto, la clasificación absoluta: puntos/valores totales.
+  const [mode, setMode] = useState<RankingMode>('absolute');
+
+  useEffect(() => {
+    if (isOpen) {
+      setMode('absolute');
+    }
+  }, [isOpen]);
   if (!isOpen) return null;
 
   const entries = sortRanking(

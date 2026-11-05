@@ -34,8 +34,8 @@ test('group statistics show two champions per card, a fair/absolute toggle in th
   }
   assert.match(statistics, /type="driverOro"[^>]*lowerIsBetter/);
   assert.match(statistics, /allowFair=\{rankingModal\.type !== 'viciado'\}/, 'rounds played per round is always 1');
-  assert.match(modal, /useState<RankingMode>\(allowFair \? 'fair' : 'absolute'\)/, 'the full ranking opens on the fair order');
+  assert.match(modal, /useState<RankingMode>\('absolute'\)/, 'the full ranking opens on the absolute order');
   assert.match(modal, /<span className="text-right">Total<\/span>\s*<span className="text-right">Por partida<\/span>/);
-  assert.match(statistics, /useState<RankingMode>\('fair'\)/);
+  assert.match(statistics, /useState<RankingMode>\('absolute'\)/);
   assert.match(statistics, /<RankingModeToggle mode=\{generalMode\} onChange=\{setGeneralMode\} \/>/);
 });
