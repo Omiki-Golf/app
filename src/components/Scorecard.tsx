@@ -9,7 +9,7 @@ import { CourseChangeConfirmModal } from './CourseChangeConfirmModal';
 import { ScoreSymbol } from './ScoreSymbol';
 import { golfService } from '../services/golfService';
 import { getStrokesReceived, calculateScoreToPar } from '../utils/calculations';
-import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
 import { FinalResultModal } from './FinalResultModal';
@@ -508,10 +508,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                     )}
                                     {score.spanish_hands && (
                                       <span
-                                        className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500 shadow-soft"
+                                        className="absolute -right-1.5 -top-1.5 h-3.5 w-3.5 rounded-full border border-white bg-accent text-on-accent shadow-soft flex items-center justify-center"
                                         title={`Spanish Hands · Hoyo ${h.hole_number}`}
                                         aria-label={`Spanish Hands en el hoyo ${h.hole_number}`}
-                                      />
+                                      >
+                                        <Hand size={8} />
+                                      </span>
                                     )}
                                   </div>
                                 ) : (

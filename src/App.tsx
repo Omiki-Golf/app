@@ -1498,6 +1498,7 @@ function App() {
             onHolesChanged={handleHolesChanged}
             onBack={handleBackToMain}
             loading={loading}
+            onProfileUpdated={refreshSubscription}
             account={user && profile && roundState.isCreator
               ? { userId: user.id, nick: profile.nick, displayName: profile.display_name, handicap: profile.exact_handicap ?? 0 }
               : null}

@@ -6,6 +6,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive, Settings } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
+import { userService } from '../services/userService';
+import { normalizeAvatarUrl } from '../utils/avatarOptions';
 import { ConfirmModal } from './ConfirmModal';
 import { PremiumModal } from './PremiumModal';
 import { GroupMemberList } from './GroupMemberList';
@@ -38,6 +40,7 @@ interface GroupWithCode {
 interface MyGroup extends GroupWithCode {
   // owner: lo creó esta cuenta; admin: le han nombrado administrador; member: miembro invitado.
   access: 'owner' | 'admin' | 'member';
+  handicap18?: number | null;
 }
 
 const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at';
@@ -61,7 +64,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
   // ─── PREMIUM ───
   const [showPremium, setShowPremium] = useState(false);
-  const { isPremium, loading: subLoading } = useSubscription(user?.id ?? null);
+  const { isPremium, profile: userProfile, loading: subLoading } = useSubscription(user?.id ?? null);
 
   const loadGroups = useCallback(async () => {
     try {
@@ -100,7 +103,17 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member' }));
       }
 
-      setGroups(sortGroups([...ownedGroups, ...joinedGroups]));
+      const groupsWithHandicap = await Promise.all([...ownedGroups, ...joinedGroups].map(async group => {
+        try {
+          const members = await userService.getGroupMembers(group.id);
+          const me = members.find(member => member.user_id === user.id);
+          return { ...group, handicap18: me?.handicap_18 };
+        } catch {
+          // No sustituir un error de lectura por el HCP personal ni por cero.
+          return group;
+        }
+      }));
+      setGroups(sortGroups(groupsWithHandicap));
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('groups.loadError')));
     } finally {
@@ -260,6 +273,18 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     )}
                   </div>
 
+                  <div className="mb-3 flex items-center gap-3 rounded-lg border border-line bg-card px-3 py-2">
+                    <img src={normalizeAvatarUrl(userProfile?.avatar_url)} alt={userNick || t('profile.player')} className="h-10 w-10 shrink-0 rounded-full object-cover" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-ink">{userNick || t('profile.player')}</p>
+                      <p className="text-sm text-ink-2">
+                        {group.handicap18 === undefined ? 'HCP no disponible' : group.handicap18 === null ? 'HCP pendiente' : (
+                          <><span className="inline-block mr-3">HCP 9: <strong>{Math.round(group.handicap18 / 2)}</strong></span><span className="inline-block">HCP 18: <strong>{group.handicap18}</strong></span></>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
                   <button
                     onClick={() => handleSelectGroup(group)}
                     className="w-full bg-accent text-on-accent px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium mb-2"
@@ -282,7 +307,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
                   {!group.archived_at && openMembers === group.id && (
                     <div className="mt-4">
-                      <GroupMemberList groupId={group.id} ownerId={group.user_auth_id || group.created_by} archived={Boolean(group.archived_at)} />
+                      <GroupMemberList onChanged={() => void loadGroups()} groupId={group.id} ownerId={group.user_auth_id || group.created_by} archived={Boolean(group.archived_at)} />
                     </div>
                   )}
 

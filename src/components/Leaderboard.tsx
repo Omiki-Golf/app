@@ -1,7 +1,7 @@
 import { NavigationButton } from './NavigationButton';
 import React, { useCallback, useState, useEffect } from 'react';
 import { GolfRound, RoundPlayer, RoundScore, GameMode } from '../types';
-import { Trophy, Medal, Eye, RefreshCw } from 'lucide-react';
+import { Trophy, Medal, Eye, RefreshCw, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -281,12 +281,24 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                           {hasGroup && entry.badges.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                               {entry.badges.map(badge => (
-                                <span
-                                  key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
-                                  className={`${badge.kind === 'red' ? 'bg-red-600 text-white' : 'bg-accent text-on-accent'} text-[10px] font-bold rounded-full px-2 py-0.5`}
-                                >
-                                  {badge.kind === 'red' ? 'Rojas' : 'Spanish Hands'} H{badge.holeNumber}{badge.owner ? ` · ${badge.owner}` : ''}
-                                </span>
+                                badge.kind === 'red' ? (
+                                  <span
+                                    key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
+                                    title={`No pasó de rojas · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                    className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-soft"
+                                  >
+                                    {badge.holeNumber}
+                                  </span>
+                                ) : (
+                                  <span
+                                    key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
+                                    title={`Spanish Hands · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                    aria-label={`Spanish Hands Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                    className="bg-accent text-on-accent rounded-full w-5 h-5 flex items-center justify-center shadow-soft"
+                                  >
+                                    <Hand size={12} />
+                                  </span>
+                                )
                               ))}
                             </div>
                           )}

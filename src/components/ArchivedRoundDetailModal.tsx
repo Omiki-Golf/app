@@ -1,6 +1,6 @@
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
-import { X, Award, Target, Users, Trophy, Beer } from 'lucide-react';
+import { X, Award, Target, Users, Trophy, Beer, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import type { ArchivedDailyRanking, ArchivedPlayerStat, ArchivedRound, ArchivedRoundRanking } from '../types';
 
@@ -77,12 +77,13 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
 
     const getScoreForHole = (player: ArchivedRoundRanking, holeNumber: number) => {
       const score = holeScores.find((s) => matchesPlayer(s, player) && s.hole_number === holeNumber);
-      if (!score) return { gross: '-', net: '-', points: '-', noPasoRojas: false };
+      if (!score) return { gross: '-', net: '-', points: '-', noPasoRojas: false, spanishHands: false };
       return {
         gross: score.gross_strokes || '-',
         net: score.net_strokes || '-',
         points: score.stableford_points || 0,
         noPasoRojas: score.no_paso_rojas || false,
+        spanishHands: score.spanish_hands || false,
       };
     };
 
@@ -133,6 +134,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
         bogeys,
         double_bogeys,
         no_paso_rojas_count: playerStat?.no_paso_rojas_count || 0,
+        spanish_hands_count: playerStat?.spanish_hands_count || playerScores.filter(s => s.spanish_hands).length,
       };
     };
 
@@ -221,9 +223,23 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               <div className="flex items-center gap-1">
                                 {Array.from({ length: player.no_paso_rojas_count }).map((_, i) => (
                                   <div
-                                    key={i}
+                                    key={`rojas-${i}`}
+                                    title="No pasó de rojas"
                                     className="w-5 h-5 rounded-full bg-red-500 border-2 border-red-700"
                                   ></div>
+                                ))}
+                              </div>
+                            )}
+                            {(player.spanish_hands_count ?? 0) > 0 && (
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: player.spanish_hands_count! }).map((_, i) => (
+                                  <div
+                                    key={`sh-${i}`}
+                                    title="Spanish Hands"
+                                    className="w-5 h-5 rounded-full bg-accent text-on-accent flex items-center justify-center shadow-soft"
+                                  >
+                                    <Hand size={11} />
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -314,7 +330,14 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                                     {score.net}
                                   </td>
                                   <td className={`text-center py-2 px-1 font-bold ${score.noPasoRojas ? 'bg-red-200 text-red-700' : (isWinner ? 'bg-amber-100 text-accent-ink' : 'text-accent-ink')}`}>
-                                    {score.points}
+                                    <span className="inline-flex items-center justify-center gap-0.5">
+                                      {score.points}
+                                      {score.spanishHands && (
+                                        <span title="Spanish Hands" aria-label="Spanish Hands" className="text-emerald-700 dark:text-emerald-400 inline-flex items-center">
+                                          <Hand size={12} />
+                                        </span>
+                                      )}
+                                    </span>
                                   </td>
                                 </React.Fragment>
                               );
@@ -341,7 +364,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                   </div>
                   <div className="mt-2 text-xs text-ink-3">
                     <p><strong>B</strong> = Bruto | <strong>N</strong> = Neto | <strong>P</strong> = Puntos</p>
-                    <p className="mt-1">Las celdas con fondo rojo indican "No pasó de rojas"</p>
+                    <p className="mt-1">Las celdas con fondo rojo indican "No pasó de rojas" · El icono <Hand size={12} className="inline text-emerald-600 align-text-bottom" /> indica "Spanish Hands"</p>
                   </div>
                 </div>
               );
@@ -367,6 +390,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                           <th className="text-center py-3 px-4 font-semibold text-ink-2 border-b">Bogeys</th>
                           <th className="text-center py-3 px-4 font-semibold text-ink-2 border-b">Dobles+</th>
                           <th className="text-center py-3 px-4 font-semibold text-ink-2 border-b">No Rojas</th>
+                          <th className="text-center py-3 px-4 font-semibold text-ink-2 border-b">Spanish Hands</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -391,6 +415,15 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                                 {stats.no_paso_rojas_count > 0 ? (
                                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
                                     {stats.no_paso_rojas_count}
+                                  </span>
+                                ) : (
+                                  <span className="text-ink-4">0</span>
+                                )}
+                              </td>
+                              <td className="text-center py-3 px-4">
+                                {stats.spanish_hands_count > 0 ? (
+                                  <span className="bg-accent text-on-accent text-xs font-bold px-2 py-1 rounded inline-flex items-center gap-1 shadow-soft">
+                                    <Hand size={11} /> {stats.spanish_hands_count}
                                   </span>
                                 ) : (
                                   <span className="text-ink-4">0</span>

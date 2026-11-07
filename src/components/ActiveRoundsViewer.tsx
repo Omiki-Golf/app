@@ -13,7 +13,7 @@ import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
-import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive, Hand } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
 
 const gameModeLabels: Record<string, string> = {
@@ -347,7 +347,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const handleSelectAccount = (profile: UserProfile) => {
     const numHoles = rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes;
     // El hándicap del perfil es el exacto de 18 hoyos; el campo pide el de los hoyos de la partida.
-    const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
+    const forHoles = numHoles === 18 ? Math.round(Number(profile.exact_handicap ?? 0)) : Math.ceil(Number(profile.exact_handicap ?? 0) / 2);
     setSelectedAccount(profile);
     setNewPlayerName(profile.nick);
     setNewPlayerHandicap(String(Math.round(forHoles * 10) / 10));
@@ -404,8 +404,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           setError('Por favor ingresa nombre y handicap');
           return;
         }
-        const handicap = parseFloat(newPlayerHandicap);
-        if (!Number.isFinite(handicap) || handicap < 0 || handicap > (round.round.num_holes === 18 ? 54 : 27)) {
+        const handicap = Number(newPlayerHandicap);
+        if (!Number.isInteger(handicap) || handicap < 0 || handicap > (round.round.num_holes === 18 ? 54 : 27)) {
           setError(`El hándicap debe estar entre 0 y ${round.round.num_holes === 18 ? 54 : 27}`);
           return;
         }
@@ -471,6 +471,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       holesPlayed: number;
       roundName: string;
       noPasoRojasHoles: number[];
+      spanishHandsHoles: number[];
     }> = [];
 
     rounds.forEach((roundStats) => {
@@ -479,6 +480,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         const playerScores = roundStats.scores.filter((s) => s.player_id === player.id);
         const noPasoRojasHoles = playerScores
           .filter((s) => s.no_paso_rojas === true)
+          .map((s) => s.hole_number)
+          .sort((a, b) => a - b);
+        const spanishHandsHoles = playerScores
+          .filter((s) => s.spanish_hands === true)
           .map((s) => s.hole_number)
           .sort((a, b) => a - b);
 
@@ -490,6 +495,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           holesPlayed: stats.scoresEntered,
           roundName: roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos',
           noPasoRojasHoles,
+          spanishHandsHoles,
         });
       });
     });
@@ -561,10 +567,24 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             <div className="flex items-center gap-1">
                               {player.noPasoRojasHoles.map((holeNumber) => (
                                 <span
-                                  key={holeNumber}
+                                  key={`rojas-${holeNumber}`}
+                                  title={`No pasó de rojas · Hoyo ${holeNumber}`}
                                   className="bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center"
                                 >
                                   {holeNumber}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {player.spanishHandsHoles.length > 0 && (
+                            <div className="flex items-center gap-1">
+                              {player.spanishHandsHoles.map((holeNumber) => (
+                                <span
+                                  key={`sh-${holeNumber}`}
+                                  title={`Spanish Hands · Hoyo ${holeNumber}`}
+                                  className="bg-accent text-on-accent text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-soft"
+                                >
+                                  <Hand size={13} />
                                 </span>
                               ))}
                             </div>
@@ -817,7 +837,24 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 }`}
                               >
                                 <div className="flex-1">
-                                  <p className={`font-semibold ${index === 0 ? 'text-yellow-950 dark:text-yellow-100' : 'text-ink'}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className={`font-semibold ${index === 0 ? 'text-yellow-950 dark:text-yellow-100' : 'text-ink'}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                                    {(() => {
+                                      const pScores = roundStats.scores.filter(s => s.player_id === item.player.id);
+                                      const rHoles = pScores.filter(s => s.no_paso_rojas).map(s => s.hole_number);
+                                      const sHoles = pScores.filter(s => s.spanish_hands).map(s => s.hole_number);
+                                      return (
+                                        <>
+                                          {rHoles.map(h => (
+                                            <span key={`r-${h}`} title={`No pasó de rojas · Hoyo ${h}`} className="bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{h}</span>
+                                          ))}
+                                          {sHoles.map(h => (
+                                            <span key={`sh-${h}`} title={`Spanish Hands · Hoyo ${h}`} className="bg-accent text-on-accent text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-soft"><Hand size={11} /></span>
+                                          ))}
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
                                   <p className="text-xs text-ink-3">
                                     HCP {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
                                   </p>

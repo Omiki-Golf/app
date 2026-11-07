@@ -15,7 +15,7 @@ const handicap9 = (handicap18: number) => {
 
 const middleEllipsis = (value: string) => value.length <= 10 ? value : `${value.slice(0, 4)}…${value.slice(-5)}`;
 
-export function GroupMemberList({ groupId, ownerId, archived = false, collapsible = false }: { groupId: string; ownerId?: string; archived?: boolean; collapsible?: boolean }) {
+export function GroupMemberList({ groupId, ownerId, archived = false, collapsible = false, onChanged }: { groupId: string; ownerId?: string; archived?: boolean; collapsible?: boolean; onChanged?: () => void }) {
   const { user } = useAuth();
   const userId = user?.id;
   const identity = `${userId ?? ''}:${groupId}`;
@@ -97,6 +97,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
     try {
       await userService.manageGroupMember(edit.member, edit.action, edit.action === 'handicap' ? Number(handicap.replace(',', '.')) : undefined);
       setEdit(null); setConfirm(false); setRefresh(value => value + 1);
+      onChanged?.();
     } catch (err) { setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se pudo guardar el cambio'); setConfirm(false); }
     finally { busyRef.current = false; setBusy(false); }
   };

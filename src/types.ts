@@ -275,6 +275,7 @@ export interface ArchivedDailyRanking {
   hcp_juego: number;
   total_points: number;
   no_paso_rojas_count: number;
+  spanish_hands_count?: number;
   is_guest?: boolean;
 }
 
@@ -286,6 +287,7 @@ export interface DailyRankingStanding {
   totalPoints: number;
   roundId: string;
   noPasoRojasHoles: number[];
+  spanishHandsHoles?: number[];
   isGuest: boolean;
 }
 

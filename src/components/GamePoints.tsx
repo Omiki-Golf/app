@@ -3,7 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import { OmikiLoadingScreen } from './OmikiSpinner';
 import React, { useState, useEffect } from 'react';
-import { Users, Trophy, TrendingUp, ChevronDown, ChevronUp, UserX, History, Edit2, Save, X, User } from 'lucide-react';
+import { Users, Trophy, TrendingUp, ChevronDown, ChevronUp, UserX, History, Edit2, Save, X, User, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { HandicapHistoryEntry, Player } from '../types';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
@@ -18,6 +18,7 @@ interface DailyStanding {
   totalPoints: number;
   roundId: string;
   noPasoRojasHoles?: number[];
+  spanishHandsHoles?: number[];
   isGuest?: boolean;
 }
 
@@ -241,27 +242,41 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
   const calculateNewHandicap = (
     index: number,
     totalPlayers: number,
-    currentHandicap: number
-  ): number => {
+    currentHandicap: number,
+    spanishHandsCount: number = 0
+  ): { newHandicap: number; adjustment: number; baseAdjustment: number; spanishHandsAdjustment: number } => {
     const isOdd = totalPlayers % 2 === 1;
+    let baseAdjustment = 0;
 
     if (isOdd) {
       const middleIndex = Math.floor(totalPlayers / 2);
       if (index < middleIndex) {
-        return currentHandicap > 0 ? currentHandicap - 1 : currentHandicap;
+        baseAdjustment = -1;
       } else if (index === middleIndex) {
-        return currentHandicap;
+        baseAdjustment = 0;
       } else {
-        return currentHandicap < 12 ? currentHandicap + 1 : currentHandicap;
+        baseAdjustment = 1;
       }
     } else {
       const middleIndex = totalPlayers / 2;
       if (index < middleIndex) {
-        return currentHandicap > 0 ? currentHandicap - 1 : currentHandicap;
+        baseAdjustment = -1;
       } else {
-        return currentHandicap < 12 ? currentHandicap + 1 : currentHandicap;
+        baseAdjustment = 1;
       }
     }
+
+    const spanishHandsAdjustment = spanishHandsCount;
+    const totalAdjustment = baseAdjustment + spanishHandsAdjustment;
+    const maxHcp = Math.max(12, currentHandicap);
+    const newHandicap = Math.min(maxHcp, Math.max(0, currentHandicap + totalAdjustment));
+
+    return {
+      newHandicap,
+      adjustment: newHandicap - currentHandicap,
+      baseAdjustment,
+      spanishHandsAdjustment,
+    };
   };
 
   const getHandicapAdjustments = () => {
@@ -273,10 +288,12 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
 
     return sortedStandings.map((standing, index) => {
       const currentHandicap = standing.playingHandicap;
-      const newHandicap = calculateNewHandicap(
+      const spanishHandsCount = standing.spanishHandsHoles?.length ?? 0;
+      const { newHandicap, adjustment, baseAdjustment, spanishHandsAdjustment } = calculateNewHandicap(
         index,
         sortedStandings.length,
-        currentHandicap
+        currentHandicap,
+        spanishHandsCount
       );
       const colorClass = getColorClass(index, sortedStandings.length);
 
@@ -284,7 +301,10 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
         playerName: standing.playerName,
         currentHandicap,
         newHandicap,
-        adjustment: newHandicap - currentHandicap,
+        adjustment,
+        baseAdjustment,
+        spanishHandsAdjustment,
+        spanishHandsCount,
         colorClass,
       };
     });
@@ -379,10 +399,24 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                     <div className="flex items-center gap-1">
                                       {standing.noPasoRojasHoles.map((holeNumber) => (
                                         <span
-                                          key={holeNumber}
+                                          key={`rojas-${holeNumber}`}
+                                          title={`No pasó de rojas · Hoyo ${holeNumber}`}
                                           className="bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center"
                                         >
                                           {holeNumber}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {standing.spanishHandsHoles && standing.spanishHandsHoles.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      {standing.spanishHandsHoles.map((holeNumber) => (
+                                        <span
+                                          key={`sh-${holeNumber}`}
+                                          title={`Spanish Hands · Hoyo ${holeNumber}`}
+                                          className="bg-accent text-on-accent text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-soft"
+                                        >
+                                          <Hand size={13} />
                                         </span>
                                       ))}
                                     </div>
@@ -431,9 +465,9 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                           </div>
                           <div>
                             <p className="text-xs uppercase tracking-wide text-ink-3">HCP nuevo</p>
-                            <p className="text-2xl font-bold text-title">
+                            <p className="text-2xl font-bold text-title flex items-center justify-center gap-1">
                               {adjustment.newHandicap}
-                              {adjustment.adjustment !== 0 && (
+                              {adjustment.adjustment !== 0 ? (
                                 <span
                                   className={`ml-1 text-sm font-semibold ${
                                     adjustment.adjustment > 0
@@ -444,8 +478,20 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                   ({adjustment.adjustment > 0 ? '+' : ''}
                                   {adjustment.adjustment})
                                 </span>
+                              ) : (
+                                adjustment.spanishHandsCount > 0 && (
+                                  <span className="ml-1 text-sm font-semibold text-ink-3">
+                                    (=)
+                                  </span>
+                                )
                               )}
                             </p>
+                            {adjustment.spanishHandsCount > 0 && (
+                              <p className="text-[11px] text-ink-3 mt-1">
+                                {adjustment.baseAdjustment < 0 ? `${adjustment.currentHandicap - 1} (-1 pos.)` : adjustment.baseAdjustment > 0 ? `${adjustment.currentHandicap + 1} (+1 pos.)` : '0 pos.'}
+                                {` y +${adjustment.spanishHandsCount} Spanish Hand${adjustment.spanishHandsCount > 1 ? 's' : ''}`}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>

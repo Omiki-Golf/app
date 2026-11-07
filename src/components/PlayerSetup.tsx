@@ -10,6 +10,7 @@ import { Trash2, Plus, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } fro
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
+import { profileHandicapForHoles, personalHandicapChange } from '../utils/personalHandicap';
 import { adminPinUtils } from '../utils/adminPin';
 
 interface PlayerSetupProps {
@@ -24,6 +25,7 @@ interface PlayerSetupProps {
   gameMode?: GameMode;
   onPlayersUpdated: (players: RoundPlayer[]) => void;
   onStartRound: () => void;
+  onProfileUpdated?: () => Promise<void> | void;
   /** En grupos: guardar la partida y volver al inicio del grupo para preparar otra salida. */
   onSaveAndReturn?: () => void;
   /** Campana de avisos en la cabecera (no flotante), como en el resto de pantallas. */
@@ -52,6 +54,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   gameMode = 'stableford',
   onPlayersUpdated,
   onStartRound,
+  onProfileUpdated,
   onSaveAndReturn,
   messagesButton,
   onOpenHoleConfig,
@@ -71,9 +74,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     setSelectedPlayer(null);
     setCreatingUnlinked(false);
     setIsGuest(false);
+    setSelectedAccount(null);
     setSearchTerm(account.nick);
     // El hándicap del perfil es el exacto; el campo pide el de los hoyos de la partida.
-    const forHoles = numHoles === 18 ? account.handicap : account.handicap / 2;
+    const forHoles = profileHandicapForHoles(account.handicap, numHoles);
     setHandicap(String(Math.round(forHoles * 10) / 10));
     setShowDropdown(false);
   };
@@ -91,6 +95,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
   const [selectedAccount, setSelectedAccount] = useState<UserProfile | null>(null);
   const [handicap, setHandicap] = useState('');
   const [error, setError] = useState('');
+  const [handicapNotice, setHandicapNotice] = useState('');
   const [adding, setAdding] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [showCode, setShowCode] = useState(false);
@@ -196,7 +201,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     setSelectedAccount(profile);
     setSearchTerm(profile.nick);
     // El hándicap del perfil es el exacto de 18 hoyos; el campo pide el de los hoyos de la partida.
-    const forHoles = numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2;
+    const forHoles = profileHandicapForHoles(Number(profile.exact_handicap ?? 0), numHoles);
     setHandicap(String(Math.round(forHoles * 10) / 10));
     setShowDropdown(false);
   };
@@ -254,11 +259,14 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
 
   const handleSelectPlayer = (player: Player) => {
     setCreatingUnlinked(false);
+    setSelectedAccount(null);
     setSelectedPlayer(player);
     setIsGuest(!!player.is_guest);
     setSearchTerm(player.name);
     const baseHandicap = player.exact_handicap_18 ?? player.exact_handicap;
-    const displayHandicap = numHoles === 18 ? baseHandicap * 2 : baseHandicap;
+    const displayHandicap = player.auth_user_id
+      ? profileHandicapForHoles(baseHandicap * 2, numHoles)
+      : numHoles === 18 ? baseHandicap * 2 : baseHandicap;
     setHandicap(player.handicap_pending ? '' : displayHandicap.toString());
     setShowDropdown(false);
   };
@@ -300,9 +308,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       setShowDropdown(true);
       return;
     }
-    const handicapNum = parseFloat(handicap);
-    if (!Number.isFinite(handicapNum) || handicapNum < 0 || handicapNum > (numHoles === 18 ? 54 : 27)) {
-      setError(`El hándicap debe estar entre 0 y ${numHoles === 18 ? 54 : 27}`);
+    const handicapNum = Number(handicap);
+    if (!handicap.trim() || !Number.isInteger(handicapNum) || handicapNum < 0 || handicapNum > (numHoles === 18 ? 54 : 27)) {
+      setError(`El hándicap debe ser un entero entre 0 y ${numHoles === 18 ? 54 : 27}`);
       return;
     }
 
@@ -318,6 +326,18 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       }
       const linkedUserId = pickedAccount ? pickedAccount.user_id : isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
 
+      const addingSelf = !!user && (linkedUserId === user.id || selectedPlayer?.auth_user_id === user.id);
+      if (addingSelf) {
+        const profile = await userService.getProfile(user.id);
+        if (!profile) throw new Error('No se ha encontrado tu perfil.');
+        const change = personalHandicapChange(profile.exact_handicap, handicapNum, numHoles);
+        if (change.handicap18 !== Number(profile.exact_handicap)) {
+          await userService.updateProfile(user.id, { exact_handicap: change.handicap18 });
+          await onProfileUpdated?.();
+          if (change.message) setHandicapNotice(change.message);
+        }
+      }
+
       let newPlayer: RoundPlayer;
       if (currentGroup) {
         newPlayer = await golfService.addGroupRoundPlayer(currentGroup.id, roundId, playerName, handicapFor9Holes, isGuest, selectedPlayer?.id);
@@ -326,7 +346,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         newPlayer = await golfService.addRegisteredQuickRoundPlayer(roundId, pickedAccount.user_id);
       } else if (user) {
         const suggestion = await golfService.saveQuickPlayerSuggestion(playerName, handicapNum * (numHoles === 9 ? 2 : 1));
-        newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, suggestion.exact_handicap, useSlope, undefined, linkedUserId);
+        newPlayer = await golfService.addPlayerToRound(roundId, suggestion.name, handicapFor9Holes, useSlope, undefined, linkedUserId);
       } else {
         const localPlayers = localStorage.getItem('quickPlayPlayers');
         const playersArray: Player[] = localPlayers ? JSON.parse(localPlayers) : [];
@@ -718,13 +738,13 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
               </label>
               <input
                 type="number"
-                step="0.1"
+                step="1"
                 min={0}
                 max={numHoles === 18 ? 54 : 27}
-                readOnly={!!selectedPlayer?.auth_user_id}
+                readOnly={(!!selectedAccount && selectedAccount.user_id !== user?.id) || (!!selectedPlayer?.auth_user_id && selectedPlayer.auth_user_id !== user?.id)}
                 value={handicap}
                 onChange={(e) => setHandicap(e.target.value)}
-                placeholder={numHoles === 9 ? "Ej: 7.0 (para 9 hoyos)" : "Ej: 14.0 (para 18 hoyos)"}
+                placeholder={numHoles === 9 ? "Ej: 7 (para 9 hoyos)" : "Ej: 14 (para 18 hoyos)"}
                 disabled={adding || loading || !canAddMorePlayers}
                 className="w-full px-4 py-3 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent transition-colors disabled:bg-gray-100"
               />
@@ -927,6 +947,15 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
         </div>
       </div>
 
+      {handicapNotice && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999]" role="dialog" aria-modal="true" aria-labelledby="personal-handicap-title">
+          <div className="bg-card text-ink rounded-xl p-6 max-w-md w-full shadow-card">
+            <h2 id="personal-handicap-title" className="text-xl font-bold mb-3">Nuevo hándicap</h2>
+            <p>{handicapNotice}</p>
+            <button type="button" autoFocus onClick={() => setHandicapNotice('')} className="mt-5 w-full bg-accent text-on-accent rounded-lg py-3">Entendido</button>
+          </div>
+        </div>
+      )}
       {showHolesRangeModal && (
         <HolesRangeModal
           onConfirm={handleHolesRangeConfirm}

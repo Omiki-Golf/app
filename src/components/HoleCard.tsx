@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScoreChangeInput } from '../types';
 import { GolfHole, RoundPlayer, RoundScore, GameMode } from '../types';
 import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput } from '../utils/calculations';
-import { ChevronDown, Minus } from 'lucide-react';
+import { ChevronDown, Minus, Hand } from 'lucide-react';
 import { HoleInOneModal } from './HoleInOneModal';
 import { CongratulationsModal } from './CongratulationsModal';
 
@@ -380,6 +380,16 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                     {isModeScoring && <ColorMarker colorIndex={isParejas ? team : playerIndex} />}
                     {isParejas && <span className="sr-only">{teamLabel}</span>}
                     <p className="truncate font-semibold text-ink" title={player.name}>{middleEllipsis(player.name)}</p>
+                    {(score?.no_paso_rojas || pendingNoPasoRojas[player.id]) && (
+                      <span title="No pasó de rojas en este hoyo" className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
+                        Rojas
+                      </span>
+                    )}
+                    {(score?.spanish_hands || pendingSpanishHands[player.id]) && (
+                      <span title="Spanish Hands en este hoyo" aria-label="Spanish Hands en este hoyo" className="bg-accent text-on-accent text-[10px] font-bold w-5 h-5 rounded-full inline-flex items-center justify-center shrink-0 shadow-soft">
+                        <Hand size={11} />
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-ink-3">HCP {player.playing_handicap}</p>
                 </div>
@@ -429,6 +439,14 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                               className="absolute w-full h-0.5 bg-white/90 opacity-90"
                               style={{ width: '60px', transform: 'rotate(45deg)' }}
                             />
+                          )}
+                          {score.spanish_hands && (
+                            <span
+                              title="Spanish Hands"
+                              className="absolute top-0.5 right-0.5 text-accent-ink"
+                            >
+                              <Hand size={10} />
+                            </span>
                           )}
                         </div>
                       </div>

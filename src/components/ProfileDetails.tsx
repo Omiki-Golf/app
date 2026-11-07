@@ -46,6 +46,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [supportIdCopied, setSupportIdCopied] = useState(false);
   const [showSupportId, setShowSupportId] = useState(false);
   const [handicap, setHandicap] = useState(profile?.exact_handicap?.toString() ?? '');
+  const [handicap9, setHandicap9] = useState(profile ? Math.ceil(profile.exact_handicap / 2).toString() : '');
   const [country, setCountry] = useState(profile?.country ?? '');
   const [postalCode, setPostalCode] = useState(profile?.postal_code ?? '');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
@@ -73,6 +74,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url ?? DEFAULT_AVATAR_URL));
     setShowSelectedAvatar(Boolean(profile?.avatar_url));
     setHandicap(profile?.exact_handicap?.toString() ?? '');
+    setHandicap9(profile ? Math.ceil(profile.exact_handicap / 2).toString() : '');
     setCountry(profile?.country ?? '');
     setPostalCode(profile?.postal_code ?? '');
     setAge(profile?.age?.toString() ?? '');
@@ -134,8 +136,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       return;
     }
     if (!profile && !displayName.trim()) return;
-    if (handicap.trim() && !Number.isFinite(Number(handicap))) {
-      setError('Introduce un hándicap válido.');
+    if (handicap.trim() && (!Number.isInteger(Number(handicap)) || Number(handicap) < 0 || Number(handicap) > 54)) {
+      setError('Introduce un hándicap entero entre 0 y 54.');
       return;
     }
     if (age.trim() && (!Number.isInteger(Number(age)) || Number(age) < 14)) {
@@ -287,18 +289,43 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
               {profile && (
                 <>
-                  <div>
-                    <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">Hándicap exacto</label>
-                    <input
-                      id="profile-handicap"
-                      type="number"
-                      step="0.1"
-                      inputMode="decimal"
-                      value={handicap}
-                      onChange={(event) => { setHandicap(event.target.value); setSaved(false); }}
-                      placeholder="Ej: 12.4"
-                      className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
-                    />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="min-w-0">
+                      <label htmlFor="profile-handicap-9" className="block text-sm font-medium text-ink-2 mb-2">HCP 9</label>
+                      <input
+                        id="profile-handicap-9"
+                        type="number"
+                        step="1"
+                        inputMode="numeric"
+                        value={handicap9}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setHandicap9(value);
+                          setHandicap(value === '' ? '' : (Number(value) * 2).toString());
+                          setSaved(false);
+                        }}
+                        placeholder="Ej: 9"
+                        className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">HCP 18</label>
+                      <input
+                        id="profile-handicap"
+                        type="number"
+                        step="0.1"
+                        inputMode="decimal"
+                        value={handicap}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setHandicap(value);
+                          setHandicap9(value === '' ? '' : Math.ceil(Number(value) / 2).toString());
+                          setSaved(false);
+                        }}
+                        placeholder="Ej: 17"
+                        className="w-full px-4 py-3 bg-card text-ink border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                      />
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

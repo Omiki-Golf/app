@@ -1661,6 +1661,10 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
                 .filter((s) => s.no_paso_rojas === true)
                 .map((s) => s.hole_number)
                 .sort((a, b) => a - b);
+              const spanishHandsHoles = playerScores
+                .filter((s) => s.spanish_hands === true)
+                .map((s) => s.hole_number)
+                .sort((a, b) => a - b);
 
               return {
                 playerId: player.id,
@@ -1670,6 +1674,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
                 totalPoints,
                 roundId,
                 noPasoRojasHoles,
+                spanishHandsHoles,
                 isGuest: !!player.is_guest,
               };
             });
@@ -1903,25 +1908,30 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     for (let index = 0; index < sortedPlayers.length; index++) {
       const player = sortedPlayers[index];
       const currentHandicap = player.playingHandicap;
-      let newHandicap = currentHandicap;
+      let baseAdjustment = 0;
 
       if (isOdd) {
         const middleIndex = Math.floor(totalPlayers / 2);
         if (index < middleIndex) {
-          newHandicap = Math.max(0, currentHandicap - 1);
+          baseAdjustment = -1;
         } else if (index === middleIndex) {
-          newHandicap = currentHandicap;
+          baseAdjustment = 0;
         } else {
-          newHandicap = currentHandicap < 12 ? currentHandicap + 1 : currentHandicap;
+          baseAdjustment = 1;
         }
       } else {
         const middleIndex = totalPlayers / 2;
         if (index < middleIndex) {
-          newHandicap = Math.max(0, currentHandicap - 1);
+          baseAdjustment = -1;
         } else {
-          newHandicap = currentHandicap < 12 ? currentHandicap + 1 : currentHandicap;
+          baseAdjustment = 1;
         }
       }
+
+      const spanishHandsCount = player.spanishHandsHoles?.length ?? 0;
+      const totalAdjustment = baseAdjustment + spanishHandsCount;
+      const maxHcp = Math.max(12, currentHandicap);
+      const newHandicap = Math.min(maxHcp, Math.max(0, currentHandicap + totalAdjustment));
 
       if (newHandicap !== currentHandicap && player.playerDbId) {
         const { error } = await supabase
@@ -3007,23 +3017,32 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     if (roundsError) throw roundsError;
 
     const archivedRoundRows = (rounds || []) as ArchivedRound[];
-    const rankingWithNoPasoRojas = dailyRanking.map((ranking) => {
+    const rankingWithAwards = dailyRanking.map((ranking) => {
       let noPasoRojasCount = 0;
+      let spanishHandsCount = 0;
 
       archivedRoundRows.forEach((round) => {
         const playerStat = round.player_stats?.find((ps) => ps.player_name === ranking.player_name);
         if (playerStat) {
           noPasoRojasCount += playerStat.no_paso_rojas_count || 0;
+          spanishHandsCount += playerStat.spanish_hands_count || 0;
+        }
+        if (!playerStat?.spanish_hands_count && round.hole_scores) {
+          const handsInHoles = round.hole_scores.filter(
+            (hs) => (hs.player_id && ranking.game_player_id ? hs.player_id === ranking.game_player_id : hs.player_name === ranking.player_name) && hs.spanish_hands
+          ).length;
+          spanishHandsCount = Math.max(spanishHandsCount, handsInHoles);
         }
       });
 
       return {
         ...ranking,
         no_paso_rojas_count: noPasoRojasCount,
+        spanish_hands_count: spanishHandsCount,
       };
     });
 
-    return rankingWithNoPasoRojas;
+    return rankingWithAwards;
   },
 
   async getArchivedRoundsForDate(groupId: string, date: Date): Promise<ArchivedRound[]> {
