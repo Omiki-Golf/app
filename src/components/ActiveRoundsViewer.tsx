@@ -13,7 +13,7 @@ import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
-import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive, Hand } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, Archive, Hand } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
 import { GamificationBadge } from './GamificationBadge';
 
@@ -66,7 +66,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [confirmDelete, setConfirmDelete] = useState(false);
   // Archivar no se puede deshacer: siempre se pide confirmación.
   const [roundToArchive, setRoundToArchive] = useState<string | null>(null);
-  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [roundToDelete, setRoundToDelete] = useState<string | null>(null);
   const [roundToFinishAndArchive, setRoundToFinishAndArchive] = useState<string | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState<string | null>(null);
@@ -82,8 +81,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [canManagePlayers, setCanManagePlayers] = useState(false);
   const [showAdminPinModal, setShowAdminPinModal] = useState(false);
   const [pinError, setPinError] = useState('');
-  const [pinActionType, setPinActionType] = useState<'deleteAll' | 'deletePlayer' | null>(null);
-  const [updatingHandicaps, setUpdatingHandicaps] = useState(false);
+  const [pinActionType, setPinActionType] = useState<'deletePlayer' | null>(null);
 
   const loadActiveRounds = useCallback(async () => {
     try {
@@ -192,35 +190,12 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     }
   };
 
-  const handleDeleteAllRounds = () => {
-    const isDivend = currentGroup?.group_code === 'DIVEND';
-
-    if (isDivend) {
-      setPinActionType('deleteAll');
-      setShowAdminPinModal(true);
-      setPinError('');
-      return;
-    }
-
-    const currentUserId = getUserId();
-    const notOwnedRounds = rounds.filter(r => r.round.user_id !== currentUserId);
-
-    if (notOwnedRounds.length > 0) {
-      setError('No tienes permisos para eliminar todas las partidas. Solo puedes eliminar las partidas que has creado.');
-      return;
-    }
-
-    setShowDeleteAllModal(true);
-  };
-
   const handlePinSubmit = (pin: string) => {
     if (adminPinUtils.verifyPin(pin)) {
       setShowAdminPinModal(false);
       setPinError('');
 
-      if (pinActionType === 'deleteAll') {
-        setShowDeleteAllModal(true);
-      } else if (pinActionType === 'deletePlayer') {
+      if (pinActionType === 'deletePlayer') {
         setConfirmDelete(false);
       }
 
@@ -237,25 +212,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
     if (pinActionType === 'deletePlayer') {
       setPlayerToDelete(null);
-    }
-  };
-
-  const handleConfirmDeleteAll = async () => {
-    setShowDeleteAllModal(false);
-    try {
-      setLoading(true);
-      setError('');
-      if (currentGroup) {
-        await golfService.deleteAllRounds(currentGroup.id);
-      } else {
-        await golfService.deleteAllRounds();
-      }
-      await loadActiveRounds();
-    } catch (err) {
-      setError(deletionErrorMessage(err, 'Error eliminando partidas'));
-      console.error(err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -438,22 +394,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     }
   };
 
-  const handleUpdateHandicaps = async () => {
-    try {
-      setUpdatingHandicaps(true);
-      setError('');
-
-      await golfService.updateHandicapsFromLastRanking();
-
-      await loadActiveRounds();
-    } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Error actualizando handicaps'));
-      console.error(err);
-    } finally {
-      setUpdatingHandicaps(false);
-    }
-  };
-
   const getPlayerStats = (roundStats: RoundStats, playerId: string) => {
     const playerScores = roundStats.scores.filter((s) => s.player_id === playerId);
     const totalPoints = playerScores.reduce((sum, s) => sum + s.stableford_points, 0);
@@ -514,8 +454,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     });
   };
 
-  const allRoundsCompleted = rounds.length > 0 && rounds.every(r => r.round.status === 'completed');
-  const hasCompletedRounds = rounds.some(r => r.round.status === 'completed');
 
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
@@ -642,35 +580,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           Clasificación
                         </span>
                       </button>
-
-                      {currentGroup && hasCompletedRounds && (
-                        <WriteButton
-                          onClick={handleUpdateHandicaps}
-                          disabled={!allRoundsCompleted || updatingHandicaps || loading}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
-                          title={
-                            !allRoundsCompleted
-                              ? 'Todas las partidas deben estar finalizadas'
-                              : 'Actualiza handicaps según la última clasificación'
-                          }
-                        >
-                          <TrendingUp size={20} />
-                          <span className="hidden sm:inline">
-                            {updatingHandicaps ? 'Actualizando...' : 'Actualizar HCP'}
-                          </span>
-                        </WriteButton>
-                      )}
-
-                      {currentGroup && (
-                        <WriteButton
-                          onClick={handleDeleteAllRounds}
-                          disabled={loading || updatingHandicaps}
-                          className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
-                        >
-                          <Trash2 size={20} />
-                          <span className="hidden sm:inline">Eliminar Todas</span>
-                        </WriteButton>
-                      )}
+                      {/* Solo Clasificación arriba: archivar y eliminar van en cada partida. */}
                     </>
                 </div>
               )}
@@ -772,6 +682,33 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                     {currentGroup && <Eye className="text-accent-ink" size={24} />}
                   </button>
 
+                  {/* Acciones de la partida (grupos): fuera del botón de la cabecera. */}
+                  {currentGroup && (
+                    <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-2 md:px-6">
+                      {isCompleted && (
+                        <WriteButton
+                          onClick={() => setRoundToArchive(roundStats.round.id)}
+                          disabled={loading}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
+                          title="Archivar partida"
+                        >
+                          <Archive size={16} />
+                          <span>Archivar partida</span>
+                        </WriteButton>
+                      )}
+                      <WriteButton
+                        onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                        disabled={loading}
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
+                        title="Borrar partida"
+                        aria-label="Borrar partida"
+                      >
+                        <Trash2 size={16} />
+                        <span>Borrar partida</span>
+                      </WriteButton>
+                    </div>
+                  )}
+
                   {isExpanded && !isCompleted && (
                     <div className="border-t bg-card-2 p-4 md:p-6 space-y-4">
                       <div>
@@ -779,18 +716,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           <h3 className="font-bold text-ink">Clasificación</h3>
                           {/* En curso solo el creador elimina; descartar aparece cuando la partida está finalizada. */}
                           {!currentGroup && !isLinkedGuest && (
-                            <WriteButton
-                              onClick={() => handleDeleteRoundClick(roundStats.round.id)}
-                              disabled={loading}
-                              className="text-red-500 hover:bg-red-50 disabled:opacity-50 p-2 rounded-lg transition-colors"
-                              title="Eliminar partida"
-                              aria-label="Eliminar partida"
-                            >
-                              <Trash2 size={20} />
-                            </WriteButton>
-                          )}
-                          {/* En grupos, Eliminar está dentro de la ficha (ya no en la cabecera). */}
-                          {currentGroup && (
                             <WriteButton
                               onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                               disabled={loading}
@@ -978,8 +903,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados
                           </button>
                         )}
-                        {/* En grupos, Archivar y Eliminar viven aquí (ya no en la cabecera de la partida). */}
-                        {(currentGroup || isRoundCreator) && (
+                        {/* En grupos, Archivar y Borrar están en la barra de acciones de la partida. */}
+                        {!currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => setRoundToArchive(roundStats.round.id)}
                             className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -1010,16 +935,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             {isLinkedGuest ? 'Descartar' : 'Eliminar'}
                           </WriteButton>
                         )}
-                        {currentGroup && (
-                          <WriteButton
-                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
-                            disabled={loading}
-                            className="w-full sm:flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                          >
-                            <Trash2 size={20} />
-                            Eliminar
-                          </WriteButton>
-                        )}
                       </div>
                     </div>
                   )}
@@ -1039,20 +954,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           onSubmit={handlePinSubmit}
           onCancel={handlePinCancel}
           error={pinError}
-        />
-      )}
-
-      {/* Modal Borrar Todas */}
-      {showDeleteAllModal && (
-        <ConfirmModal
-          message={currentGroup
-            ? '¿Estás seguro de que quieres eliminar TODAS las partidas activas o finalizadas de este grupo?'
-            : isExpressPlan
-            ? '¿Estás seguro de que quieres eliminar todas tus partidas? La lista se limpiará, pero seguirán contando dentro del cupo consumido del Plan Express.'
-            : '¿Estás seguro de que quieres eliminar todas tus partidas?'}
-          requiredText={currentGroup ? 'ELIMINAR TODAS' : undefined}
-          onConfirm={handleConfirmDeleteAll}
-          onCancel={() => setShowDeleteAllModal(false)}
         />
       )}
 
