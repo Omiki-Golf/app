@@ -14,6 +14,8 @@ import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
 import { FinalResultModal } from './FinalResultModal';
 import { calculateFinalResult, isDecidedBeforeLastHole, type FinalResult } from '../utils/finalResult';
+import { groupSettingsService } from '../services/groupSettingsService';
+import { EXTRA_GAMIFICATION_PRODUCTS, gamificationProduct } from '../data/gamification';
 
 interface ScorecardProps {
   holes: GolfHole[];
@@ -34,6 +36,7 @@ interface ScorecardProps {
   isRoundFinished?: boolean;
   courseName?: string;
   groupCode?: string | null;
+  groupId?: string | null;
   hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   decidedResult?: DecidedResult | null;
@@ -62,6 +65,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   isRoundFinished = false,
   courseName = '',
   groupCode = null,
+  groupId = null,
   hoyo19Enabled,
   gameMode = 'stableford',
   decidedResult = null,
@@ -74,6 +78,11 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   messagesButton,
 }) => {
   const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
+  const [enabledGamification, setEnabledGamification] = useState<string[]>([]);
+  useEffect(() => {
+    if (!groupId) { setEnabledGamification([]); return; }
+    void groupSettingsService.getEnabledGamification(groupId).then(setEnabledGamification);
+  }, [groupId]);
   const isModeScoring = gameMode !== 'stableford';
   const modeLabels: Record<GameMode, string> = {
     stableford: 'Stableford',
@@ -344,6 +353,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 readonly={!hasEditAccess}
                 groupCode={groupCode}
                 hoyo19Enabled={isDivend}
+                enabledGamification={enabledGamification}
                 gameMode={gameMode}
                 teamAssignments={gameMode === 'parejas' && players.length === 4 ? Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1])) : undefined}
                 onScoreChange={(playerId, score) => {
@@ -851,6 +861,21 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 </div>
               </>
             )}
+
+            {enabledGamification.filter(id => EXTRA_GAMIFICATION_PRODUCTS.some(item => item.id === id)).map(productId => {
+              const product = gamificationProduct(productId)!;
+              return <div key={productId} className="mt-6">
+                <h3 className="mb-3 font-semibold text-ink-2">{product.name}</h3>
+                <div className="space-y-2">{players.map(player => {
+                  const playerRound = roundsMap.get(player.id);
+                  const eventHoles = playableHoles.filter(h => playerRound?.scores[h.hole_number]?.gamification_events?.includes(productId)).map(h => h.hole_number);
+                  return <div key={player.id} className="flex items-center justify-between rounded-lg border border-line bg-card-2 p-3">
+                    <div><p className="font-semibold text-ink">{player.name}</p><p className="text-xs text-ink-3">{eventHoles.length ? `Hoyos: ${eventHoles.join(', ')}` : 'Ninguno'}</p></div>
+                    <span className="rounded-lg bg-accent-soft px-3 py-1 text-xl font-bold text-accent-ink">{eventHoles.length}</span>
+                  </div>;
+                })}</div>
+              </div>;
+            })}
 
           </div>
         </div>

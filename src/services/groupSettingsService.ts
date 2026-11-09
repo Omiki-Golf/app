@@ -29,6 +29,23 @@ const getLocalSettings = (groupId: string): GroupSettings | null => {
 };
 
 export const groupSettingsService = {
+  async getGamification(groupId: string): Promise<Array<{ product_id: string; enabled: boolean }>> {
+    const { data, error } = await supabase.from('group_gamification').select('product_id, enabled').eq('group_id', groupId).eq('purchased', true).order('product_id');
+    if (error) return [];
+    return data || [];
+  },
+
+  async getEnabledGamification(groupId: string): Promise<string[]> {
+    return (await this.getGamification(groupId)).filter(item => item.enabled).map(item => item.product_id);
+  },
+
+  async saveGamification(groupId: string, products: Array<{ product_id: string; enabled: boolean }>): Promise<void> {
+    if (!products.length) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Inicia sesión para guardar la gamificación.');
+    const { error } = await supabase.from('group_gamification').upsert(products.map(item => ({ group_id: groupId, product_id: item.product_id, purchased: true, enabled: item.enabled, updated_by: user.id, updated_at: new Date().toISOString() })), { onConflict: 'group_id,product_id' });
+    if (error) throw error;
+  },
   async getGroupSettings(groupId: string): Promise<GroupSettings> {
     const local = getLocalSettings(groupId);
 

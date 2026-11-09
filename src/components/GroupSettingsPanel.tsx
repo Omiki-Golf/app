@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Save } from 'lucide-react';
 import { groupSettingsService, HandicapVariationMode } from '../services/groupSettingsService';
+import { GAMIFICATION_PRODUCTS } from '../data/gamification';
 
 interface GroupSettingsPanelProps {
   groupId: string;
@@ -12,13 +13,15 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [gamification, setGamification] = useState<Array<{ product_id: string; enabled: boolean }>>([]);
 
   useEffect(() => {
     let cancelled = false;
-    groupSettingsService.getGroupSettings(groupId).then((settings) => {
+    Promise.all([groupSettingsService.getGroupSettings(groupId), groupSettingsService.getGamification(groupId)]).then(([settings, products]) => {
       if (!cancelled) {
         setMinRounds(settings.min_rounds_for_awards);
         setHcpVariation(settings.handicap_variation_mode);
+        setGamification(products);
         setLoading(false);
       }
     });
@@ -35,6 +38,7 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
         min_rounds_for_awards: minRounds,
         handicap_variation_mode: hcpVariation,
       });
+      await groupSettingsService.saveGamification(groupId, gamification);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } finally {
@@ -121,6 +125,22 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
       </div>
 
       {/* Botón Guardar */}
+      <div className="border-t border-line pt-4">
+        <h3 className="text-sm font-bold text-ink">Gamificación</h3>
+        <p className="mb-2 text-xs text-ink-3">Activa qué títulos contratados se pueden marcar en la tarjeta de puntuación.</p>
+        <div className="space-y-2">
+          {gamification.map(item => {
+            const product = GAMIFICATION_PRODUCTS.find(product => product.id === item.product_id);
+            if (!product) return null;
+            return <label key={item.product_id} className="flex items-center justify-between rounded-lg border border-line bg-card-2 px-3 py-2 text-sm text-ink">
+              <span>{product.name}</span>
+              <input type="checkbox" checked={item.enabled} onChange={() => setGamification(current => current.map(row => row.product_id === item.product_id ? { ...row, enabled: !row.enabled } : row))} className="h-5 w-5 accent-[var(--accent)]" />
+            </label>;
+          })}
+          {gamification.length === 0 && <p className="text-xs text-ink-3">Activa títulos desde el Pro-Shop para que aparezcan aquí.</p>}
+        </div>
+      </div>
+
       <div className="pt-2 flex items-center justify-between border-t border-line">
         <div>
           {saved && (

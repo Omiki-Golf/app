@@ -16,8 +16,17 @@ test('classification uses points, then lower handicap, and shares position only 
   assert.deepEqual(sorted.map((_, index) => competitionPosition(sorted, index, (a, b) => a.points === b.points && a.hcp === b.hcp)), [1, 2, 3, 3]);
 });
 
-test('tied positive awards put lower handicap first and negative awards put higher handicap first', () => {
+test('quick awards only remain tied when result and deciding handicap both tie', () => {
   const tied = players.map(player => ({ ...player, awards: 2 }));
-  assert.deepEqual(tiedAwardLeaders(tied, p => p.awards, 'max', p => p.hcp, 'lower').map(p => p.name), ['Pepe', 'Fede', 'Perico', 'Jose']);
-  assert.deepEqual(tiedAwardLeaders(tied, p => p.awards, 'max', p => p.hcp, 'higher').map(p => p.name), ['Perico', 'Jose', 'Pepe', 'Fede']);
+  assert.deepEqual(tiedAwardLeaders(tied, p => p.awards, 'max', p => p.hcp, 'lower').map(p => p.name), ['Pepe', 'Fede']);
+  assert.deepEqual(tiedAwardLeaders(tied, p => p.awards, 'max', p => p.hcp, 'higher').map(p => p.name), ['Perico', 'Jose']);
+});
+
+test('quick count awards favor lower handicap while variation favors higher handicap', () => {
+  const tied = players.map(player => ({ ...player, count: 3, variation: 4 }));
+  const countWinners = tiedAwardLeaders(tied, p => p.count, 'max', p => p.hcp, 'lower');
+  const variationWinners = tiedAwardLeaders(tied, p => p.variation, 'max', p => p.hcp, 'higher');
+
+  assert.deepEqual(countWinners.map(p => p.name), ['Pepe', 'Fede']);
+  assert.deepEqual(variationWinners.map(p => p.name), ['Perico', 'Jose']);
 });

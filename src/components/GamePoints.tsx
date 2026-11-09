@@ -11,6 +11,7 @@ import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { GroupMemberList } from './GroupMemberList';
 import { competitionPosition } from '../utils/ranking';
+import { gamificationProduct } from '../data/gamification';
 
 interface DailyStanding {
   playerId: string;
@@ -20,6 +21,7 @@ interface DailyStanding {
   roundId: string;
   noPasoRojasHoles?: number[];
   spanishHandsHoles?: number[];
+  gamificationEvents?: Array<{ productId: string; holeNumber: number }>;
   isGuest?: boolean;
 }
 
@@ -423,6 +425,10 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                       ))}
                                     </div>
                                   )}
+                                  {standing.gamificationEvents?.map(({ productId, holeNumber }, eventIndex) => {
+                                    const product = gamificationProduct(productId);
+                                    return <span key={`${productId}-${holeNumber}-${eventIndex}`} title={`${product?.name || productId} · Hoyo ${holeNumber}`} className="rounded-full bg-amber-500 px-1.5 py-1 text-[10px] font-bold text-amber-950">{product?.short || productId} {holeNumber}</span>;
+                                  })}
                                 </div>
                                 <span className="text-xl font-bold text-title">
                                   {standing.totalPoints} pts

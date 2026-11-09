@@ -5,6 +5,7 @@ import { Trophy, Medal, Eye, RefreshCw, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ThemeToggle } from './ThemeToggle';
 import { competitionPosition } from '../utils/ranking';
+import { gamificationProduct } from '../data/gamification';
 
 interface LeaderboardProps {
   players: RoundPlayer[];
@@ -82,6 +83,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
       holesCompleted: round ? Object.keys(round.scores).length : 0,
       noPasoRojasHoles: round ? Object.values(round.scores).filter(s => s.no_paso_rojas).map(s => s.hole_number) : [],
       spanishHandsHoles: round ? Object.values(round.scores).filter(s => s.spanish_hands).map(s => s.hole_number) : [],
+      gamificationEvents: round ? Object.values(round.scores).flatMap(s => (s.gamification_events || []).map(productId => ({ productId, holeNumber: s.hole_number }))) : [],
     };
   });
 
@@ -120,6 +122,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
           badges: memberStats.flatMap((stat) => [
             ...stat.noPasoRojasHoles.map((holeNumber) => ({ kind: 'red' as const, holeNumber, owner: stat.player.name as string | null })),
             ...stat.spanishHandsHoles.map((holeNumber) => ({ kind: 'sh' as const, holeNumber, owner: stat.player.name as string | null })),
+            ...stat.gamificationEvents.map(({ productId, holeNumber }) => ({ kind: 'gamification' as const, productId, holeNumber, owner: stat.player.name as string | null })),
           ]),
         };
       }).sort((a, b) => b.totalPoints - a.totalPoints || a.handicap - b.handicap)
@@ -134,6 +137,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
         badges: [
           ...stat.noPasoRojasHoles.map((holeNumber) => ({ kind: 'red' as const, holeNumber, owner: null as string | null })),
           ...stat.spanishHandsHoles.map((holeNumber) => ({ kind: 'sh' as const, holeNumber, owner: null as string | null })),
+          ...stat.gamificationEvents.map(({ productId, holeNumber }) => ({ kind: 'gamification' as const, productId, holeNumber, owner: null as string | null })),
         ],
       }));
 
@@ -291,7 +295,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                   >
                                     {badge.holeNumber}
                                   </span>
-                                ) : (
+                                ) : badge.kind === 'sh' ? (
                                   <span
                                     key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
                                     title={`Spanish Hands · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
@@ -299,6 +303,14 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                     className="bg-accent text-on-accent rounded-full w-5 h-5 flex items-center justify-center shadow-soft"
                                   >
                                     <Hand size={12} />
+                                  </span>
+                                ) : (
+                                  <span
+                                    key={`${badge.kind}-${badge.productId}-${badge.owner ?? ''}-${badge.holeNumber}`}
+                                    title={`${gamificationProduct(badge.productId)?.name || badge.productId} · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                    className="rounded-full bg-amber-500 px-1.5 py-1 text-[9px] font-bold text-amber-950"
+                                  >
+                                    {gamificationProduct(badge.productId)?.short || badge.productId} {badge.holeNumber}
                                   </span>
                                 )
                               ))}

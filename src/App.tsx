@@ -792,6 +792,7 @@ function App() {
       const stablefordPoints = score.stablefordPoints ?? score.stableford_points;
       const noPasoRojas = score.no_paso_rojas ?? false;
       const spanishHands = score.spanish_hands ?? false;
+      const gamificationEvents = score.gamification_events ?? [];
       const abandoned = score.abandoned ?? false;
       const modePoints = score.mode_points ?? 0;
 
@@ -840,7 +841,7 @@ function App() {
         { round_id: editingRoundId, player_id: playerId, hole_number: holeNumber,
           gross_strokes: grossStrokes, strokes_received: strokesReceived, net_strokes: netStrokes,
           stableford_points: stablefordPoints, no_paso_rojas: noPasoRojas,
-          spanish_hands: spanishHands, abandoned, mode_points: modePoints },
+          spanish_hands: spanishHands, gamification_events: gamificationEvents, abandoned, mode_points: modePoints },
         ...updatedOtherScores,
       ], editCode);
       let decidedResult = roundState.round.decided_result || null;
@@ -1588,6 +1589,7 @@ function App() {
           isRoundFinished={roundState.round.status === 'completed' || roundState.round.status === 'archived'}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
+          groupId={currentGroup?.id}
           hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
           gameMode={roundState.round.game_mode}
           decidedResult={roundState.round.decided_result}

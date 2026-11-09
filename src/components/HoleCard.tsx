@@ -5,6 +5,7 @@ import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput
 import { ChevronDown, Minus, Hand } from 'lucide-react';
 import { HoleInOneModal } from './HoleInOneModal';
 import { CongratulationsModal } from './CongratulationsModal';
+import { EXTRA_GAMIFICATION_PRODUCTS, gamificationProduct } from '../data/gamification';
 
 interface HoleCardProps {
   hole: GolfHole;
@@ -17,6 +18,7 @@ interface HoleCardProps {
   groupCode?: string | null;
   /** Gamificación Hoyo 19 del grupo (No pasó de rojas). */
   hoyo19Enabled?: boolean;
+  enabledGamification?: string[];
   gameMode?: GameMode;
   teamAssignments?: Record<string, 0 | 1>;
   onScoreChange: (playerId: string, score: ScoreChangeInput | null) => void;
@@ -69,6 +71,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   readonly = false,
   groupCode = null,
   hoyo19Enabled,
+  enabledGamification = [],
   gameMode = 'stableford',
   teamAssignments = {},
   allHoleScores = {},
@@ -84,6 +87,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   const [congratsPlayerName, setCongratsPlayerName] = useState('');
   const [pendingNoPasoRojas, setPendingNoPasoRojas] = useState<Record<string, boolean>>({});
   const [pendingSpanishHands, setPendingSpanishHands] = useState<Record<string, boolean>>({});
+  const [pendingGamification, setPendingGamification] = useState<Record<string, string[]>>({});
 
   const computeModePointsForPlayer = (playerId: string, grossStrokesVal: number, strokesRecv: number, abandonedVal: boolean): number => {
     if (!isModeScoring) return 0;
@@ -208,6 +212,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         newScore.no_paso_rojas = true;
       }
       newScore.spanish_hands = pendingSpanishHands[playerId] || false;
+      newScore.gamification_events = pendingGamification[playerId] || [];
       newScore.abandoned = false;
       newScore.mode_points = computeModePointsForPlayer(playerId, twoDigitNumber, newScore.strokesReceived, false);
       onScoreChange(playerId, newScore);
@@ -238,6 +243,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         newScore.no_paso_rojas = true;
       }
       newScore.spanish_hands = pendingSpanishHands[playerId] || false;
+      newScore.gamification_events = pendingGamification[playerId] || [];
       newScore.abandoned = false;
       newScore.mode_points = computeModePointsForPlayer(playerId, num, newScore.strokesReceived, false);
       onScoreChange(playerId, newScore);
@@ -269,6 +275,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
           newScore.no_paso_rojas = true;
         }
         newScore.spanish_hands = pendingSpanishHands[pendingPlayerId] || false;
+        newScore.gamification_events = pendingGamification[pendingPlayerId] || [];
         newScore.abandoned = false;
         newScore.mode_points = computeModePointsForPlayer(pendingPlayerId, 1, newScore.strokesReceived, false);
         onScoreChange(pendingPlayerId, newScore);
@@ -390,6 +397,9 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                         <Hand size={11} />
                       </span>
                     )}
+                    {[...(score?.gamification_events || []), ...(pendingGamification[player.id] || [])].filter((id, index, all) => all.indexOf(id) === index).map(id => (
+                      <span key={id} title={gamificationProduct(id)?.name || id} className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">{gamificationProduct(id)?.short || id}</span>
+                    ))}
                   </div>
                   <p className="text-xs text-ink-3">HCP {player.playing_handicap}</p>
                 </div>
@@ -513,6 +523,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                               newScore.no_paso_rojas = true;
                             }
                             newScore.spanish_hands = pendingSpanishHands[player.id] || false;
+                            newScore.gamification_events = pendingGamification[player.id] || [];
                             newScore.abandoned = false;
                             newScore.mode_points = computeModePointsForPlayer(player.id, 10, newScore.strokesReceived, false);
                             onScoreChange(player.id, newScore);
@@ -547,6 +558,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                                 newScore.no_paso_rojas = true;
                               }
                               newScore.spanish_hands = pendingSpanishHands[player.id] || false;
+                              newScore.gamification_events = pendingGamification[player.id] || [];
                               newScore.abandoned = true;
                               newScore.stablefordPoints = 0;
                               newScore.mode_points = computeModePointsForPlayer(player.id, rayaScore, newScore.strokesReceived, true);
@@ -659,6 +671,23 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                           : 'Marcar: Spanish Hands'}
                       </button>
                     )}
+                    {enabledGamification.filter(id => EXTRA_GAMIFICATION_PRODUCTS.some(item => item.id === id)).map(productId => {
+                      const events = score?.gamification_events || pendingGamification[player.id] || [];
+                      const selected = events.includes(productId);
+                      const product = gamificationProduct(productId)!;
+                      return <button key={productId} type="button" onClick={() => {
+                        if (score && score.gross_strokes > 0) {
+                          onScoreChange(player.id, { ...score, grossStrokes: score.gross_strokes, strokesReceived, netStrokes: score.net_strokes, stablefordPoints: score.stableford_points, gamification_events: selected ? events.filter(id => id !== productId) : [...events, productId] });
+                        } else {
+                          setPendingGamification(current => {
+                            const pending = current[player.id] || [];
+                            return { ...current, [player.id]: pending.includes(productId) ? pending.filter(id => id !== productId) : [...pending, productId] };
+                          });
+                        }
+                      }} className={`w-full rounded-lg py-3 font-semibold transition-colors ${selected ? 'bg-amber-500 text-amber-950' : 'bg-neutral text-ink-2 hover:bg-neutral-hover'}`}>
+                        {selected ? '✓ ' : 'Marcar: '}{product.name}
+                      </button>;
+                    })}
                   </div>
                 );
               })()}

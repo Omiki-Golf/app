@@ -1666,6 +1666,9 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
                 .filter((s) => s.spanish_hands === true)
                 .map((s) => s.hole_number)
                 .sort((a, b) => a - b);
+              const gamificationEvents = playerScores.flatMap(score =>
+                (score.gamification_events || []).map(productId => ({ productId, holeNumber: score.hole_number }))
+              );
 
               return {
                 playerId: player.id,
@@ -1676,6 +1679,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
                 roundId,
                 noPasoRojasHoles,
                 spanishHandsHoles,
+                gamificationEvents,
                 isGuest: !!player.is_guest,
               };
             });
@@ -1998,6 +2002,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         : playerScores.reduce((sum, s) => sum + (s.mode_points ?? 0), 0);
       const noPasoRojasCount = playerScores.filter((s) => s.no_paso_rojas === true).length;
       const spanishHandsCount = playerScores.filter((s) => s.spanish_hands === true).length;
+      const gamificationCounts = playerScores.flatMap(score => score.gamification_events || []).reduce<Record<string, number>>((counts, id) => ({ ...counts, [id]: (counts[id] || 0) + 1 }), {});
 
       const eagles = playerScores.filter((s) => {
         const hole = holes.find((h) => h.hole_number === s.hole_number);
@@ -2038,6 +2043,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         totalPoints,
         noPasoRojasCount,
         spanishHandsCount,
+        gamificationCounts,
         totalHolesPlayed: playerScores.length,
         holeResults: {
           eagles,
@@ -2103,6 +2109,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         handicap: player.exactHandicap,
         no_paso_rojas_count: player.noPasoRojasCount,
         spanish_hands_count: player.spanishHandsCount,
+        gamification_counts: player.gamificationCounts,
         total_holes_played: player.totalHolesPlayed,
         beers_won: beersWon,
         beers_paid: beersPaid,
@@ -2136,6 +2143,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         result: result,
         no_paso_rojas: score.no_paso_rojas || false,
         spanish_hands: score.spanish_hands || false,
+        gamification_events: score.gamification_events || [],
       };
     }).filter(Boolean);
 

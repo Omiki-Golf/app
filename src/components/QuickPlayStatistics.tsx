@@ -564,8 +564,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const highlightPosition = (index: number) => competitionPosition(rankedHighlights, index, (a, b) => a.totalPoints === b.totalPoints && a.handicap === b.handicap);
   const birdieKings = tiedAwardLeaders(highlights, h => h.birdies, 'max', h => h.handicap, 'lower');
   const rollerCoasters = tiedAwardLeaders(highlights, h => h.variability, 'max', h => h.handicap, 'higher');
-  const bogeyKings = tiedAwardLeaders(highlights, h => h.bogeys, 'max', h => h.handicap, 'higher');
-  const doubleBogeyKings = tiedAwardLeaders(highlights, h => h.doubleBogeyPlus, 'max', h => h.handicap, 'higher');
+  const bogeyKings = tiedAwardLeaders(highlights, h => h.bogeys, 'max', h => h.handicap, 'lower');
+  const doubleBogeyKings = tiedAwardLeaders(highlights, h => h.doubleBogeyPlus, 'max', h => h.handicap, 'lower');
   const getPlayerGrossStrokes = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.totalGrossStrokes ?? 0;
   const getPlayerScoreToPar = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.scoreToPar ?? { value: 0, display: '-' };
 

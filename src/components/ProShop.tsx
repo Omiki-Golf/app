@@ -3,6 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useRef, useState } from 'react';
 import { Beer, CalendarDays, Check, Hand, Info, Mail, ShoppingCart, Trophy, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface ProShopProps {
   groupId: string | null;
@@ -20,8 +21,6 @@ interface ShopItem {
   icon: LucideIcon;
   /** Incluido gratis en Team: siempre seleccionado. */
   free?: boolean;
-  /** Necesita datos que la tarjeta aún no registra: visible pero no seleccionable. */
-  comingSoon?: boolean;
 }
 
 interface Addon extends ShopItem {
@@ -33,13 +32,13 @@ interface Addon extends ShopItem {
 const titles: ShopItem[] = [
   { id: 'no-paso-rojas', name: 'No paso de Rojas', icon: Beer, free: true, info: 'El jugador que no pasa de rojas (bolas de damas) en la salida paga una cerveza al resto de su partida. La tradición más sagrada del golf entre amigos, ahora digitalizada.' },
   { id: 'spanish-hand', name: 'Spanish Hand', icon: Hand, info: 'Birdie conseguido desde fuera del green. El título más patrio para los que embocan de lejos.' },
-  { id: 'buceador', name: 'Buceador', icon: Trophy, comingSoon: true, info: 'El jugador con más bolas enviadas al agua durante la temporada. Un clásico entre los amigos.' },
-  { id: 'minero', name: 'Minero', icon: Trophy, comingSoon: true, info: 'Rey indiscutible de los bunkers. El que más veces termina jugando desde la arena.' },
-  { id: 'lumberjack', name: 'Lumberjack', icon: Trophy, comingSoon: true, info: 'El jugador que más árboles ha golpeado durante el año. Leñador honorario del grupo.' },
-  { id: 'maestro-obstaculos', name: 'Maestro de Obstáculos', icon: Trophy, comingSoon: true, info: 'El que más veces se ha salvado de un obstáculo imposible y ha salvado el par o mejor.' },
-  { id: 'fenomeno-tee', name: 'Fenómeno del Tee', icon: Trophy, comingSoon: true, info: 'Mejor media de drive de toda la temporada. El que más lejos llega con consistencia.' },
-  { id: 'abrelatas', name: 'Abrelatas', icon: Trophy, comingSoon: true, info: 'Más bolas perdidas en todo el año. El que más pelotas ha tenido que reponer en su bolsa.' },
-  { id: 'hada-patos', name: 'Hada de los Patos', icon: Trophy, comingSoon: true, info: 'El que más veces ha asustado a los patos del campo. Por las risas más que por el juego.' },
+  { id: 'buceador', name: 'Buceador', icon: Trophy, info: 'El jugador con más bolas enviadas al agua durante la temporada. Un clásico entre los amigos.' },
+  { id: 'minero', name: 'Minero', icon: Trophy, info: 'Rey indiscutible de los bunkers. El que más veces termina jugando desde la arena.' },
+  { id: 'lumberjack', name: 'Lumberjack', icon: Trophy, info: 'El jugador que más árboles ha golpeado durante el año. Leñador honorario del grupo.' },
+  { id: 'maestro-obstaculos', name: 'Maestro de Obstáculos', icon: Trophy, info: 'El que más veces se ha salvado de un obstáculo imposible y ha salvado el par o mejor.' },
+  { id: 'fenomeno-tee', name: 'Fenómeno del Tee', icon: Trophy, info: 'Mejor drive de la jornada. Márcalo en el hoyo para incluirlo en las estadísticas.' },
+  { id: 'abrelatas', name: 'Abrelatas', icon: Trophy, info: 'Más bolas perdidas en todo el año. El que más pelotas ha tenido que reponer en su bolsa.' },
+  { id: 'hada-patos', name: 'Hada de los Patos', icon: Trophy, info: 'El que más veces ha asustado a los patos del campo. Por las risas más que por el juego.' },
 ];
 
 const addons: Addon[] = [
@@ -56,6 +55,14 @@ const CONTACT_EMAIL = 'hola@omikigolf.com';
 export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, onBack, messagesButton }) => {
   const [selectedTitles, setSelectedTitles] = useState<Set<string>>(() => new Set(titles.filter(item => item.free).map(item => item.id)));
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (!groupId) return;
+    void supabase.from('group_gamification').select('product_id').eq('group_id', groupId).eq('purchased', true)
+      .then(({ data }) => setSelectedTitles(new Set(['no-paso-rojas', ...(data || []).map(row => row.product_id)])));
+  }, [groupId]);
 
   const toggle = (set: Set<string>, setter: (next: Set<string>) => void, id: string) => {
     const next = new Set(set);
@@ -66,6 +73,19 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
   const paidTitles = titles.filter(item => !item.free && selectedTitles.has(item.id));
   const chosenAddons = addons.filter(item => selectedAddons.has(item.id));
   const hasRequest = paidTitles.length > 0 || chosenAddons.length > 0;
+
+  const activateForTesting = async () => {
+    if (!groupId) return;
+    setSaving(true); setSaved(false);
+    try {
+      const rows = paidTitles.map(item => ({ group_id: groupId, product_id: item.id, purchased: true, enabled: true, updated_by: userId, updated_at: new Date().toISOString() }));
+      if (rows.length) {
+        const { error } = await supabase.from('group_gamification').upsert(rows, { onConflict: 'group_id,product_id' });
+        if (error) throw error;
+      }
+      setSaved(true);
+    } finally { setSaving(false); }
+  };
 
   const requestHref = () => {
     const lines = [
@@ -149,20 +169,23 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                   )}
                 </div>
               </div>
-              {hasRequest ? (
-                <a
-                  href={requestHref()}
+              {paidTitles.length > 0 ? (
+                <WriteButton
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void activateForTesting()}
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent transition-colors hover:bg-accent-hover"
                 >
-                  <Mail size={18} aria-hidden="true" />
-                  Solicitar
-                </a>
+                  <Check size={18} aria-hidden="true" />
+                  {saving ? 'Activando…' : saved ? 'Activado para pruebas' : 'Activar selección para pruebas'}
+                </WriteButton>
               ) : (
                 <WriteButton disabled className="w-full rounded-xl bg-neutral px-4 py-3 font-semibold text-ink-3 disabled:cursor-not-allowed">
                   Solicitar
                 </WriteButton>
               )}
-              <p className="text-xs text-ink-3">De momento la solicitud se envía por email a {CONTACT_EMAIL} y la activamos en tu grupo. Pronto podrás pagarla desde la app.</p>
+              {chosenAddons.length > 0 && <a href={requestHref()} className="flex items-center justify-center gap-2 text-sm font-semibold text-accent-ink underline"><Mail size={16} />Solicitar ampliaciones por email</a>}
+              <p className="text-xs text-ink-3">Los títulos de gamificación están desbloqueados para pruebas. Tras activarlos aparecerán en Configuración del grupo.</p>
             </section>
           </div>
         )}
@@ -179,29 +202,27 @@ const ShopRow: React.FC<{
   note?: string;
   onToggle: () => void;
 }> = ({ item, first, checked, price, note, onToggle }) => {
-  const locked = item.free || item.comingSoon;
+  const locked = item.free;
   const inputId = `shop-${item.id}`;
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'}`}>
       <input
         id={inputId}
         type="checkbox"
-        checked={checked && !item.comingSoon}
+        checked={checked}
         disabled={locked}
         onChange={onToggle}
-        className={`h-5 w-5 shrink-0 accent-[var(--accent)] disabled:cursor-not-allowed ${item.comingSoon ? 'opacity-60' : ''}`}
+        className="h-5 w-5 shrink-0 accent-[var(--accent)] disabled:cursor-not-allowed"
       />
-      <item.icon size={18} className={`shrink-0 text-accent-ink ${item.comingSoon ? 'opacity-60' : ''}`} />
+      <item.icon size={18} className="shrink-0 text-accent-ink" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <label htmlFor={inputId} className={`truncate font-semibold text-ink ${locked ? '' : 'cursor-pointer'} ${item.comingSoon ? 'opacity-70' : ''}`}>{item.name}</label>
+          <label htmlFor={inputId} className={`truncate font-semibold text-ink ${locked ? '' : 'cursor-pointer'}`}>{item.name}</label>
           <InfoTrigger title={item.name} text={item.info} />
         </div>
         {note && <p className="text-xs text-ink-3">{note}</p>}
       </div>
-      {item.comingSoon ? (
-        <span className="shrink-0 rounded-full bg-card-2 px-2 py-1 text-[10px] font-bold uppercase text-ink-3">Próximamente</span>
-      ) : item.free ? (
+      {item.free ? (
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-1 text-xs font-semibold text-accent-ink"><Check size={13} aria-hidden="true" />{price}</span>
       ) : (
         <span className="shrink-0 text-sm font-bold text-ink">{price}</span>

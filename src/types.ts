@@ -175,6 +175,7 @@ export interface RoundScore {
   stableford_points: number;
   no_paso_rojas: boolean;
   spanish_hands?: boolean;
+  gamification_events?: string[];
   abandoned: boolean;
   mode_points: number;
   created_at: string;
@@ -193,6 +194,7 @@ export interface ScoreChangeInput {
   mode_points?: number;
   no_paso_rojas?: boolean;
   spanish_hands?: boolean;
+  gamification_events?: string[];
   abandoned?: boolean;
 }
 
@@ -233,6 +235,7 @@ export interface ArchivedPlayerStat {
   handicap?: number;
   no_paso_rojas_count?: number;
   spanish_hands_count?: number;
+  gamification_counts?: Record<string, number>;
   total_holes_played?: number;
   beers_won?: number;
   beers_paid?: number;
@@ -250,6 +253,7 @@ export interface ArchivedHoleScore {
   stableford_points: number;
   no_paso_rojas?: boolean;
   spanish_hands?: boolean;
+  gamification_events?: string[];
 }
 
 export interface ArchivedRound {
@@ -288,6 +292,7 @@ export interface DailyRankingStanding {
   roundId: string;
   noPasoRojasHoles: number[];
   spanishHandsHoles?: number[];
+  gamificationEvents?: Array<{ productId: string; holeNumber: number }>;
   isGuest: boolean;
 }
 

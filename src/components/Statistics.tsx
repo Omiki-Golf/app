@@ -22,6 +22,7 @@ import { groupSettingsService } from '../services/groupSettingsService';
 import { scoreResultBar, scoreResultLabel } from '../utils/scoreColors';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
+import { EXTRA_GAMIFICATION_PRODUCTS } from '../data/gamification';
 
 interface StatisticsProps {
   onBack: () => void;
@@ -542,6 +543,38 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     );
   };
 
+  const gamificationTotalsFor = (playerName?: string) => {
+    const totals: Record<string, number> = {};
+    archivedRounds.forEach(round => round.player_stats?.forEach(stat => {
+      if (playerName && stat.player_name !== playerName) return;
+      Object.entries(stat.gamification_counts || {}).forEach(([id, count]) => { totals[id] = (totals[id] || 0) + Number(count || 0); });
+    }));
+    return totals;
+  };
+
+  const renderPlayerGamificationStats = () => {
+    const totals = gamificationTotalsFor(selectedPlayer);
+    const items = EXTRA_GAMIFICATION_PRODUCTS.filter(item => (totals[item.id] || 0) > 0);
+    if (!items.length) return null;
+    return <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{items.map(item => <div key={item.id} className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:bg-amber-950/30">
+      <p className="font-bold text-amber-950 dark:text-amber-200">{item.name}</p><p className="mt-2 text-4xl font-black text-amber-600">{totals[item.id]}</p><p className="text-xs text-ink-3">marcas en sus partidas</p>
+    </div>)}</div>;
+  };
+
+  const renderGroupGamificationAwards = () => {
+    const byProduct = new Map<string, Map<string, number>>();
+    archivedRounds.forEach(round => round.player_stats?.forEach(stat => Object.entries(stat.gamification_counts || {}).forEach(([id, count]) => {
+      const players = byProduct.get(id) || new Map<string, number>();
+      players.set(stat.player_name, (players.get(stat.player_name) || 0) + Number(count || 0)); byProduct.set(id, players);
+    })));
+    const products = EXTRA_GAMIFICATION_PRODUCTS.filter(item => byProduct.has(item.id));
+    if (!products.length) return null;
+    return <div className="mb-6"><h3 className="mb-4 text-lg font-bold text-ink">Premios especiales · Gamificación</h3><div className="grid grid-cols-1 gap-4 md:grid-cols-2">{products.map(product => {
+      const leaders = [...byProduct.get(product.id)!.entries()].sort((a, b) => b[1] - a[1]); const max = leaders[0]?.[1] || 0;
+      return <div key={product.id} className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 dark:bg-amber-950/30"><h4 className="font-bold text-amber-950 dark:text-amber-200">{product.name}</h4><p className="mt-2 text-xl font-black text-amber-700">{leaders.filter(([, count]) => count === max).map(([name]) => name).join(' / ')}</p><p className="text-sm text-ink-3">{max} marcas</p></div>;
+    })}</div></div>;
+  };
+
   const renderNoPasoRojasStats = () => {
     const playerRounds = archivedRounds.filter((round) =>
       round.player_stats?.some((ps) => ps.player_name === selectedPlayer)
@@ -833,6 +866,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                     )}
 
                     {renderSpanishHandsStats()}
+                    {renderPlayerGamificationStats()}
                   </div>
                 )}
               </div>
@@ -844,6 +878,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
                 {groupStats && (
                   <div className="space-y-6">
+                    {renderGroupGamificationAwards()}
                     <button
                       onClick={() => setShowArchivedRoundsModal(true)}
                       className="w-full bg-accent-soft hover:bg-accent-soft rounded-lg p-4 border border-accent-ring transition-colors text-left"

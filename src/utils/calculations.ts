@@ -61,6 +61,7 @@ export interface CalculatedScore {
   stablefordPoints: number;
   no_paso_rojas?: boolean;
   spanish_hands?: boolean;
+  gamification_events?: string[];
   abandoned?: boolean;
   mode_points?: number;
 }

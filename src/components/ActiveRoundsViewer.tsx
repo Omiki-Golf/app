@@ -15,6 +15,7 @@ import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
 import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive, Hand } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
+import { gamificationProduct } from '../data/gamification';
 
 const gameModeLabels: Record<string, string> = {
   stableford: 'Stableford',
@@ -472,6 +473,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       roundName: string;
       noPasoRojasHoles: number[];
       spanishHandsHoles: number[];
+      gamificationEvents: Array<{ productId: string; holeNumber: number }>;
     }> = [];
 
     rounds.forEach((roundStats) => {
@@ -486,6 +488,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           .filter((s) => s.spanish_hands === true)
           .map((s) => s.hole_number)
           .sort((a, b) => a - b);
+        const gamificationEvents = playerScores.flatMap(score =>
+          (score.gamification_events || []).map(productId => ({ productId, holeNumber: score.hole_number }))
+        );
 
         allPlayers.push({
           name: player.name,
@@ -496,6 +501,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           roundName: roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos',
           noPasoRojasHoles,
           spanishHandsHoles,
+          gamificationEvents,
         });
       });
     });
@@ -589,6 +595,9 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               ))}
                             </div>
                           )}
+                          {player.gamificationEvents.map(({ productId, holeNumber }, eventIndex) => (
+                            <span key={`${productId}-${holeNumber}-${eventIndex}`} title={`${gamificationProduct(productId)?.name || productId} · Hoyo ${holeNumber}`} className="rounded-full bg-amber-500 px-1.5 py-1 text-[10px] font-bold text-amber-950">{gamificationProduct(productId)?.short || productId} {holeNumber}</span>
+                          ))}
                         </div>
                         <p className="text-sm text-ink-3">
                           HCP {player.handicap} • {player.roundName} • {player.holesPlayed} hoyos
@@ -749,31 +758,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             </span>
                           ) : null}
                         </div>
-                        {currentGroup && <div className="flex items-center gap-1">
-                          {isCompleted && (
-                            <WriteButton
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setRoundToArchive(roundStats.round.id);
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
-                              title="Archivar partida"
-                            >
-                              <Archive size={16} />
-                              <span>Archivar</span>
-                            </WriteButton>
-                          )}
-                          <WriteButton
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteRoundClick(roundStats.round.id);
-                            }}
-                            className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors"
-                            title="Eliminar partida"
-                          >
-                            <Trash2 size={18} />
-                          </WriteButton>
-                        </div>}
                       </div>
                       <div className="flex gap-2 text-sm text-ink-3 mt-1 flex-wrap">
                         <span>{roundStats.players.length} {roundStats.players.length === 1 ? 'Jugador' : 'Jugadores'}</span>
