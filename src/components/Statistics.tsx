@@ -544,18 +544,17 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
     if (playerRounds.length === 0) return null;
 
+    // Ficha compacta (dos por fila junto a los títulos del Pro-Shop).
     return (
-      <div className="bg-gradient-to-r from-sky-50 to-blue-100 dark:from-sky-950/40 dark:to-blue-900/30 rounded-2xl p-6 border border-sky-200 dark:border-sky-800">
-        <div className="flex items-center gap-3 mb-4">
-          <Hand size={30} className="text-sky-600 dark:text-sky-400" />
-          <h3 className="text-xl font-bold text-sky-950 dark:text-sky-200">Spanish Hands</h3>
+      <div className="bg-gradient-to-r from-sky-50 to-blue-100 dark:from-sky-950/40 dark:to-blue-900/30 rounded-xl p-3 border border-sky-200 dark:border-sky-800">
+        <div className="flex min-w-0 items-center gap-2">
+          <Hand size={20} className="shrink-0 text-sky-600 dark:text-sky-400" />
+          <h3 className="truncate text-sm font-bold text-sky-950 dark:text-sky-200">Spanish Hands</h3>
         </div>
-        <div className="text-center">
-          <p className="text-5xl font-black text-sky-600 dark:text-sky-400">{totalSpanishHands}</p>
-          <p className="text-sm text-ink-3 mt-2 font-medium">
-            en {roundsWithSpanishHands} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
-          </p>
-        </div>
+        <p className="mt-2 text-center text-3xl font-black text-sky-600 dark:text-sky-400">{totalSpanishHands}</p>
+        <p className="text-center text-xs text-ink-3 font-medium">
+          en {roundsWithSpanishHands} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
+        </p>
       </div>
     );
   };
@@ -583,17 +582,15 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
         if (count > 0) roundsWith += 1;
       });
       return (
-        <div key={item.id} className="bg-card-2 rounded-2xl p-6 border border-line">
-          <div className="flex items-center gap-3 mb-4">
-            <GamificationBadge productId={item.id} size={34} />
-            <h3 className="text-xl font-bold text-ink">{item.name}</h3>
+        <div key={item.id} className="bg-card-2 rounded-xl p-3 border border-line">
+          <div className="flex min-w-0 items-center gap-2">
+            <GamificationBadge productId={item.id} size={22} />
+            <h3 className="truncate text-sm font-bold text-ink" title={item.name}>{item.name}</h3>
           </div>
-          <div className="text-center">
-            <p className="text-5xl font-black text-ink">{total}</p>
-            <p className="text-sm text-ink-3 mt-2 font-medium">
-              en {roundsWith} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
-            </p>
-          </div>
+          <p className="mt-2 text-center text-3xl font-black text-ink">{total}</p>
+          <p className="text-center text-xs text-ink-3 font-medium">
+            en {roundsWith} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
+          </p>
         </div>
       );
     })}</>;
@@ -907,8 +904,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       </>
                     )}
 
-                    {spanishHandsEnabled && renderSpanishHandsStats()}
-                    {renderPlayerGamificationStats()}
+                    {/* Spanish Hands y títulos del Pro-Shop: fichas compactas, dos por fila. */}
+                    <div className="grid grid-cols-2 gap-3 empty:hidden">
+                      {spanishHandsEnabled && renderSpanishHandsStats()}
+                      {renderPlayerGamificationStats()}
+                    </div>
                   </div>
                 )}
               </div>
@@ -920,7 +920,6 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
                 {groupStats && (
                   <div className="space-y-6">
-                    {renderGroupGamificationAwards()}
                     <button
                       onClick={() => setShowArchivedRoundsModal(true)}
                       className="w-full bg-accent-soft hover:bg-accent-soft rounded-lg p-4 border border-accent-ring transition-colors text-left"
@@ -1018,6 +1017,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                         </div>
                       </div>
                     )}
+
+                    {/* Gamificación: debajo de Premios Especiales y encima de Títulos y Rankings. */}
+                    {renderGroupGamificationAwards()}
 
                     {phase2Stats && (
                       <div className="space-y-6">

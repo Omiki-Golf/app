@@ -752,22 +752,19 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 }`}
                               >
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                     <p className={`font-semibold ${index === 0 ? 'text-yellow-950 dark:text-yellow-100' : 'text-ink'}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                                     {(() => {
-                                      const pScores = roundStats.scores.filter(s => s.player_id === item.player.id);
-                                      const rHoles = pScores.filter(s => s.no_paso_rojas).map(s => s.hole_number);
-                                      const sHoles = pScores.filter(s => s.spanish_hands).map(s => s.hole_number);
-                                      return (
-                                        <>
-                                          {rHoles.map(h => (
-                                            <span key={`r-${h}`} title={`No pasó de rojas · Hoyo ${h}`} className="bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">{h}</span>
-                                          ))}
-                                          {sHoles.map(h => (
-                                            <span key={`sh-${h}`} title={`Spanish Hands · Hoyo ${h}`} className="bg-accent text-on-accent text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-soft"><Hand size={11} /></span>
-                                          ))}
-                                        </>
-                                      );
+                                      // Mismas fichas con icono que en la Clasificación: Rojas, Spanish Hands y títulos del Pro-Shop.
+                                      const pScores = [...roundStats.scores.filter(s => s.player_id === item.player.id)].sort((a, b) => a.hole_number - b.hole_number);
+                                      const marks = [
+                                        ...pScores.filter(s => s.no_paso_rojas).map(s => ({ productId: 'no-paso-rojas', hole: s.hole_number })),
+                                        ...pScores.filter(s => s.spanish_hands).map(s => ({ productId: 'spanish-hand', hole: s.hole_number })),
+                                        ...pScores.flatMap(s => (s.gamification_events || []).map(productId => ({ productId, hole: s.hole_number }))),
+                                      ];
+                                      return marks.map(mark => (
+                                        <GamificationBadge key={`${mark.productId}-${mark.hole}`} productId={mark.productId} detail={`Hoyo ${mark.hole}`} />
+                                      ));
                                     })()}
                                   </div>
                                   <p className="text-xs text-ink-3">

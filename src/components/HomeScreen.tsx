@@ -7,6 +7,10 @@ import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
+type GroupAccess = 'owner' | 'admin' | 'member';
+const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
+const ROLE_BADGE = 'shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] uppercase tracking-wide';
+
 interface HomeScreenProps {
   planType: PlanType;
   isAuthenticated: boolean;
@@ -151,7 +155,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </WriteButton>
 
 
-          {groupShortcuts.map(group => {
+          {/* Orden por rol: Creador, Administrador y Miembro (estable dentro de cada rol). */}
+          {[...groupShortcuts].sort((a, b) => ROLE_ORDER[a.access] - ROLE_ORDER[b.access]).map(group => {
             const managesGroup = group.access === 'owner' || group.access === 'admin';
             return <WriteButton
               key={group.id}
@@ -162,7 +167,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
               <Users className="w-6 h-6" aria-hidden="true" />
               <span className="min-w-0 truncate">{group.name}</span>
-              {!managesGroup && <span className="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] uppercase tracking-wide">Miembro</span>}
+              {group.access === 'owner' && <span className={ROLE_BADGE}>Creador</span>}
+              {group.access === 'admin' && <span className={ROLE_BADGE}>Administrador</span>}
+              {group.access === 'member' && <span className={ROLE_BADGE}>Miembro</span>}
             </WriteButton>;
           })}
 
