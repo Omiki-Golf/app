@@ -15,7 +15,7 @@ import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
 import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, TrendingUp, Archive, Hand } from 'lucide-react';
 import { getErrorMessage } from '../utils/errorMessage';
-import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 const gameModeLabels: Record<string, string> = {
   stableford: 'Stableford',
@@ -567,18 +567,12 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         {index + 1}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="font-bold text-lg text-ink">{player.name}{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                           {player.noPasoRojasHoles.length > 0 && (
                             <div className="flex items-center gap-1">
                               {player.noPasoRojasHoles.map((holeNumber) => (
-                                <span
-                                  key={`rojas-${holeNumber}`}
-                                  title={`No pasó de rojas · Hoyo ${holeNumber}`}
-                                  className="bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center"
-                                >
-                                  {holeNumber}
-                                </span>
+                                <GamificationBadge key={`rojas-${holeNumber}`} productId="no-paso-rojas" size={24} detail={`Hoyo ${holeNumber}`} />
                               ))}
                             </div>
                           )}
@@ -596,7 +590,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             </div>
                           )}
                           {player.gamificationEvents.map(({ productId, holeNumber }, eventIndex) => (
-                            <span key={`${productId}-${holeNumber}-${eventIndex}`} title={`${gamificationProduct(productId)?.name || productId} · Hoyo ${holeNumber}`} className="rounded-full bg-amber-500 px-1.5 py-1 text-[10px] font-bold text-amber-950">{gamificationProduct(productId)?.short || productId} {holeNumber}</span>
+                            <GamificationBadge key={`${productId}-${holeNumber}-${eventIndex}`} productId={productId} size={24} detail={`Hoyo ${holeNumber}`} />
                           ))}
                         </div>
                         <p className="text-sm text-ink-3">
@@ -795,6 +789,18 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               <Trash2 size={20} />
                             </WriteButton>
                           )}
+                          {/* En grupos, Eliminar está dentro de la ficha (ya no en la cabecera). */}
+                          {currentGroup && (
+                            <WriteButton
+                              onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                              disabled={loading}
+                              className="text-red-500 hover:bg-red-50 disabled:opacity-50 p-2 rounded-lg transition-colors"
+                              title="Eliminar partida"
+                              aria-label="Eliminar partida"
+                            >
+                              <Trash2 size={20} />
+                            </WriteButton>
+                          )}
                         </div>
                         <div className="space-y-2">
                           {roundStats.players
@@ -972,6 +978,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados
                           </button>
                         )}
+                        {/* En grupos, Archivar y Eliminar viven aquí (ya no en la cabecera de la partida). */}
                         {(currentGroup || isRoundCreator) && (
                           <WriteButton
                             onClick={() => setRoundToArchive(roundStats.round.id)}
@@ -1001,6 +1008,16 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           >
                             {isLinkedGuest ? <EyeOff size={20} /> : <Trash2 size={20} />}
                             {isLinkedGuest ? 'Descartar' : 'Eliminar'}
+                          </WriteButton>
+                        )}
+                        {currentGroup && (
+                          <WriteButton
+                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                            disabled={loading}
+                            className="w-full sm:flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={20} />
+                            Eliminar
                           </WriteButton>
                         )}
                       </div>

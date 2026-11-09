@@ -3029,12 +3029,16 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     const rankingWithAwards = dailyRanking.map((ranking) => {
       let noPasoRojasCount = 0;
       let spanishHandsCount = 0;
+      const gamificationCounts: Record<string, number> = {};
 
       archivedRoundRows.forEach((round) => {
         const playerStat = round.player_stats?.find((ps) => ps.player_name === ranking.player_name);
         if (playerStat) {
           noPasoRojasCount += playerStat.no_paso_rojas_count || 0;
           spanishHandsCount += playerStat.spanish_hands_count || 0;
+          Object.entries(playerStat.gamification_counts || {}).forEach(([id, count]) => {
+            gamificationCounts[id] = (gamificationCounts[id] || 0) + Number(count || 0);
+          });
         }
         if (!playerStat?.spanish_hands_count && round.hole_scores) {
           const handsInHoles = round.hole_scores.filter(
@@ -3048,6 +3052,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         ...ranking,
         no_paso_rojas_count: noPasoRojasCount,
         spanish_hands_count: spanishHandsCount,
+        gamification_counts: gamificationCounts,
       };
     });
 

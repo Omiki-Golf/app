@@ -5,7 +5,8 @@ import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput
 import { ChevronDown, Minus, Hand } from 'lucide-react';
 import { HoleInOneModal } from './HoleInOneModal';
 import { CongratulationsModal } from './CongratulationsModal';
-import { EXTRA_GAMIFICATION_PRODUCTS, gamificationProduct } from '../data/gamification';
+import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface HoleCardProps {
   hole: GolfHole;
@@ -18,6 +19,9 @@ interface HoleCardProps {
   groupCode?: string | null;
   /** Gamificación Hoyo 19 del grupo (No pasó de rojas). */
   hoyo19Enabled?: boolean;
+  /** Spanish Hands activo en el grupo (por defecto, en cualquier partida de grupo). */
+  spanishHandsEnabled?: boolean;
+  /** Títulos extra del Pro-Shop activos en el grupo, en orden de catálogo. */
   enabledGamification?: string[];
   gameMode?: GameMode;
   teamAssignments?: Record<string, 0 | 1>;
@@ -71,6 +75,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   readonly = false,
   groupCode = null,
   hoyo19Enabled,
+  spanishHandsEnabled,
   enabledGamification = [],
   gameMode = 'stableford',
   teamAssignments = {},
@@ -88,6 +93,38 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   const [pendingNoPasoRojas, setPendingNoPasoRojas] = useState<Record<string, boolean>>({});
   const [pendingSpanishHands, setPendingSpanishHands] = useState<Record<string, boolean>>({});
   const [pendingGamification, setPendingGamification] = useState<Record<string, string[]>>({});
+  const showSpanishHands = spanishHandsEnabled ?? groupCode !== null;
+
+  // Toast breve al marcar/desmarcar Rojas, Spanish Hands o un título del Pro-Shop.
+  const [markToast, setMarkToast] = useState<{ key: number; productId: string; text: string } | null>(null);
+  useEffect(() => {
+    if (!markToast) return;
+    const timer = window.setTimeout(() => setMarkToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [markToast]);
+  const showMarkToast = (playerName: string, productId: string, label: string, marked: boolean) => {
+    setMarkToast({ key: Date.now(), productId, text: `${label} ${marked ? 'marcado' : 'desmarcado'} · ${playerName}` });
+  };
+
+  // Al apuntar golpes se conservan las marcas ya guardadas del hoyo (Rojas, Spanish
+  // Hands y títulos del Pro-Shop); lo marcado antes de apuntar tiene prioridad.
+  const applyPendingMarks = (newScore: ScoreChangeInput, playerId: string) => {
+    const existing = scores[playerId];
+    newScore.no_paso_rojas = pendingNoPasoRojas[playerId] ?? existing?.no_paso_rojas ?? false;
+    newScore.spanish_hands = pendingSpanishHands[playerId] ?? existing?.spanish_hands ?? false;
+    newScore.gamification_events = pendingGamification[playerId] ?? existing?.gamification_events ?? [];
+  };
+  const clearPendingMarks = (playerId: string) => {
+    const without = <T,>(prev: Record<string, T>) => {
+      if (!(playerId in prev)) return prev;
+      const next = { ...prev };
+      delete next[playerId];
+      return next;
+    };
+    setPendingNoPasoRojas(without);
+    setPendingSpanishHands(without);
+    setPendingGamification(without);
+  };
 
   const computeModePointsForPlayer = (playerId: string, grossStrokesVal: number, strokesRecv: number, abandonedVal: boolean): number => {
     if (!isModeScoring) return 0;
@@ -183,16 +220,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
       setExpandedPlayerId(null);
       setFirstDigit(null);
       setPendingPlayerId(null);
-      setPendingNoPasoRojas(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
-      setPendingSpanishHands(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
+      clearPendingMarks(playerId);
     } else {
       // Abriendo el desplegable
       setExpandedPlayerId(playerId);
@@ -208,27 +236,14 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         par: hole.par,
         strokeIndex: hole.stroke_index,
       }, numHoles, allHoles);
-      if (pendingNoPasoRojas[playerId]) {
-        newScore.no_paso_rojas = true;
-      }
-      newScore.spanish_hands = pendingSpanishHands[playerId] || false;
-      newScore.gamification_events = pendingGamification[playerId] || [];
+      applyPendingMarks(newScore, playerId);
       newScore.abandoned = false;
       newScore.mode_points = computeModePointsForPlayer(playerId, twoDigitNumber, newScore.strokesReceived, false);
       onScoreChange(playerId, newScore);
       setExpandedPlayerId(null);
       setFirstDigit(null);
       setPendingPlayerId(null);
-      setPendingNoPasoRojas(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
-      setPendingSpanishHands(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
+      clearPendingMarks(playerId);
     } else if (num === 1) {
       // Marcando el 1, esperar segundo dígito
       setFirstDigit(1);
@@ -239,27 +254,14 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         par: hole.par,
         strokeIndex: hole.stroke_index,
       }, numHoles, allHoles);
-      if (pendingNoPasoRojas[playerId]) {
-        newScore.no_paso_rojas = true;
-      }
-      newScore.spanish_hands = pendingSpanishHands[playerId] || false;
-      newScore.gamification_events = pendingGamification[playerId] || [];
+      applyPendingMarks(newScore, playerId);
       newScore.abandoned = false;
       newScore.mode_points = computeModePointsForPlayer(playerId, num, newScore.strokesReceived, false);
       onScoreChange(playerId, newScore);
       setExpandedPlayerId(null);
       setFirstDigit(null);
       setPendingPlayerId(null);
-      setPendingNoPasoRojas(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
-      setPendingSpanishHands(prev => {
-        const newState = { ...prev };
-        delete newState[playerId];
-        return newState;
-      });
+      clearPendingMarks(playerId);
     }
   };
 
@@ -271,11 +273,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
           par: hole.par,
           strokeIndex: hole.stroke_index,
         }, numHoles, allHoles);
-        if (pendingNoPasoRojas[pendingPlayerId]) {
-          newScore.no_paso_rojas = true;
-        }
-        newScore.spanish_hands = pendingSpanishHands[pendingPlayerId] || false;
-        newScore.gamification_events = pendingGamification[pendingPlayerId] || [];
+        applyPendingMarks(newScore, pendingPlayerId);
         newScore.abandoned = false;
         newScore.mode_points = computeModePointsForPlayer(pendingPlayerId, 1, newScore.strokesReceived, false);
         onScoreChange(pendingPlayerId, newScore);
@@ -287,16 +285,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
     setExpandedPlayerId(null);
     setFirstDigit(null);
     setPendingPlayerId(null);
-    setPendingNoPasoRojas(prev => {
-      const newState = { ...prev };
-      if (pendingPlayerId) delete newState[pendingPlayerId];
-      return newState;
-    });
-    setPendingSpanishHands(prev => {
-      const newState = { ...prev };
-      if (pendingPlayerId) delete newState[pendingPlayerId];
-      return newState;
-    });
+    if (pendingPlayerId) clearPendingMarks(pendingPlayerId);
   };
 
   const handleCancelHoleInOne = () => {
@@ -387,21 +376,20 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                     {isModeScoring && <ColorMarker colorIndex={isParejas ? team : playerIndex} />}
                     {isParejas && <span className="sr-only">{teamLabel}</span>}
                     <p className="truncate font-semibold text-ink" title={player.name}>{middleEllipsis(player.name)}</p>
-                    {(score?.no_paso_rojas || pendingNoPasoRojas[player.id]) && (
-                      <span title="No pasó de rojas en este hoyo" className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0">
-                        Rojas
-                      </span>
+                  </div>
+                  {/* Marcas del hoyo: solo iconos, en la fila del HCP para no tapar el nombre. */}
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                    <p className="mr-1 text-xs text-ink-3">HCP {player.playing_handicap}</p>
+                    {(pendingNoPasoRojas[player.id] ?? score?.no_paso_rojas) && (
+                      <GamificationBadge productId="no-paso-rojas" size={18} detail="en este hoyo" />
                     )}
-                    {(score?.spanish_hands || pendingSpanishHands[player.id]) && (
-                      <span title="Spanish Hands en este hoyo" aria-label="Spanish Hands en este hoyo" className="bg-accent text-on-accent text-[10px] font-bold w-5 h-5 rounded-full inline-flex items-center justify-center shrink-0 shadow-soft">
-                        <Hand size={11} />
-                      </span>
+                    {(pendingSpanishHands[player.id] ?? score?.spanish_hands) && (
+                      <GamificationBadge productId="spanish-hand" size={18} detail="en este hoyo" />
                     )}
-                    {[...(score?.gamification_events || []), ...(pendingGamification[player.id] || [])].filter((id, index, all) => all.indexOf(id) === index).map(id => (
-                      <span key={id} title={gamificationProduct(id)?.name || id} className="shrink-0 rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-amber-950">{gamificationProduct(id)?.short || id}</span>
+                    {(pendingGamification[player.id] ?? score?.gamification_events ?? []).map(id => (
+                      <GamificationBadge key={id} productId={id} size={18} detail="en este hoyo" />
                     ))}
                   </div>
-                  <p className="text-xs text-ink-3">HCP {player.playing_handicap}</p>
                 </div>
                 {/* FBP-Ini}
                 {score ? (
@@ -519,27 +507,14 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                               par: hole.par,
                               strokeIndex: hole.stroke_index,
                             }, numHoles, allHoles);
-                            if (pendingNoPasoRojas[player.id]) {
-                              newScore.no_paso_rojas = true;
-                            }
-                            newScore.spanish_hands = pendingSpanishHands[player.id] || false;
-                            newScore.gamification_events = pendingGamification[player.id] || [];
+                            applyPendingMarks(newScore, player.id);
                             newScore.abandoned = false;
                             newScore.mode_points = computeModePointsForPlayer(player.id, 10, newScore.strokesReceived, false);
                             onScoreChange(player.id, newScore);
                             setExpandedPlayerId(null);
                             setFirstDigit(null);
                             setPendingPlayerId(null);
-                            setPendingNoPasoRojas(prev => {
-                              const newState = { ...prev };
-                              delete newState[player.id];
-                              return newState;
-                            });
-                            setPendingSpanishHands(prev => {
-                              const newState = { ...prev };
-                              delete newState[player.id];
-                              return newState;
-                            });
+                            clearPendingMarks(player.id);
                           }}
                           className="h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-lg transition-colors shadow-soft active:scale-95"
                         >
@@ -554,11 +529,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                                 par: hole.par,
                                 strokeIndex: hole.stroke_index,
                               }, numHoles, allHoles);
-                              if (pendingNoPasoRojas[player.id]) {
-                                newScore.no_paso_rojas = true;
-                              }
-                              newScore.spanish_hands = pendingSpanishHands[player.id] || false;
-                              newScore.gamification_events = pendingGamification[player.id] || [];
+                              applyPendingMarks(newScore, player.id);
                               newScore.abandoned = true;
                               newScore.stablefordPoints = 0;
                               newScore.mode_points = computeModePointsForPlayer(player.id, rayaScore, newScore.strokesReceived, true);
@@ -566,16 +537,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                             setExpandedPlayerId(null);
                             setFirstDigit(null);
                             setPendingPlayerId(null);
-                            setPendingNoPasoRojas(prev => {
-                              const newState = { ...prev };
-                              delete newState[player.id];
-                              return newState;
-                            });
-                            setPendingSpanishHands(prev => {
-                              const newState = { ...prev };
-                              delete newState[player.id];
-                              return newState;
-                            });
+                            clearPendingMarks(player.id);
                           }}
                           className="h-11 bg-black hover:bg-gray-800 text-white rounded-lg font-bold transition-colors shadow-soft active:scale-95 flex items-center justify-center"
                         >
@@ -608,86 +570,84 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                       </div>
                     </div>
 
-                    {isDivend && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (score && score.gross_strokes > 0) {
-                            const newNoPasoRojas = !score.no_paso_rojas;
-                            const updatedScore = {
-                              ...score,
-                              grossStrokes: score.gross_strokes,
-                              strokesReceived: strokesReceived,
-                              netStrokes: score.net_strokes,
-                              stablefordPoints: score.stableford_points,
-                              no_paso_rojas: newNoPasoRojas,
-                            };
-                            onScoreChange(player.id, updatedScore);
-                          } else {
-                            setPendingNoPasoRojas(prev => ({
-                              ...prev,
-                              [player.id]: !prev[player.id]
-                            }));
-                          }
-                        }}
-                        className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                          (score?.no_paso_rojas || pendingNoPasoRojas[player.id])
-                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                            : 'bg-neutral hover:bg-neutral-hover text-ink-2'
-                        }`}
-                      >
-                        {(score?.no_paso_rojas || pendingNoPasoRojas[player.id]) ? '✓ No pasó de rojas' : 'Marcar: No pasó de rojas'}
-                      </button>
-                    )}
-
-                    {groupCode !== null && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (score && score.gross_strokes > 0) {
-                            onScoreChange(player.id, {
-                              ...score,
-                              grossStrokes: score.gross_strokes,
-                              strokesReceived,
-                              netStrokes: score.net_strokes,
-                              stablefordPoints: score.stableford_points,
-                              spanish_hands: !score.spanish_hands,
-                            });
-                          } else {
-                            setPendingSpanishHands(prev => ({
-                              ...prev,
-                              [player.id]: !prev[player.id],
-                            }));
-                          }
-                        }}
-                        className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                          (score?.spanish_hands || pendingSpanishHands[player.id])
-                            ? 'bg-accent hover:bg-accent-hover text-on-accent'
-                            : 'bg-neutral hover:bg-neutral-hover text-ink-2'
-                        }`}
-                      >
-                        {(score?.spanish_hands || pendingSpanishHands[player.id])
-                          ? '✓ Spanish Hands'
-                          : 'Marcar: Spanish Hands'}
-                      </button>
-                    )}
-                    {enabledGamification.filter(id => EXTRA_GAMIFICATION_PRODUCTS.some(item => item.id === id)).map(productId => {
-                      const events = score?.gamification_events || pendingGamification[player.id] || [];
-                      const selected = events.includes(productId);
-                      const product = gamificationProduct(productId)!;
-                      return <button key={productId} type="button" onClick={() => {
-                        if (score && score.gross_strokes > 0) {
-                          onScoreChange(player.id, { ...score, grossStrokes: score.gross_strokes, strokesReceived, netStrokes: score.net_strokes, stablefordPoints: score.stableford_points, gamification_events: selected ? events.filter(id => id !== productId) : [...events, productId] });
-                        } else {
-                          setPendingGamification(current => {
-                            const pending = current[player.id] || [];
-                            return { ...current, [player.id]: pending.includes(productId) ? pending.filter(id => id !== productId) : [...pending, productId] };
-                          });
-                        }
-                      }} className={`w-full rounded-lg py-3 font-semibold transition-colors ${selected ? 'bg-amber-500 text-amber-950' : 'bg-neutral text-ink-2 hover:bg-neutral-hover'}`}>
-                        {selected ? '✓ ' : 'Marcar: '}{product.name}
-                      </button>;
-                    })}
+                    {(() => {
+                      // Marcas del hoyo: Rojas, Spanish Hands y títulos del Pro-Shop.
+                      // En móvil solo el icono (con ✓ si está marcado); en pantallas anchas, icono + texto.
+                      const hasSavedScore = !!score && score.gross_strokes > 0;
+                      const savedBase = hasSavedScore ? {
+                        ...score,
+                        grossStrokes: score.gross_strokes,
+                        strokesReceived,
+                        netStrokes: score.net_strokes,
+                        stablefordPoints: score.stableford_points,
+                      } : null;
+                      const events = hasSavedScore
+                        ? (score.gamification_events ?? [])
+                        : (pendingGamification[player.id] ?? score?.gamification_events ?? []);
+                      const marks: Array<{ productId: string; label: string; selected: boolean; toggle: () => void }> = [];
+                      if (isDivend) {
+                        const selected = !!(pendingNoPasoRojas[player.id] ?? score?.no_paso_rojas);
+                        marks.push({
+                          productId: 'no-paso-rojas', label: 'No pasó de rojas', selected,
+                          toggle: () => savedBase
+                            ? onScoreChange(player.id, { ...savedBase, no_paso_rojas: !selected })
+                            : setPendingNoPasoRojas(prev => ({ ...prev, [player.id]: !selected })),
+                        });
+                      }
+                      if (showSpanishHands) {
+                        const selected = !!(pendingSpanishHands[player.id] ?? score?.spanish_hands);
+                        marks.push({
+                          productId: 'spanish-hand', label: 'Spanish Hands', selected,
+                          toggle: () => savedBase
+                            ? onScoreChange(player.id, { ...savedBase, spanish_hands: !selected })
+                            : setPendingSpanishHands(prev => ({ ...prev, [player.id]: !selected })),
+                        });
+                      }
+                      enabledGamification.forEach(productId => {
+                        const product = gamificationProduct(productId);
+                        if (!product) return;
+                        const selected = events.includes(productId);
+                        const nextEvents = selected ? events.filter(id => id !== productId) : [...events, productId];
+                        marks.push({
+                          productId, label: product.name, selected,
+                          toggle: () => savedBase
+                            ? onScoreChange(player.id, { ...savedBase, gamification_events: nextEvents })
+                            : setPendingGamification(current => ({ ...current, [player.id]: nextEvents })),
+                        });
+                      });
+                      if (!marks.length) return null;
+                      return (
+                        <div className="grid grid-cols-4 gap-2 sm:grid-cols-1">
+                          {marks.map(mark => {
+                            const product = gamificationProduct(mark.productId)!;
+                            const Icon = product.icon;
+                            const actionLabel = `${mark.selected ? 'Desmarcar' : 'Marcar'}: ${mark.label}`;
+                            return (
+                              <button
+                                key={mark.productId}
+                                type="button"
+                                aria-pressed={mark.selected}
+                                aria-label={actionLabel}
+                                title={actionLabel}
+                                onClick={() => {
+                                  mark.toggle();
+                                  showMarkToast(player.name, mark.productId, mark.label, !mark.selected);
+                                }}
+                                className={`relative flex h-12 items-center justify-center gap-2 rounded-lg font-semibold transition-colors sm:h-auto sm:w-full sm:py-3 ${
+                                  mark.selected ? `${product.badge} hover:opacity-90` : 'bg-neutral hover:bg-neutral-hover text-ink-2'
+                                }`}
+                              >
+                                <Icon size={20} aria-hidden="true" className="shrink-0" />
+                                <span className="hidden sm:inline">{mark.selected ? `✓ ${mark.label}` : `Marcar: ${mark.label}`}</span>
+                                {mark.selected && (
+                                  <span aria-hidden="true" className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-black text-ink sm:hidden">✓</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })()}
@@ -796,6 +756,15 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
           onClose={() => setShowCongratulationsModal(false)}
         />
       )}
+
+      <div aria-live="polite" role="status" className="pointer-events-none fixed inset-x-0 bottom-6 z-[9999] flex justify-center px-4">
+        {markToast && (
+          <div key={markToast.key} className="flex max-w-sm items-center gap-2 rounded-full border border-line bg-card px-4 py-2 text-sm font-semibold text-ink shadow-2xl">
+            <GamificationBadge productId={markToast.productId} size={22} />
+            <span className="truncate">{markToast.text}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -2,6 +2,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect } from 'react';
 import { X, Award, Target, Users, Trophy, Beer, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
+import { GamificationBadge } from './GamificationBadge';
 import type { ArchivedDailyRanking, ArchivedPlayerStat, ArchivedRound, ArchivedRoundRanking } from '../types';
 
 interface ArchivedRoundDetailModalProps {
@@ -77,13 +78,14 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
 
     const getScoreForHole = (player: ArchivedRoundRanking, holeNumber: number) => {
       const score = holeScores.find((s) => matchesPlayer(s, player) && s.hole_number === holeNumber);
-      if (!score) return { gross: '-', net: '-', points: '-', noPasoRojas: false, spanishHands: false };
+      if (!score) return { gross: '-', net: '-', points: '-', noPasoRojas: false, spanishHands: false, gamificationEvents: [] as string[] };
       return {
         gross: score.gross_strokes || '-',
         net: score.net_strokes || '-',
         points: score.stableford_points || 0,
         noPasoRojas: score.no_paso_rojas || false,
         spanishHands: score.spanish_hands || false,
+        gamificationEvents: score.gamification_events || [],
       };
     };
 
@@ -222,11 +224,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                             {player.no_paso_rojas_count > 0 && (
                               <div className="flex items-center gap-1">
                                 {Array.from({ length: player.no_paso_rojas_count }).map((_, i) => (
-                                  <div
-                                    key={`rojas-${i}`}
-                                    title="No pasó de rojas"
-                                    className="w-5 h-5 rounded-full bg-red-500 border-2 border-red-700"
-                                  ></div>
+                                  <GamificationBadge key={`rojas-${i}`} productId="no-paso-rojas" />
                                 ))}
                               </div>
                             )}
@@ -241,6 +239,15 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                                     <Hand size={11} />
                                   </div>
                                 ))}
+                              </div>
+                            )}
+                            {Object.entries(player.gamification_counts || {}).some(([, count]) => count > 0) && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {Object.entries(player.gamification_counts || {}).flatMap(([productId, count]) =>
+                                  Array.from({ length: Number(count) || 0 }).map((_, i) => (
+                                    <GamificationBadge key={`${productId}-${i}`} productId={productId} />
+                                  ))
+                                )}
                               </div>
                             )}
                             <p className="text-2xl font-bold text-ink">{player.total_points} pts</p>
@@ -337,6 +344,9 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                                           <Hand size={12} />
                                         </span>
                                       )}
+                                      {score.gamificationEvents.map(productId => (
+                                        <GamificationBadge key={productId} productId={productId} size={14} detail={`Hoyo ${hole.hole_number}`} />
+                                      ))}
                                     </span>
                                   </td>
                                 </React.Fragment>
@@ -413,8 +423,8 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               <td className="text-center py-3 px-4 text-ink-2">{stats.double_bogeys}</td>
                               <td className="text-center py-3 px-4">
                                 {stats.no_paso_rojas_count > 0 ? (
-                                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
-                                    {stats.no_paso_rojas_count}
+                                  <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded inline-flex items-center gap-1 shadow-soft">
+                                    <Beer size={11} /> {stats.no_paso_rojas_count}
                                   </span>
                                 ) : (
                                   <span className="text-ink-4">0</span>

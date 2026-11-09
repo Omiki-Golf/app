@@ -22,7 +22,9 @@ import { groupSettingsService } from '../services/groupSettingsService';
 import { scoreResultBar, scoreResultLabel } from '../utils/scoreColors';
 import { ArchivedRoundsModal } from './ArchivedRoundsModal';
 import { ArchivedRoundDetailModal } from './ArchivedRoundDetailModal';
-import { EXTRA_GAMIFICATION_PRODUCTS } from '../data/gamification';
+import { enabledExtraProducts } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
+import { GAMIFICATION_UPDATED_EVENT } from '../services/groupSettingsService';
 
 interface StatisticsProps {
   onBack: () => void;
@@ -168,6 +170,8 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   // Clasificación general: absoluta (puntos totales) por defecto, o justa (promedio por partida).
   const [generalMode, setGeneralMode] = useState<RankingMode>('absolute');
   const [minRounds, setMinRounds] = useState<number>(0);
+  // null = aún no leída (o error): Rojas y Spanish Hands siguen el comportamiento clásico.
+  const [enabledGamification, setEnabledGamification] = useState<string[] | null>(null);
 
   const [uniquePlayers, setUniquePlayers] = useState<string[]>([]);
   const [uniqueCourses, setUniqueCourses] = useState<string[]>([]);
@@ -189,7 +193,10 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
   const [selectedArchivedRound, setSelectedArchivedRound] = useState<ArchivedRound | null>(null);
 
   // Rojas y cervezas: grupos con la gamificación Hoyo 19 activada (DIVEND siempre).
-  const isDivend = currentGroup.group_code === 'DIVEND' || !!currentGroup.hoyo_19_enabled;
+  const isDivend = currentGroup.group_code === 'DIVEND'
+    || (enabledGamification ? enabledGamification.includes('no-paso-rojas') : !!currentGroup.hoyo_19_enabled);
+  const spanishHandsEnabled = enabledGamification ? enabledGamification.includes('spanish-hand') : true;
+  const extraGamification = enabledExtraProducts(enabledGamification);
 
   const loadPlayerStatistics = useCallback(async (playerName: string) => {
     try {
@@ -336,6 +343,13 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     groupSettingsService.getGroupSettings(currentGroup.id).then((settings) => {
       setMinRounds(settings.min_rounds_for_awards);
     });
+    let gamificationCancelled = false;
+    const loadGamification = () => {
+      void groupSettingsService.getEnabledGamification(currentGroup.id).then(ids => {
+        if (!gamificationCancelled) setEnabledGamification(ids);
+      });
+    };
+    loadGamification();
 
     const handleSettingsUpdate = (e: Event) => {
       const custom = e as CustomEvent<{ groupId: string; settings: { min_rounds_for_awards: number } }>;
@@ -344,8 +358,11 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       }
     };
     window.addEventListener('group_settings_updated', handleSettingsUpdate);
+    window.addEventListener(GAMIFICATION_UPDATED_EVENT, loadGamification);
     return () => {
+      gamificationCancelled = true;
       window.removeEventListener('group_settings_updated', handleSettingsUpdate);
+      window.removeEventListener(GAMIFICATION_UPDATED_EVENT, loadGamification);
     };
   }, [currentGroup.id]);
 
@@ -552,13 +569,34 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     return totals;
   };
 
+  // Una ficha por título activo, con el mismo formato que la de Spanish Hands.
   const renderPlayerGamificationStats = () => {
-    const totals = gamificationTotalsFor(selectedPlayer);
-    const items = EXTRA_GAMIFICATION_PRODUCTS.filter(item => (totals[item.id] || 0) > 0);
-    if (!items.length) return null;
-    return <div className="grid grid-cols-1 gap-3 md:grid-cols-2">{items.map(item => <div key={item.id} className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:bg-amber-950/30">
-      <p className="font-bold text-amber-950 dark:text-amber-200">{item.name}</p><p className="mt-2 text-4xl font-black text-amber-600">{totals[item.id]}</p><p className="text-xs text-ink-3">marcas en sus partidas</p>
-    </div>)}</div>;
+    if (!extraGamification.length) return null;
+    const playerRounds = archivedRounds.filter(round => round.player_stats?.some(ps => ps.player_name === selectedPlayer));
+    if (playerRounds.length === 0) return null;
+    return <>{extraGamification.map(item => {
+      let total = 0;
+      let roundsWith = 0;
+      playerRounds.forEach(round => {
+        const count = Number(round.player_stats?.find(ps => ps.player_name === selectedPlayer)?.gamification_counts?.[item.id] || 0);
+        total += count;
+        if (count > 0) roundsWith += 1;
+      });
+      return (
+        <div key={item.id} className="bg-card-2 rounded-2xl p-6 border border-line">
+          <div className="flex items-center gap-3 mb-4">
+            <GamificationBadge productId={item.id} size={34} />
+            <h3 className="text-xl font-bold text-ink">{item.name}</h3>
+          </div>
+          <div className="text-center">
+            <p className="text-5xl font-black text-ink">{total}</p>
+            <p className="text-sm text-ink-3 mt-2 font-medium">
+              en {roundsWith} de {playerRounds.length} {playerRounds.length === 1 ? 'partida' : 'partidas'}
+            </p>
+          </div>
+        </div>
+      );
+    })}</>;
   };
 
   const renderGroupGamificationAwards = () => {
@@ -567,11 +605,15 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       const players = byProduct.get(id) || new Map<string, number>();
       players.set(stat.player_name, (players.get(stat.player_name) || 0) + Number(count || 0)); byProduct.set(id, players);
     })));
-    const products = EXTRA_GAMIFICATION_PRODUCTS.filter(item => byProduct.has(item.id));
+    const products = extraGamification;
     if (!products.length) return null;
     return <div className="mb-6"><h3 className="mb-4 text-lg font-bold text-ink">Premios especiales · Gamificación</h3><div className="grid grid-cols-1 gap-4 md:grid-cols-2">{products.map(product => {
-      const leaders = [...byProduct.get(product.id)!.entries()].sort((a, b) => b[1] - a[1]); const max = leaders[0]?.[1] || 0;
-      return <div key={product.id} className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 dark:bg-amber-950/30"><h4 className="font-bold text-amber-950 dark:text-amber-200">{product.name}</h4><p className="mt-2 text-xl font-black text-amber-700">{leaders.filter(([, count]) => count === max).map(([name]) => name).join(' / ')}</p><p className="text-sm text-ink-3">{max} marcas</p></div>;
+      const leaders = [...(byProduct.get(product.id)?.entries() || [])].sort((a, b) => b[1] - a[1]); const max = leaders[0]?.[1] || 0;
+      return <div key={product.id} className="rounded-xl border-2 border-line bg-card-2 p-5">
+        <h4 className="flex items-center gap-2 font-bold text-ink"><GamificationBadge productId={product.id} size={26} />{product.name}</h4>
+        <p className="mt-2 text-xl font-black text-ink">{max > 0 ? leaders.filter(([, count]) => count === max).map(([name]) => name).join(' / ') : 'Sin marcas todavía'}</p>
+        <p className="text-sm text-ink-3">{max} {max === 1 ? 'marca' : 'marcas'}</p>
+      </div>;
     })}</div></div>;
   };
 
@@ -865,7 +907,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                       </>
                     )}
 
-                    {renderSpanishHandsStats()}
+                    {spanishHandsEnabled && renderSpanishHandsStats()}
                     {renderPlayerGamificationStats()}
                   </div>
                 )}

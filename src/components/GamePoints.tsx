@@ -11,7 +11,7 @@ import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { GroupMemberList } from './GroupMemberList';
 import { competitionPosition } from '../utils/ranking';
-import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface DailyStanding {
   playerId: string;
@@ -402,13 +402,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                   {standing.noPasoRojasHoles && standing.noPasoRojasHoles.length > 0 && (
                                     <div className="flex items-center gap-1">
                                       {standing.noPasoRojasHoles.map((holeNumber) => (
-                                        <span
-                                          key={`rojas-${holeNumber}`}
-                                          title={`No pasó de rojas · Hoyo ${holeNumber}`}
-                                          className="bg-red-500 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center"
-                                        >
-                                          {holeNumber}
-                                        </span>
+                                        <GamificationBadge key={`rojas-${holeNumber}`} productId="no-paso-rojas" size={24} detail={`Hoyo ${holeNumber}`} />
                                       ))}
                                     </div>
                                   )}
@@ -425,10 +419,13 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                       ))}
                                     </div>
                                   )}
-                                  {standing.gamificationEvents?.map(({ productId, holeNumber }, eventIndex) => {
-                                    const product = gamificationProduct(productId);
-                                    return <span key={`${productId}-${holeNumber}-${eventIndex}`} title={`${product?.name || productId} · Hoyo ${holeNumber}`} className="rounded-full bg-amber-500 px-1.5 py-1 text-[10px] font-bold text-amber-950">{product?.short || productId} {holeNumber}</span>;
-                                  })}
+                                  {standing.gamificationEvents && standing.gamificationEvents.length > 0 && (
+                                    <div className="flex items-center gap-1">
+                                      {standing.gamificationEvents.map(({ productId, holeNumber }, eventIndex) => (
+                                        <GamificationBadge key={`${productId}-${holeNumber}-${eventIndex}`} productId={productId} size={24} detail={`Hoyo ${holeNumber}`} />
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                                 <span className="text-xl font-bold text-title">
                                   {standing.totalPoints} pts

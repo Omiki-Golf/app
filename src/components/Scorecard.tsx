@@ -14,8 +14,9 @@ import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
 import { FinalResultModal } from './FinalResultModal';
 import { calculateFinalResult, isDecidedBeforeLastHole, type FinalResult } from '../utils/finalResult';
-import { groupSettingsService } from '../services/groupSettingsService';
-import { EXTRA_GAMIFICATION_PRODUCTS, gamificationProduct } from '../data/gamification';
+import { groupSettingsService, GAMIFICATION_UPDATED_EVENT } from '../services/groupSettingsService';
+import { enabledExtraProducts } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface ScorecardProps {
   holes: GolfHole[];
@@ -77,12 +78,24 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onCourseChanged,
   messagesButton,
 }) => {
-  const isDivend = hoyo19Enabled ?? groupCode === 'DIVEND';
-  const [enabledGamification, setEnabledGamification] = useState<string[]>([]);
+  // null = aún no leída (o error): se usa el comportamiento clásico del grupo.
+  const [enabledGamification, setEnabledGamification] = useState<string[] | null>(null);
   useEffect(() => {
-    if (!groupId) { setEnabledGamification([]); return; }
-    void groupSettingsService.getEnabledGamification(groupId).then(setEnabledGamification);
+    if (!groupId) { setEnabledGamification(null); return; }
+    let cancelled = false;
+    const load = () => { void groupSettingsService.getEnabledGamification(groupId).then(ids => { if (!cancelled) setEnabledGamification(ids); }); };
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ groupId?: string }>).detail;
+      if (!detail?.groupId || detail.groupId === groupId) load();
+    };
+    load();
+    window.addEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated);
+    return () => { cancelled = true; window.removeEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated); };
   }, [groupId]);
+  const legacyRojas = hoyo19Enabled ?? groupCode === 'DIVEND';
+  const isDivend = groupCode === 'DIVEND' || (enabledGamification ? enabledGamification.includes('no-paso-rojas') : legacyRojas);
+  const spanishHandsEnabled = groupCode !== null && (enabledGamification ? enabledGamification.includes('spanish-hand') : true);
+  const extraGamification = enabledExtraProducts(enabledGamification);
   const isModeScoring = gameMode !== 'stableford';
   const modeLabels: Record<GameMode, string> = {
     stableford: 'Stableford',
@@ -242,7 +255,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-card rounded-lg shadow-card p-6 md:p-8">
+        {/* En móvil ocupa toda la pantalla como el resto de vistas; el marco de tarjeta solo en pantallas anchas. */}
+        <div className="md:bg-card md:rounded-lg md:shadow-card md:p-8">
           <div className="mb-4 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="flex items-center gap-2">
               <NavigationButton destination={backDestination} onClick={onResetGame} />
@@ -353,7 +367,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 readonly={!hasEditAccess}
                 groupCode={groupCode}
                 hoyo19Enabled={isDivend}
-                enabledGamification={enabledGamification}
+                spanishHandsEnabled={spanishHandsEnabled}
+                enabledGamification={extraGamification.map(item => item.id)}
                 gameMode={gameMode}
                 teamAssignments={gameMode === 'parejas' && players.length === 4 ? Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1])) : undefined}
                 onScoreChange={(playerId, score) => {
@@ -510,10 +525,11 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                       abandoned={score.abandoned}
                                     />
                                     {score.no_paso_rojas && (
-                                      <span
-                                        className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full border border-white bg-red-600 shadow-soft"
-                                        title={`No pasó de rojas · Hoyo ${h.hole_number}`}
-                                        aria-label={`No pasó de rojas en el hoyo ${h.hole_number}`}
+                                      <GamificationBadge
+                                        productId="no-paso-rojas"
+                                        size={14}
+                                        detail={`Hoyo ${h.hole_number}`}
+                                        className="absolute -left-1.5 -top-1.5 border border-white"
                                       />
                                     )}
                                     {score.spanish_hands && (
@@ -523,6 +539,13 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                                         aria-label={`Spanish Hands en el hoyo ${h.hole_number}`}
                                       >
                                         <Hand size={8} />
+                                      </span>
+                                    )}
+                                    {(score.gamification_events?.length ?? 0) > 0 && (
+                                      <span className="absolute -bottom-1.5 left-1/2 flex -translate-x-1/2 -space-x-1">
+                                        {score.gamification_events!.slice(0, 3).map(productId => (
+                                          <GamificationBadge key={productId} productId={productId} size={12} detail={`Hoyo ${h.hole_number}`} className="border border-white" />
+                                        ))}
                                       </span>
                                     )}
                                   </div>
@@ -785,7 +808,10 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
             {isDivend && (
               <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6">No pasó de rojas</h3>
+                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
+                  <GamificationBadge productId="no-paso-rojas" size={22} />
+                  No pasó de rojas
+                </h3>
                 <div className="space-y-3">
                   {players.map((player) => {
                     const round = roundsMap.get(player.id);
@@ -799,9 +825,6 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                     });
 
                     const noPasoRojasCount = noPasoRojasHoles.length;
-                    const holesList = noPasoRojasHoles.length > 0
-                      ? `Hoyo: ${noPasoRojasHoles.join(', ')}`
-                      : 'Ninguno';
 
                     return (
                       <div
@@ -817,7 +840,15 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             )}
                             <p className="font-semibold text-ink">{player.name}{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                           </div>
-                          <p className="text-xs text-ink-3">{holesList}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {noPasoRojasHoles.length > 0
+                              ? noPasoRojasHoles.map(holeNumber => (
+                                  <span key={holeNumber} className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                                    Hoyo {holeNumber}
+                                  </span>
+                                ))
+                              : <span className="text-xs text-ink-3">Ninguno</span>}
+                          </div>
                         </div>
                         <div className="bg-red-100 border-2 border-red-300 rounded-lg px-4 py-2 min-w-[60px] text-center">
                           <p className="text-2xl font-bold text-red-600">{noPasoRojasCount}</p>
@@ -829,9 +860,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </>
             )}
 
-            {groupCode !== null && (
+            {spanishHandsEnabled && (
               <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6">Spanish Hands</h3>
+                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
+                  <GamificationBadge productId="spanish-hand" size={22} />
+                  Spanish Hands
+                </h3>
                 <div className="space-y-3">
                   {players.map((player) => {
                     const playerRound = roundsMap.get(player.id);
@@ -862,20 +896,41 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </>
             )}
 
-            {enabledGamification.filter(id => EXTRA_GAMIFICATION_PRODUCTS.some(item => item.id === id)).map(productId => {
-              const product = gamificationProduct(productId)!;
-              return <div key={productId} className="mt-6">
-                <h3 className="mb-3 font-semibold text-ink-2">{product.name}</h3>
-                <div className="space-y-2">{players.map(player => {
-                  const playerRound = roundsMap.get(player.id);
-                  const eventHoles = playableHoles.filter(h => playerRound?.scores[h.hole_number]?.gamification_events?.includes(productId)).map(h => h.hole_number);
-                  return <div key={player.id} className="flex items-center justify-between rounded-lg border border-line bg-card-2 p-3">
-                    <div><p className="font-semibold text-ink">{player.name}</p><p className="text-xs text-ink-3">{eventHoles.length ? `Hoyos: ${eventHoles.join(', ')}` : 'Ninguno'}</p></div>
-                    <span className="rounded-lg bg-accent-soft px-3 py-1 text-xl font-bold text-accent-ink">{eventHoles.length}</span>
-                  </div>;
-                })}</div>
-              </div>;
-            })}
+            {extraGamification.map(product => (
+              <React.Fragment key={product.id}>
+                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
+                  <GamificationBadge productId={product.id} size={22} />
+                  {product.name}
+                </h3>
+                <div className="space-y-3">
+                  {players.map(player => {
+                    const playerRound = roundsMap.get(player.id);
+                    const eventHoles = playableHoles
+                      .filter(h => playerRound?.scores[h.hole_number]?.gamification_events?.includes(product.id))
+                      .map(h => h.hole_number);
+                    return (
+                      <div key={player.id} className="bg-card-2 border-2 border-line rounded-lg p-3 flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-ink">{player.name}{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {eventHoles.length > 0
+                              ? eventHoles.map(holeNumber => (
+                                  <span key={holeNumber} className={`${product.badge} text-xs font-bold rounded-full px-2 py-0.5`}>
+                                    Hoyo {holeNumber}
+                                  </span>
+                                ))
+                              : <span className="text-xs text-ink-3">Ninguno</span>}
+                          </div>
+                        </div>
+                        <div className="bg-card border-2 border-line rounded-lg px-4 py-2 min-w-[60px] text-center">
+                          <p className="text-2xl font-bold text-ink">{eventHoles.length}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </React.Fragment>
+            ))}
 
           </div>
         </div>

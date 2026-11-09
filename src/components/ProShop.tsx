@@ -2,8 +2,11 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useRef, useState } from 'react';
-import { Beer, CalendarDays, Check, Hand, Info, Mail, ShoppingCart, Trophy, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Check, Info, Mail, Save, ShoppingCart, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { notifyGamificationUpdated } from '../services/groupSettingsService';
+import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface ProShopProps {
   groupId: string | null;
@@ -29,16 +32,21 @@ interface Addon extends ShopItem {
 }
 
 // Mismo catálogo que la web (OmikiWEB: GamificationPack y TeamAddons).
+// Icono y ficha de cada título salen de data/gamification (los mismos que en la tarjeta).
+const title = (id: string, info: string, free = false): ShopItem => {
+  const product = gamificationProduct(id)!;
+  return { id, name: product.name, icon: product.icon, info, free };
+};
 const titles: ShopItem[] = [
-  { id: 'no-paso-rojas', name: 'No paso de Rojas', icon: Beer, free: true, info: 'El jugador que no pasa de rojas (bolas de damas) en la salida paga una cerveza al resto de su partida. La tradición más sagrada del golf entre amigos, ahora digitalizada.' },
-  { id: 'spanish-hand', name: 'Spanish Hand', icon: Hand, info: 'Birdie conseguido desde fuera del green. El título más patrio para los que embocan de lejos.' },
-  { id: 'buceador', name: 'Buceador', icon: Trophy, info: 'El jugador con más bolas enviadas al agua durante la temporada. Un clásico entre los amigos.' },
-  { id: 'minero', name: 'Minero', icon: Trophy, info: 'Rey indiscutible de los bunkers. El que más veces termina jugando desde la arena.' },
-  { id: 'lumberjack', name: 'Lumberjack', icon: Trophy, info: 'El jugador que más árboles ha golpeado durante el año. Leñador honorario del grupo.' },
-  { id: 'maestro-obstaculos', name: 'Maestro de Obstáculos', icon: Trophy, info: 'El que más veces se ha salvado de un obstáculo imposible y ha salvado el par o mejor.' },
-  { id: 'fenomeno-tee', name: 'Fenómeno del Tee', icon: Trophy, info: 'Mejor drive de la jornada. Márcalo en el hoyo para incluirlo en las estadísticas.' },
-  { id: 'abrelatas', name: 'Abrelatas', icon: Trophy, info: 'Más bolas perdidas en todo el año. El que más pelotas ha tenido que reponer en su bolsa.' },
-  { id: 'hada-patos', name: 'Hada de los Patos', icon: Trophy, info: 'El que más veces ha asustado a los patos del campo. Por las risas más que por el juego.' },
+  title('no-paso-rojas', 'El jugador que no pasa de rojas (bolas de damas) en la salida paga una cerveza al resto de su partida. La tradición más sagrada del golf entre amigos, ahora digitalizada.', true),
+  title('spanish-hand', 'Birdie conseguido desde fuera del green. El título más patrio para los que embocan de lejos.'),
+  title('buceador', 'El jugador con más bolas enviadas al agua durante la temporada. Un clásico entre los amigos.'),
+  title('minero', 'Rey indiscutible de los bunkers. El que más veces termina jugando desde la arena.'),
+  title('lumberjack', 'El jugador que más árboles ha golpeado durante el año. Leñador honorario del grupo.'),
+  title('maestro-obstaculos', 'El que más veces se ha salvado de un obstáculo imposible y ha salvado el par o mejor.'),
+  title('fenomeno-tee', 'Mejor drive de la jornada. Márcalo en el hoyo para incluirlo en las estadísticas.'),
+  title('abrelatas', 'Más bolas perdidas en todo el año. El que más pelotas ha tenido que reponer en su bolsa.'),
+  title('hada-patos', 'El que más veces ha asustado a los patos del campo. Por las risas más que por el juego.'),
 ];
 
 const addons: Addon[] = [
@@ -57,17 +65,24 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (!groupId) return;
+    let cancelled = false;
     void supabase.from('group_gamification').select('product_id').eq('group_id', groupId).eq('purchased', true)
-      .then(({ data }) => setSelectedTitles(new Set(['no-paso-rojas', ...(data || []).map(row => row.product_id)])));
+      .then(({ data, error }) => {
+        if (cancelled || error) return;
+        setSelectedTitles(new Set(['no-paso-rojas', ...(data || []).map(row => row.product_id)]));
+      });
+    return () => { cancelled = true; };
   }, [groupId]);
 
   const toggle = (set: Set<string>, setter: (next: Set<string>) => void, id: string) => {
     const next = new Set(set);
     if (next.has(id)) next.delete(id); else next.add(id);
     setter(next);
+    setSaved(false);
   };
 
   const paidTitles = titles.filter(item => !item.free && selectedTitles.has(item.id));
@@ -76,14 +91,15 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
 
   const activateForTesting = async () => {
     if (!groupId) return;
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setSaveError('');
     try {
-      const rows = paidTitles.map(item => ({ group_id: groupId, product_id: item.id, purchased: true, enabled: true, updated_by: userId, updated_at: new Date().toISOString() }));
-      if (rows.length) {
-        const { error } = await supabase.from('group_gamification').upsert(rows, { onConflict: 'group_id,product_id' });
-        if (error) throw error;
-      }
+      const { error } = await supabase.rpc('activate_group_gamification', { p_group: groupId, p_product_ids: paidTitles.map(item => item.id) });
+      if (error) throw error;
       setSaved(true);
+      notifyGamificationUpdated(groupId);
+    } catch (error) {
+      console.error('Error activating group gamification:', error);
+      setSaveError('No se ha podido guardar la selección en tu grupo. Inténtalo de nuevo.');
     } finally { setSaving(false); }
   };
 
@@ -169,22 +185,19 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                   )}
                 </div>
               </div>
-              {paidTitles.length > 0 ? (
-                <WriteButton
-                  type="button"
-                  disabled={saving}
-                  onClick={() => void activateForTesting()}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent transition-colors hover:bg-accent-hover"
-                >
-                  <Check size={18} aria-hidden="true" />
-                  {saving ? 'Activando…' : saved ? 'Activado para pruebas' : 'Activar selección para pruebas'}
-                </WriteButton>
-              ) : (
-                <WriteButton disabled className="w-full rounded-xl bg-neutral px-4 py-3 font-semibold text-ink-3 disabled:cursor-not-allowed">
-                  Solicitar
-                </WriteButton>
-              )}
+              {/* Siempre se puede guardar: también para retirar títulos desmarcados. */}
+              <WriteButton
+                type="button"
+                disabled={saving}
+                onClick={() => void activateForTesting()}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
+              >
+                {saved ? <Check size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                {saving ? 'Guardando…' : saved ? 'Selección guardada' : 'Guardar selección (pruebas)'}
+              </WriteButton>
+              {saved && <p role="status" className="text-center text-xs font-semibold text-accent-ink">Guardado en {groupName || 'tu grupo'}. Actívalos o desactívalos en Configuración del grupo.</p>}
               {chosenAddons.length > 0 && <a href={requestHref()} className="flex items-center justify-center gap-2 text-sm font-semibold text-accent-ink underline"><Mail size={16} />Solicitar ampliaciones por email</a>}
+              {saveError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{saveError}</p>}
               <p className="text-xs text-ink-3">Los títulos de gamificación están desbloqueados para pruebas. Tras activarlos aparecerán en Configuración del grupo.</p>
             </section>
           </div>
@@ -214,7 +227,9 @@ const ShopRow: React.FC<{
         onChange={onToggle}
         className="h-5 w-5 shrink-0 accent-[var(--accent)] disabled:cursor-not-allowed"
       />
-      <item.icon size={18} className="shrink-0 text-accent-ink" />
+      {gamificationProduct(item.id)
+        ? <GamificationBadge productId={item.id} size={24} />
+        : <item.icon size={18} className="shrink-0 text-accent-ink" />}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <label htmlFor={inputId} className={`truncate font-semibold text-ink ${locked ? '' : 'cursor-pointer'}`}>{item.name}</label>

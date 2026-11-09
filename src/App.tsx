@@ -78,6 +78,10 @@ function App() {
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
   const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member' }>>([]);
+  // Pro-Shop: el grupo abierto si soy su creador; si no, mi primer grupo creado.
+  const proShopGroup = (currentGroup && homeGroups.some(item => item.access === 'owner' && item.group.id === currentGroup.id))
+    ? currentGroup
+    : ownedTeam;
   const [hasGroupMembership, setHasGroupMembership] = useState(false);
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
@@ -1344,8 +1348,8 @@ function App() {
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
           <ProShop
-            groupId={currentGroup?.id ?? ownedTeam?.id ?? null}
-            groupName={currentGroup?.name ?? ownedTeam?.name}
+            groupId={proShopGroup?.id ?? null}
+            groupName={proShopGroup?.name}
             userId={user.id}
             onBack={() => setCurrentView('profile')}
             onPurchaseComplete={() => setCurrentView('profile')}

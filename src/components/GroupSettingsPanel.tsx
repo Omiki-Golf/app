@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Check, Save } from 'lucide-react';
-import { groupSettingsService, HandicapVariationMode } from '../services/groupSettingsService';
-import { GAMIFICATION_PRODUCTS } from '../data/gamification';
+import { groupSettingsService, HandicapVariationMode, GAMIFICATION_UPDATED_EVENT } from '../services/groupSettingsService';
+import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface GroupSettingsPanelProps {
   groupId: string;
@@ -14,6 +15,8 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [gamification, setGamification] = useState<Array<{ product_id: string; enabled: boolean }>>([]);
+  const [gamificationError, setGamificationError] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -21,18 +24,32 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
       if (!cancelled) {
         setMinRounds(settings.min_rounds_for_awards);
         setHcpVariation(settings.handicap_variation_mode);
-        setGamification(products);
+        setGamification(products ?? []);
+        setGamificationError(products === null);
         setLoading(false);
       }
     });
+    // Al guardar en el Pro-Shop, el desplegable muestra al momento lo contratado.
+    const reloadGamification = (event: Event) => {
+      const detail = (event as CustomEvent<{ groupId?: string }>).detail;
+      if (detail?.groupId && detail.groupId !== groupId) return;
+      void groupSettingsService.getGamification(groupId).then(products => {
+        if (cancelled || !products) return;
+        setGamification(products);
+        setGamificationError(false);
+      });
+    };
+    window.addEventListener(GAMIFICATION_UPDATED_EVENT, reloadGamification);
     return () => {
       cancelled = true;
+      window.removeEventListener(GAMIFICATION_UPDATED_EVENT, reloadGamification);
     };
   }, [groupId]);
 
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
+    setSaveError('');
     try {
       await groupSettingsService.saveGroupSettings(groupId, {
         min_rounds_for_awards: minRounds,
@@ -41,6 +58,9 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
       await groupSettingsService.saveGamification(groupId, gamification);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+    } catch (error) {
+      console.error('Error guardando la configuración del grupo:', error);
+      setSaveError('No se ha podido guardar la gamificación. Inténtalo de nuevo.');
     } finally {
       setSaving(false);
     }
@@ -130,19 +150,23 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
         <p className="mb-2 text-xs text-ink-3">Activa qué títulos contratados se pueden marcar en la tarjeta de puntuación.</p>
         <div className="space-y-2">
           {gamification.map(item => {
-            const product = GAMIFICATION_PRODUCTS.find(product => product.id === item.product_id);
+            const product = gamificationProduct(item.product_id);
             if (!product) return null;
-            return <label key={item.product_id} className="flex items-center justify-between rounded-lg border border-line bg-card-2 px-3 py-2 text-sm text-ink">
-              <span>{product.name}</span>
-              <input type="checkbox" checked={item.enabled} onChange={() => setGamification(current => current.map(row => row.product_id === item.product_id ? { ...row, enabled: !row.enabled } : row))} className="h-5 w-5 accent-[var(--accent)]" />
+            const inputId = `gamification-${groupId}-${item.product_id}`;
+            return <label key={item.product_id} htmlFor={inputId} className="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-card-2 px-3 py-2 text-sm text-ink">
+              <GamificationBadge productId={item.product_id} size={24} />
+              <span className="min-w-0 flex-1 truncate">{product.name}</span>
+              <input id={inputId} type="checkbox" checked={item.enabled} onChange={() => setGamification(current => current.map(row => row.product_id === item.product_id ? { ...row, enabled: !row.enabled } : row))} className="h-5 w-5 shrink-0 accent-[var(--accent)]" />
             </label>;
           })}
-          {gamification.length === 0 && <p className="text-xs text-ink-3">Activa títulos desde el Pro-Shop para que aparezcan aquí.</p>}
+          {gamificationError && <p className="text-xs text-red-600">No se han podido cargar los títulos del grupo.</p>}
+          {!gamificationError && gamification.length === 0 && <p className="text-xs text-ink-3">Activa títulos desde el Pro-Shop para que aparezcan aquí.</p>}
         </div>
       </div>
 
       <div className="pt-2 flex items-center justify-between border-t border-line">
         <div>
+          {saveError && <span role="alert" className="text-xs font-semibold text-red-600">{saveError}</span>}
           {saved && (
             <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 animate-fade-in">
               <Check size={16} /> Configuración guardada

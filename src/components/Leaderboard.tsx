@@ -5,7 +5,7 @@ import { Trophy, Medal, Eye, RefreshCw, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ThemeToggle } from './ThemeToggle';
 import { competitionPosition } from '../utils/ranking';
-import { gamificationProduct } from '../data/gamification';
+import { GamificationBadge } from './GamificationBadge';
 
 interface LeaderboardProps {
   players: RoundPlayer[];
@@ -288,13 +288,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                             <div className="flex flex-wrap gap-1 mt-2">
                               {entry.badges.map(badge => (
                                 badge.kind === 'red' ? (
-                                  <span
+                                  <GamificationBadge
                                     key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
-                                    title={`No pasó de rojas · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
-                                    className="bg-red-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-soft"
-                                  >
-                                    {badge.holeNumber}
-                                  </span>
+                                    productId="no-paso-rojas"
+                                    detail={`Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                  />
                                 ) : badge.kind === 'sh' ? (
                                   <span
                                     key={`${badge.kind}-${badge.owner ?? ''}-${badge.holeNumber}`}
@@ -305,13 +303,11 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                     <Hand size={12} />
                                   </span>
                                 ) : (
-                                  <span
+                                  <GamificationBadge
                                     key={`${badge.kind}-${badge.productId}-${badge.owner ?? ''}-${badge.holeNumber}`}
-                                    title={`${gamificationProduct(badge.productId)?.name || badge.productId} · Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
-                                    className="rounded-full bg-amber-500 px-1.5 py-1 text-[9px] font-bold text-amber-950"
-                                  >
-                                    {gamificationProduct(badge.productId)?.short || badge.productId} {badge.holeNumber}
-                                  </span>
+                                    productId={badge.productId}
+                                    detail={`Hoyo ${badge.holeNumber}${badge.owner ? ` · ${badge.owner}` : ''}`}
+                                  />
                                 )
                               ))}
                             </div>

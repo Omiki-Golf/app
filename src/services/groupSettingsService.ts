@@ -1,4 +1,11 @@
 import { supabase } from './supabaseClient';
+import { GAMIFICATION_PRODUCTS } from '../data/gamification';
+
+/** Evento que avisa a tarjeta, estadísticas y panel de que cambió la gamificación de un grupo. */
+export const GAMIFICATION_UPDATED_EVENT = 'group-gamification-updated';
+export const notifyGamificationUpdated = (groupId: string) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(GAMIFICATION_UPDATED_EVENT, { detail: { groupId } }));
+};
 
 export type HandicapVariationMode = 'mitad' | 'primero_ultimo';
 
@@ -29,22 +36,37 @@ const getLocalSettings = (groupId: string): GroupSettings | null => {
 };
 
 export const groupSettingsService = {
-  async getGamification(groupId: string): Promise<Array<{ product_id: string; enabled: boolean }>> {
-    const { data, error } = await supabase.from('group_gamification').select('product_id, enabled').eq('group_id', groupId).eq('purchased', true).order('product_id');
-    if (error) return [];
-    return data || [];
+  /** Títulos contratados del grupo, en el orden del catálogo. `null` si no se han podido leer. */
+  async getGamification(groupId: string): Promise<Array<{ product_id: string; enabled: boolean }> | null> {
+    const { data, error } = await supabase.from('group_gamification').select('product_id, enabled').eq('group_id', groupId).eq('purchased', true);
+    if (error) {
+      console.warn('No se ha podido leer la gamificación del grupo:', error);
+      return null;
+    }
+    const order = GAMIFICATION_PRODUCTS.map(item => item.id as string);
+    return (data || [])
+      .filter(item => order.includes(item.product_id))
+      .sort((a, b) => order.indexOf(a.product_id) - order.indexOf(b.product_id));
   },
 
-  async getEnabledGamification(groupId: string): Promise<string[]> {
-    return (await this.getGamification(groupId)).filter(item => item.enabled).map(item => item.product_id);
+  /** Títulos contratados y activos. `null` si no se han podido leer (se usa el comportamiento clásico). */
+  async getEnabledGamification(groupId: string): Promise<string[] | null> {
+    const products = await this.getGamification(groupId);
+    return products ? products.filter(item => item.enabled).map(item => item.product_id) : null;
   },
 
   async saveGamification(groupId: string, products: Array<{ product_id: string; enabled: boolean }>): Promise<void> {
     if (!products.length) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Inicia sesión para guardar la gamificación.');
-    const { error } = await supabase.from('group_gamification').upsert(products.map(item => ({ group_id: groupId, product_id: item.product_id, purchased: true, enabled: item.enabled, updated_by: user.id, updated_at: new Date().toISOString() })), { onConflict: 'group_id,product_id' });
-    if (error) throw error;
+    // update (no upsert): el panel solo activa o desactiva lo ya contratado en el Pro-Shop.
+    for (const item of products) {
+      const { error } = await supabase.from('group_gamification')
+        .update({ enabled: item.enabled, updated_by: user.id, updated_at: new Date().toISOString() })
+        .eq('group_id', groupId).eq('product_id', item.product_id).eq('purchased', true);
+      if (error) throw error;
+    }
+    notifyGamificationUpdated(groupId);
   },
   async getGroupSettings(groupId: string): Promise<GroupSettings> {
     const local = getLocalSettings(groupId);

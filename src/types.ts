@@ -280,6 +280,8 @@ export interface ArchivedDailyRanking {
   total_points: number;
   no_paso_rojas_count: number;
   spanish_hands_count?: number;
+  /** Títulos del Pro-Shop marcados en la jornada: { productId: veces }. */
+  gamification_counts?: Record<string, number>;
   is_guest?: boolean;
 }
 
