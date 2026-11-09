@@ -689,7 +689,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                         <WriteButton
                           onClick={() => setRoundToArchive(roundStats.round.id)}
                           disabled={loading}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
+                          className="text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
                           title="Archivar partida"
                         >
                           <Archive size={16} />
