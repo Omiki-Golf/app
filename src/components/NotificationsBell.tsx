@@ -8,6 +8,7 @@ import { userService } from '../services/userService';
 import { GroupInvitation, QuickRoundInvitation } from '../types';
 import type { ActivityEvent, ActivityScope } from '../services/messageService';
 import { useTranslation } from 'react-i18next';
+import { gamificationProduct } from '../data/gamification';
 
 interface NotificationsBellProps {
   userId: string | null;
@@ -147,15 +148,22 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
             const isNoPasoRojas = event.event_type === 'no_paso_rojas' || event.event_type?.includes('rojas');
             const isHoleInOne = event.event_type === 'hole_in_one';
             const isSpanishHands = event.event_type === 'spanish_hands';
+            // Títulos del Pro-Shop (buceador, minero…): su icono y nombre del catálogo.
+            const product = gamificationProduct(event.event_type);
 
-            const Icon = isHoleInOne ? Trophy : isNoPasoRojas ? Flag : isSpanishHands ? Hand : Bell;
-            const iconColor = isHoleInOne
+            const Icon = product ? product.icon : isHoleInOne ? Trophy : isNoPasoRojas ? Flag : isSpanishHands ? Hand : Bell;
+            const iconColor = product
+              ? product.badge
+              : isHoleInOne
               ? 'text-amber-500 bg-amber-500/10'
               : isNoPasoRojas
               ? 'text-red-600 bg-red-600/10'
               : isSpanishHands
               ? 'text-sky-500 bg-sky-500/10'
               : 'text-accent-ink bg-accent-soft';
+            const label = product
+              ? product.name
+              : t(`activity.events.${event.event_type}`, { defaultValue: isNoPasoRojas ? 'No pasó de rojas' : event.event_type });
 
             return (
               <article key={event.id} className="flex items-start gap-3 rounded-xl border border-line bg-card p-4 shadow-sm">
@@ -164,7 +172,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-ink">
-                    {event.player_name} · {t(`activity.events.${event.event_type}`) || (isNoPasoRojas ? 'No pasó de rojas' : event.event_type)} · {t('activity.hole', { number: event.hole_number })}
+                    {event.player_name} · {label} · {t('activity.hole', { number: event.hole_number })}
                   </p>
                   <p className="text-xs text-ink-3 mt-0.5">{new Date(event.created_at).toLocaleString()}</p>
                 </div>

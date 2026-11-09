@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { safeStorage } from "../utils/safeStorage";
+import type { GamificationId } from "../data/gamification";
 export interface Recipient {
   kind: "user" | "express";
   id: string;
@@ -71,7 +72,8 @@ export interface ActivityEvent {
   id: string;
   round_id: string;
   group_id: string | null;
-  event_type: 'hole_in_one' | 'no_paso_rojas' | 'spanish_hands';
+  /** hole_in_one, no_paso_rojas, spanish_hands o el id de un título del Pro-Shop (buceador, minero…). */
+  event_type: 'hole_in_one' | 'no_paso_rojas' | 'spanish_hands' | Exclude<GamificationId, 'no-paso-rojas' | 'spanish-hand'>;
   player_name: string;
   hole_number: number;
   created_at: string;

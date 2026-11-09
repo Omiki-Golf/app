@@ -55,3 +55,33 @@ test('round activity is idempotent, correctable and scoped to round access or Te
     await assert.rejects(db.query('SELECT round_activity_inbox(NULL,$1,NULL,NULL,false)',[G]),/acceso/);
   } finally { await db.close(); }
 });
+
+test('Pro-Shop titles marked on a hole create, follow and backfill game activity', async () => {
+  const db = new PGlite();
+  try {
+    await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA auth;
+      CREATE TABLE auth.users(id uuid PRIMARY KEY);
+      CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$SELECT nullif(current_setting('request.uid',true),'')::uuid$$;
+      CREATE TABLE groups(id uuid PRIMARY KEY,user_auth_id uuid);
+      CREATE TABLE group_members(group_id uuid,user_id uuid);
+      CREATE TABLE golf_rounds(id uuid PRIMARY KEY,group_id uuid,user_id text,access_code text);
+      CREATE TABLE round_players(id uuid PRIMARY KEY,round_id uuid REFERENCES golf_rounds(id),name text);
+      CREATE TABLE round_scores(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),round_id uuid REFERENCES golf_rounds(id),player_id uuid REFERENCES round_players(id),hole_number integer,gross_strokes integer,abandoned boolean DEFAULT false,no_paso_rojas boolean DEFAULT false,spanish_hands boolean DEFAULT false,gamification_events text[] NOT NULL DEFAULT '{}',updated_at timestamptz DEFAULT now());
+      INSERT INTO groups VALUES('${G}',NULL);
+      INSERT INTO golf_rounds VALUES('${TEAM}','${G}','${U}','5678');
+      INSERT INTO round_players VALUES('${TP}','${TEAM}','Jose');`);
+    await db.exec(migration);
+    // Marca hecha antes de la migración: se rellena como aviso.
+    await db.query(`INSERT INTO round_scores(round_id,player_id,hole_number,gross_strokes,gamification_events) VALUES($1,$2,2,5,'{minero}')`, [TEAM, TP]);
+    await db.exec(await readFile(new URL('../supabase/migrations/20261109160000_gamification_activity_events.sql', import.meta.url), 'utf8'));
+    const types = async () => (await db.query('SELECT event_type, hole_number FROM round_activity_events WHERE round_id=$1 ORDER BY hole_number, event_type',[TEAM])).rows.map(r => `${r.event_type}@${r.hole_number}`);
+    assert.deepEqual(await types(), ['minero@2']);
+
+    await db.query(`INSERT INTO round_scores(round_id,player_id,hole_number,gross_strokes,spanish_hands,gamification_events) VALUES($1,$2,4,3,true,'{buceador,hada-patos}')`, [TEAM, TP]);
+    assert.deepEqual(await types(), ['minero@2', 'buceador@4', 'hada-patos@4', 'spanish_hands@4']);
+
+    // Desmarcar un título quita su aviso; cambiar golpes no duplica.
+    await db.query(`UPDATE round_scores SET gamification_events='{hada-patos}', gross_strokes=4 WHERE round_id=$1 AND hole_number=4`, [TEAM]);
+    assert.deepEqual(await types(), ['minero@2', 'hada-patos@4', 'spanish_hands@4']);
+  } finally { await db.close(); }
+});
