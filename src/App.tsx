@@ -5,6 +5,7 @@ import React, { lazy, Suspense, useState, useEffect, useCallback, useRef } from 
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { GolfRound, GolfHole, GolfCourse, RoundPlayer, RoundScore, Group, GameMode, PlanType, ScoreChangeInput, QuickPlayCompletedRound } from './types';
 import { golfService } from './services/golfService';
+import { ensureExpressIdentity } from './services/expressIdentity';
 import { calculateModePoints, ModeScoreInput } from './utils/calculations';
 import { accessCodeStorage } from './utils/accessCode';
 import { storageUtils } from './utils/storage';
@@ -76,6 +77,7 @@ function App() {
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
+  const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member' }>>([]);
   const [hasGroupMembership, setHasGroupMembership] = useState(false);
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
@@ -152,7 +154,7 @@ function App() {
   const [myRoundsSelectedId, setMyRoundsSelectedId] = useState<string | null>(null);
   const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
-  const { planType, profile, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+  const { planType, profile, subscription, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
   const latestHandicap = useLatestPlayingHandicap(user?.id, profile, currentView);
 
   // Arranque: la app se muestra cuando ya se conocen la sesión, el perfil, el plan y sus imágenes
@@ -589,12 +591,38 @@ function App() {
   }, [roundState.round?.id, roundState.round?.group_id, setCurrentView]);
 
   // El botón de Team de la pantalla de inicio muestra el grupo propio cuando ya existe.
+  // También da acceso a los demás grupos activos: creador/administrador conservan el botón
+  // sólido y los miembros reciben una variante visual sin privilegios implícitos.
   useEffect(() => {
-    if (!user?.id || currentView !== 'main') return;
+    if (!user?.id || currentView !== 'main') {
+      if (!user?.id) { setOwnedTeam(null); setHomeGroups([]); }
+      return;
+    }
     let active = true;
-    golfService.getOwnedGroup(user.id)
-      .then((group) => { if (active) setOwnedTeam(group); })
-      .catch(() => { if (active) setOwnedTeam(null); });
+    const loadHomeGroups = async () => {
+      const [owned, memberships] = await Promise.all([
+        supabase.from('groups').select('*').eq('user_auth_id', user.id).is('archived_at', null),
+        supabase.from('group_members').select('group_id, role').eq('user_id', user.id),
+      ]);
+      if (owned.error) throw owned.error;
+      if (memberships.error) throw memberships.error;
+      const ownedGroups = (owned.data || []) as Group[];
+      const ownedIds = new Set(ownedGroups.map(group => group.id));
+      const roles = new Map((memberships.data || []).filter(item => !ownedIds.has(item.group_id)).map(item => [item.group_id, item.role === 'admin' ? 'admin' as const : 'member' as const]));
+      let joinedGroups: Group[] = [];
+      if (roles.size) {
+        const joined = await supabase.from('groups').select('*').in('id', [...roles.keys()]).is('archived_at', null);
+        if (joined.error) throw joined.error;
+        joinedGroups = (joined.data || []) as Group[];
+      }
+      if (!active) return;
+      setOwnedTeam(ownedGroups[0] ?? null);
+      setHomeGroups([
+        ...ownedGroups.map(group => ({ group, access: 'owner' as const })),
+        ...joinedGroups.map(group => ({ group, access: roles.get(group.id) ?? 'member' as const })),
+      ]);
+    };
+    void loadHomeGroups().catch(() => { if (active) { setOwnedTeam(null); setHomeGroups([]); } });
     return () => { active = false; };
   }, [user?.id, currentView]);
 
@@ -688,6 +716,9 @@ function App() {
 
         if (!roundData.round.group_id && !isCreator && storedCode) {
           await golfService.registerExpressRoundAccess(roundId, storedCode);
+          // registerExpressRoundAccess puede provisionar la identidad Express por primera vez.
+          // Volver a guardar el código lo vincula al identificador definitivo del espectador.
+          accessCodeStorage.saveAccessCode(roundId, storedCode);
         }
 
         const course = await golfService.getCourse(roundData.round.course_id);
@@ -915,11 +946,19 @@ function App() {
       setLoading(true);
       setAccessCodeError('');
 
+      // Un Express nuevo todavía puede tener solo el identificador provisional del dispositivo.
+      // La capacidad debe guardarse después de obtener su identidad estable, o se perderá al
+      // intentar informar el primer golpe.
+      const saveAccessForCurrentIdentity = async (roundId: string, accessCode: string) => {
+        if (!user) await ensureExpressIdentity();
+        accessCodeStorage.saveAccessCode(roundId, accessCode);
+      };
+
       if (pendingRoundId) {
         const isValid = await golfService.verifyAccessCode(pendingRoundId, code);
 
         if (isValid) {
-          accessCodeStorage.saveAccessCode(pendingRoundId, code);
+          await saveAccessForCurrentIdentity(pendingRoundId, code);
           setShowAccessCodeModal(false);
           setPendingRoundId(null);
           await handleJoinRound(pendingRoundId);
@@ -939,7 +978,7 @@ function App() {
               setHasLimitedAccess(true);
             }
           }
-          accessCodeStorage.saveAccessCode(round.id, code);
+          await saveAccessForCurrentIdentity(round.id, code);
           setShowAccessCodeModal(false);
           await handleJoinRound(round.id);
         } else if (!currentGroup) {
@@ -1090,7 +1129,14 @@ function App() {
             }}
             expressLimit={plansContext === 'express-limit'}
             expressModes={plansContext === 'express-modes'}
-            currentPlan={user ? activePlanType : undefined}
+            // Durante la prueba, el plan efectivo es Team, pero el plan pagado sigue siendo Player.
+            // Mostrar este último permite suscribirse a Team antes de que termine la prueba.
+            currentPlan={user ? ((subscription?.plan_type === 'player' || subscription?.plan_type === 'team' || subscription?.plan_type === 'premium') ? subscription.plan_type : activePlanType) : undefined}
+            currentBillingPeriod={subscription?.current_period_start && subscription.current_period_end
+              ? (Date.parse(subscription.current_period_end) - Date.parse(subscription.current_period_start) > 60 * 86_400_000 ? 'annual' : 'monthly')
+              : undefined}
+            currentPeriodEnd={subscription?.current_period_end}
+            teamTrialUsed={Boolean(subscription?.team_trial_started_at)}
             onStartTeamTrial={user && activePlanType === 'player' ? async () => {
               await userService.startTeamTrial();
               await refreshSubscription();
@@ -1104,11 +1150,16 @@ function App() {
                 setCurrentView('registration');
               }
             }}
-            onRegisterPlan={(plan, period) => {
+            onRegisterPlan={async (plan, period) => {
               setRegistrationPlan(plan);
               setRegistrationPeriod(period);
-              if (user) setCurrentView(pendingPlayer ? 'player-checkout' : 'profile');
-              else setCurrentView('registration');
+              if (user) {
+                const intent = { id: crypto.randomUUID(), plan, period };
+                const { error } = await supabase.auth.updateUser({ data: { player_checkout: intent } });
+                if (error) throw error;
+                setCheckoutReturn(null);
+                setCurrentView('player-checkout');
+              } else setCurrentView('registration');
             }}
             onShowAuth={user || plansContext === 'express-limit' ? undefined : () => openAuth('plans')}
           />
@@ -1162,6 +1213,7 @@ function App() {
           <ProfileScreen
             profile={profile}
             planType={activePlanType}
+            subscription={subscription}
             handicap9={latestHandicap.handicap9}
             handicap18={latestHandicap.handicap18}
             onBack={() => {
@@ -1376,8 +1428,12 @@ function App() {
               setShowAccessCodeModal(true);
               setAccessCodeError('');
             }}
-            teamName={ownedTeam?.name || ownedTeam?.group_code}
             onCreateTeam={() => ownedTeam ? void handleGroupJoined(ownedTeam) : setCurrentView('team-creation')}
+            groupShortcuts={homeGroups.map(({ group, access }) => ({ id: group.id, name: group.name || group.group_code, access }))}
+            onOpenGroup={(groupId) => {
+              const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
+              if (selectedGroup) void handleGroupJoined(selectedGroup);
+            }}
             onShowProfile={() => setCurrentView('profile')}
             onShowAuth={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}

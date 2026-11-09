@@ -85,6 +85,10 @@ test('the app uses the private code endpoints and keeps admin controls creator-o
   assert.doesNotMatch(service, /\.eq\('access_code'/);
   assert.match(service, /find_active_round_by_code/);
   assert.match(service, /write_round_hole_scores_by_code/);
+  assert.match(app, /const saveAccessForCurrentIdentity[\s\S]{0,300}if \(!user\) await ensureExpressIdentity\(\);[\s\S]{0,200}accessCodeStorage\.saveAccessCode\(roundId, accessCode\)/);
+  assert.match(app, /await saveAccessForCurrentIdentity\(pendingRoundId, code\)/);
+  assert.match(app, /await saveAccessForCurrentIdentity\(round\.id, code\)/);
+  assert.match(app, /registerExpressRoundAccess\(roundId, storedCode\);[\s\S]{0,300}accessCodeStorage\.saveAccessCode\(roundId, storedCode\)/);
   assert.match(app, /canEditRoundScores\(isCreator, roundData\.round\.status, !!storedCode\)/);
   assert.match(app, /canFinishRound=\{roundState\.isCreator\}/);
   assert.match(app, /hasEditAccess=\{roundState\.isCreator && roundState\.hasEditAccess && !readOnly\}/);

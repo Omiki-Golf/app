@@ -10,6 +10,7 @@ import { EditPlayerNameModal } from './EditPlayerNameModal';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { GroupMemberList } from './GroupMemberList';
+import { competitionPosition } from '../utils/ranking';
 
 interface DailyStanding {
   playerId: string;
@@ -375,6 +376,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                         </h3>
                         <div className="space-y-2">
                           {sortedStandings.map((standing, index) => {
+                            const position = competitionPosition(sortedStandings, index, (a, b) => a.totalPoints === b.totalPoints && a.playingHandicap === b.playingHandicap);
                             // El color indica el ajuste de hándicap: solo entre miembros.
                             const colorClass = standing.isGuest
                               ? 'bg-card border-line'
@@ -386,7 +388,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                               >
                                 <div className="flex items-center gap-3">
                                   <span className="font-bold text-lg text-ink-2 w-8">
-                                    {index + 1}º
+                                    {position}º
                                   </span>
                                   <span className="font-medium text-ink">
                                     {standing.playerName}

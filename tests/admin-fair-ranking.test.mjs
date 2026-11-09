@@ -16,7 +16,7 @@ const corto = toFairEntries([
 
 test('the fair ranking orders by average per round, the absolute one by total', () => {
   assert.deepEqual(sortRanking(corto, 'fair').map(entry => entry.name), ['Martín', 'Alfonso', 'Pedro', 'Sin datos'], 'no rounds go last');
-  assert.deepEqual(sortRanking(corto, 'absolute').map(entry => entry.name), ['Pedro', 'Martín', 'Alfonso', 'Sin datos'], 'a tie in total goes to the better average');
+  assert.deepEqual(sortRanking(corto, 'absolute').map(entry => entry.name), ['Pedro', 'Alfonso', 'Martín', 'Sin datos'], 'a tie in the award goes to the lower handicap');
   assert.equal(formatAverage(corto.find(entry => entry.name === 'Martín').average), '0,50');
   assert.equal(formatAverage(corto.find(entry => entry.name === 'Alfonso').average), '0,36');
 });

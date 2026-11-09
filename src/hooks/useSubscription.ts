@@ -2,12 +2,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { PlanType, UserProfile } from '../types';
+import { effectivePlan } from '../utils/effectivePlan';
 
 interface SubscriptionState {
   planType: PlanType;
   isPremium: boolean;
   loading: boolean;
   profile: UserProfile | null;
+  subscription: Awaited<ReturnType<typeof userService.getSubscription>>;
   refresh: () => Promise<void>;
 }
 
@@ -16,6 +18,7 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [subscription, setSubscription] = useState<Awaited<ReturnType<typeof userService.getSubscription>>>(null);
   const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const refreshVersion = useRef(0);
   const invalidatePendingRefresh = useCallback(() => {
@@ -30,6 +33,7 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
       setPlanType('express');
       setIsPremium(false);
       setProfile(null);
+      setSubscription(null);
       setLoadedUserId(null);
       setLoading(false);
       return;
@@ -38,9 +42,11 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
     try {
       // ensureProfileFromMetadata already returns the existing or newly created profile.
       const p = await userService.ensureProfileFromMetadata(user.id, user.user_metadata || {});
-      const plan = await userService.getPlanType(user.id);
+      const subscriptionData = await userService.getSubscription(user.id);
+      const plan = effectivePlan(subscriptionData);
       if (version !== refreshVersion.current) return;
       setProfile(p);
+      setSubscription(subscriptionData);
       setPlanType(plan);
       setIsPremium(plan !== 'express');
       setLoadedUserId(user.id);
@@ -49,6 +55,7 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
       console.error('Error cargando el perfil o la suscripcion:', error);
       setPlanType('express');
       setIsPremium(false);
+      setSubscription(null);
       setLoadedUserId(null);
     } finally {
       if (version === refreshVersion.current) setLoading(false);
@@ -82,6 +89,7 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
     isPremium: belongsToCurrentUser ? isPremium : false,
     loading: loading || !belongsToCurrentUser,
     profile: belongsToCurrentUser ? profile : null,
+    subscription: belongsToCurrentUser ? subscription : null,
     refresh,
   };
 };

@@ -10,8 +10,11 @@ interface PlansComparisonProps {
   backDestination?: 'back' | 'home';
   onSelectPlan: (plan: PlanType) => void;
   onShowAuth?: () => void;
-  onRegisterPlan?: (plan: PaidPlan, period: BillingPeriod) => void;
+  onRegisterPlan?: (plan: PaidPlan, period: BillingPeriod) => Promise<void> | void;
   currentPlan?: PlanType;
+  currentBillingPeriod?: BillingPeriod;
+  currentPeriodEnd?: string | null;
+  teamTrialUsed?: boolean;
   onStartTeamTrial?: () => Promise<void>;
   expressLimit?: boolean;
   /** Express que intenta usar una modalidad bloqueada: solo Express (actual) y Player, sin inicio de sesión. */
@@ -30,19 +33,21 @@ const longDate = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long
 // Weekend es un pago puntual: nunca se considera "incluido" en otro plan.
 const planRank: Record<DisplayPlan, number> = { express: 0, player: 1, team: 2, premium: 3, weekend: 99 };
 
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, onStartTeamTrial, expressLimit = false, expressModes = false }) => {
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, expressLimit = false, expressModes = false }) => {
   const currentPlan = expressModes ? 'express' : planInUse;
   const onShowAuth = expressModes ? undefined : showAuth;
   const [selected, setSelected] = useState<DisplayPlan>(expressLimit || expressModes ? 'player' : (currentPlan ?? 'express'));
-  const [annual, setAnnual] = useState(true);
+  const [annual, setAnnual] = useState(currentBillingPeriod ? currentBillingPeriod === 'annual' : true);
   const [comingSoon, setComingSoon] = useState(false);
   const [confirmPlayer, setConfirmPlayer] = useState(false);
+  const [paidTeamUpgrade, setPaidTeamUpgrade] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const plan = planCatalog.find(item => item.id === selected)!;
   const style = styles[selected];
   const isCurrentPlan = currentPlan === selected;
-  const isTeamTrial = currentPlan === 'player' && selected === 'team' && !!onStartTeamTrial;
+  const isPlayerToTeam = currentPlan === 'player' && selected === 'team';
+  const canStartTeamTrial = isPlayerToTeam && !!onStartTeamTrial && !teamTrialUsed;
   const visiblePlans = expressLimit
     ? planCatalog.filter(item => item.id === 'player')
     : expressModes ? planCatalog.filter(item => item.id === 'express' || item.id === 'player') : planCatalog;
@@ -116,13 +121,13 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             ? <p className="mt-3 text-center text-[11px] text-ink-3">Pago único. Sin renovación automática.</p>
             : selected !== 'express' && <p className="mt-3 text-center text-[11px] text-ink-3">Sin permanencia. Cancela cuando quieras.</p>}
         </section>
-        {isTeamTrial ? (
+        {isPlayerToTeam ? (
           // Un Player que elige Team puede probarlo 30 días o suscribirse directamente.
           <div className="mt-4 grid gap-2">
-            <button type="button" disabled={updating} onClick={() => { setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-60 ${style.button}`}>
+            {canStartTeamTrial && <button type="button" disabled={updating} onClick={() => { setPaidTeamUpgrade(false); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-60 ${style.button}`}>
               Prueba gratis de 30 días
-            </button>
-            <button type="button" disabled={updating} onClick={() => { setUpdateError(''); setComingSoon(true); }} className={`w-full rounded-xl border-2 ${style.border} bg-card px-4 py-3.5 text-sm font-bold ${style.ink} transition-colors hover:bg-card-2 disabled:opacity-60`}>
+            </button>}
+            <button type="button" disabled={updating} onClick={() => { setPaidTeamUpgrade(true); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl border-2 ${style.border} bg-card px-4 py-3.5 text-sm font-bold ${style.ink} transition-colors hover:bg-card-2 disabled:opacity-60`}>
               Suscribirse a Team
             </button>
           </div>
@@ -142,15 +147,17 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
       </div>
       {confirmPlayer && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="player-choice-title" onKeyDown={event => { if (event.key === 'Escape') setConfirmPlayer(false); }}>
         <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 shadow-card">
-          <h2 id="player-choice-title" className="font-bold text-ink">{isTeamTrial ? 'Probar Team durante 30 días' : `Has elegido el plan ${plan.name}`}</h2>
-          <p className="mt-2 text-sm text-ink-3">{isTeamTrial
+          <h2 id="player-choice-title" className="font-bold text-ink">{canStartTeamTrial && !paidTeamUpgrade ? 'Probar Team durante 30 días' : paidTeamUpgrade ? 'Mejorar de Player a Team' : `Has elegido el plan ${plan.name}`}</h2>
+          <p className="mt-2 text-sm text-ink-3">{canStartTeamTrial && !paidTeamUpgrade
             ? `La prueba empieza hoy, ${longDate.format(new Date())}, y termina el ${longDate.format(new Date(Date.now() + 30 * 86_400_000))}. Conservarás tu plan Player. Solo se puede usar una vez.`
+            : paidTeamUpgrade
+              ? `Stripe calculará solo la diferencia proporcional hasta ${currentPeriodEnd ? longDate.format(new Date(currentPeriodEnd)) : 'tu próxima renovación'}. Mantendrás tu fecha de renovación y tu periodicidad ${currentBillingPeriod === 'monthly' ? 'mensual' : 'anual'}.`
             : 'Vamos a crear tu cuenta. Necesitamos algunos datos para configurar tu perfil.'}</p>
           <div className="mt-5 flex gap-3">
             <button autoFocus type="button" onClick={() => setConfirmPlayer(false)} className="flex-1 rounded-xl bg-card-2 px-4 py-3 font-semibold text-ink">Cancelar</button>
             <button type="button" disabled={updating} onClick={async () => {
               if (selected === 'express' || selected === 'weekend') return;
-              if (isTeamTrial && onStartTeamTrial) {
+              if (canStartTeamTrial && !paidTeamUpgrade && onStartTeamTrial) {
                 setUpdating(true);
                 setUpdateError('');
                 try {
@@ -164,8 +171,17 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
                 }
                 return;
               }
-              setConfirmPlayer(false);
-              onRegisterPlan?.(selected, annual ? 'annual' : 'monthly');
+              setUpdating(true);
+              setUpdateError('');
+              try {
+                await onRegisterPlan?.(selected, currentBillingPeriod ?? (annual ? 'annual' : 'monthly'));
+                setConfirmPlayer(false);
+              } catch (error) {
+                setConfirmPlayer(false);
+                setUpdateError(error instanceof Error ? error.message : 'No se ha podido iniciar el cambio de plan.');
+              } finally {
+                setUpdating(false);
+              }
             }} className="flex-1 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent disabled:opacity-60">{updating ? 'Activando…' : 'Continuar'}</button>
           </div>
         </div>

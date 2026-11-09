@@ -14,8 +14,8 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  /** Nombre del grupo propio; si existe, el botón de Team entra en él en lugar de crear otro. */
-  teamName?: string;
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member' }>;
+  onOpenGroup?: (groupId: string) => void;
   onShowProfile: () => void;
   onShowAuth: () => void;
   onShowShare: () => void;
@@ -35,7 +35,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onQuickPlay,
   onJoinQuickPlay,
   onCreateTeam,
-  teamName,
+  groupShortcuts = [],
+  onOpenGroup,
   onShowProfile,
   onShowAuth,
   onShowShare,
@@ -150,13 +151,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </WriteButton>
 
 
-          {isTeam && (
+          {groupShortcuts.map(group => {
+            const managesGroup = group.access === 'owner' || group.access === 'admin';
+            return <WriteButton
+              key={group.id}
+              onClick={() => onOpenGroup?.(group.id)}
+              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup
+                ? 'border-amber-500 bg-amber-500 text-amber-950 shadow-card hover:bg-amber-600'
+                : 'border-amber-500 bg-card text-amber-500 hover:bg-amber-500/10'}`}
+            >
+              <Users className="w-6 h-6" aria-hidden="true" />
+              <span className="min-w-0 truncate">{group.name}</span>
+              {!managesGroup && <span className="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] uppercase tracking-wide">Miembro</span>}
+            </WriteButton>;
+          })}
+
+          {isTeam && groupShortcuts.every(group => group.access !== 'owner') && (
             <WriteButton
               onClick={onCreateTeam}
               className="w-full flex items-center justify-center gap-3 bg-amber-500 text-amber-950 px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
             >
-              {teamName ? <Users className="w-6 h-6" aria-hidden="true" /> : <Plus className="w-6 h-6" aria-hidden="true" />}
-              <span className="truncate">{teamName || t('home.createTeam')}</span>
+              <Plus className="w-6 h-6" aria-hidden="true" />
+              <span className="truncate">{t('home.createTeam')}</span>
             </WriteButton>
           )}
         </div>

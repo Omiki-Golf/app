@@ -465,8 +465,8 @@ export interface QuickPlayTeamRanking {
 }
 
 export interface QuickPlaySpecialAwards {
-  reyDelBosque: { player: RoundPlayer; count: number } | null;
-  noPasoRojas: { player: RoundPlayer; count: number } | null;
+  reyDelBosque: { players: RoundPlayer[]; count: number } | null;
+  noPasoRojas: { players: RoundPlayer[]; count: number } | null;
   holeInOne: { players: Array<{ player: RoundPlayer; count: number }> } | null;
   hoyoMuerte: { holeNumber: number; par: number; avgPoints: number } | null;
   hoyoGloria: { holeNumber: number; par: number; avgPoints: number } | null;
@@ -483,6 +483,7 @@ export interface QuickPlayAwardsSummary {
   ranking: QuickPlayPlayerRanking[];
   awards: QuickPlaySpecialAwards;
   matchResult?: {
+    isTie: boolean;
     winner: RoundPlayer | null;
     loser: RoundPlayer | null;
     winnerPoints: number;

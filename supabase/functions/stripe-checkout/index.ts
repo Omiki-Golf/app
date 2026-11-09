@@ -34,6 +34,40 @@ Deno.serve(async req => {
     const stripe=await checkedStripe();
     stage='configuration';
     const settings=await config(service);
+    const {data:currentSubscription,error:currentSubscriptionError}=await service.from('user_subscriptions')
+      .select('plan_type,status,current_period_end,stripe_subscription_id').eq('user_id',user.id).maybeSingle();
+    if(currentSubscriptionError) throw new Error('No se pudo comprobar la suscripción actual.');
+    const ranks:Record<string,number>={player:1,team:2,premium:3};
+    const isUpgrade=input.action==='create' && currentSubscription?.stripe_subscription_id && currentSubscription.status==='active'
+      && (!currentSubscription.current_period_end || Date.parse(currentSubscription.current_period_end)>Date.now())
+      && (ranks[intent.plan]??0)>(ranks[currentSubscription.plan_type]??0);
+    if(isUpgrade) {
+      stage='subscription-upgrade';
+      const targetPrice=settings.prices[`${intent.plan}_${intent.period}`];
+      const currentPrice=settings.prices[`${currentSubscription.plan_type}_${intent.period}`];
+      if(!targetPrice || !currentPrice) throw new Error('Precio no configurado.');
+      const subscription=await stripe.subscriptions.retrieve(currentSubscription.stripe_subscription_id,{expand:['latest_invoice']});
+      if(subscription.livemode || subscription.metadata.app!=='omiki-sandbox' || subscription.metadata.user_id!==user.id || subscription.items.data.length!==1)
+        throw new Error('Suscripción no válida para mejorar.');
+      if(subscription.items.data[0].price.id!==currentPrice)
+        return reply({error:'Elige la misma periodicidad que tu plan Player actual.'},409);
+      const metadata={app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id};
+      if(subscription.metadata.intent_id!==intent.id) {
+        const {error:clearError}=await service.from('stripe_checkout_state').delete().eq('user_id',user.id);
+        if(clearError) throw new Error('No se pudo preparar el cambio de plan.');
+        const {error:stateError}=await service.from('stripe_checkout_state').insert({
+          user_id:user.id,attempt_id:intent.id,intent_id:intent.id,plan:intent.plan,period:intent.period,
+          origin,email:user.email,price_id:targetPrice,session_id:null,
+        });
+        if(stateError) throw new Error('No se pudo registrar el cambio de plan.');
+        await stripe.subscriptions.update(subscription.id,{
+          metadata,items:[{id:subscription.items.data[0].id,price:targetPrice,quantity:1}],
+          proration_behavior:'always_invoice',payment_behavior:'error_if_incomplete',expand:['latest_invoice'],
+        },{idempotencyKey:`omiki-upgrade:${intent.id}`});
+      }
+      await synchronize(stripe,service,subscription.id);
+      return reply({ok:true,upgraded:true});
+    }
     stage='checkout-state';
     const {data:existing,error:existingError}=await service.from('stripe_checkout_state').select('*').eq('user_id',user.id).maybeSingle();
     if(existingError) throw new Error('No se pudo comprobar el pago.');

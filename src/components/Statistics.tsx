@@ -93,7 +93,8 @@ const awardValue: Record<AwardType, (entry: RankingRpcRow) => number | undefined
 /** Campeón absoluto (total) y justo (promedio por partida); si coinciden, ambos con su desglose en 2 columnas estilo tarjeta. */
 const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: string; tone: string; lowerIsBetter?: boolean; minRounds?: number }> = ({ rows, type, unit: _unit, tone, lowerIsBetter = false, minRounds = 0 }) => {
   const eligibleRows = minRounds > 0 ? rows.filter(r => (r.total_rounds ?? 0) >= minRounds) : rows;
-  const { absolute, fair } = awardChampions(toFairEntries(eligibleRows, awardValue[type]), lowerIsBetter);
+  const negativeAward = type === 'patrocinador' || type === 'corto' || type === 'amigoDelMasUno' || type === 'reyDelBosque';
+  const { absolute, fair } = awardChampions(toFairEntries(eligibleRows, awardValue[type]), lowerIsBetter, negativeAward ? 'higher' : 'lower');
   if (!absolute) {
     if (minRounds > 0 && rows.length > 0) {
       return (
@@ -1355,6 +1356,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
             key={rankingModal.type}
             allowFair={rankingModal.type !== 'viciado'}
             lowerIsBetter={rankingModal.type === 'driverOro'}
+            negativeAward={rankingModal.type === 'patrocinador' || rankingModal.type === 'corto' || rankingModal.type === 'amigoDelMasUno' || rankingModal.type === 'reyDelBosque'}
             isOpen={rankingModal.isOpen}
             onClose={closeRankingModal}
             title={

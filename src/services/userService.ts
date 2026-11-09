@@ -104,14 +104,27 @@ export const userService = {
   },
 
   async getPlanType(userId: string): Promise<PlanType> {
+    const data = await this.getSubscription(userId);
+    return effectivePlan(data);
+  },
+
+  async getSubscription(userId: string): Promise<{
+    plan_type: string;
+    status: string;
+    current_period_start: string | null;
+    current_period_end: string | null;
+    team_trial_started_at: string | null;
+    team_trial_ends_at: string | null;
+    stripe_subscription_id: string | null;
+  } | null> {
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .select('plan_type, status, current_period_end, team_trial_ends_at')
+      .select('plan_type, status, current_period_start, current_period_end, team_trial_started_at, team_trial_ends_at, stripe_subscription_id')
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle();
     if (error) throw error;
-    return effectivePlan(data);
+    return data;
   },
 
   /** Pasa a la cuenta las partidas rápidas creadas en este dispositivo como Express. */

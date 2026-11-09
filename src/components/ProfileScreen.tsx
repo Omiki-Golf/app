@@ -7,6 +7,10 @@ import { useTranslation } from 'react-i18next';
 interface ProfileScreenProps {
   profile: UserProfile | null;
   planType: PlanType;
+  subscription?: {
+    plan_type: string;
+    team_trial_ends_at: string | null;
+  } | null;
   onBack: () => void;
   onLogout: () => void;
   onShowRoundStats: () => void;
@@ -25,6 +29,7 @@ interface ProfileScreenProps {
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   profile,
   planType,
+  subscription,
   onBack,
   onLogout,
   onShowRoundStats,
@@ -41,6 +46,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const { t } = useTranslation();
   const [showHandicapInfo, setShowHandicapInfo] = useState(false);
   const isTeam = (planType === 'team' || planType === 'premium');
+  const trialEnd = subscription?.plan_type === 'player' && subscription.team_trial_ends_at
+    && Date.parse(subscription.team_trial_ends_at) > Date.now()
+    ? new Date(subscription.team_trial_ends_at) : null;
+  const trialDaysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000)) : 0;
   const nick = profile?.nick || t('profile.player');
   const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
   const fallbackHandicap18 = profile?.exact_handicap;
@@ -158,6 +167,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             )}
           </div>
         </div>
+
+        {trialEnd && (
+          <div className="mb-5 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-soft dark:bg-amber-950/40 dark:text-amber-100" role="status">
+            <div className="flex items-center gap-2 font-bold"><Crown size={18} fill="currentColor" /> Team de prueba</div>
+            <p className="mt-1 text-sm">Te quedan {trialDaysLeft} días. La prueba termina el {trialEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+            <p className="mt-1 text-xs opacity-80">Después volverás automáticamente a tu plan Player si no te suscribes a Team.</p>
+          </div>
+        )}
 
         {/* Menu items */}
         <div className="bg-card rounded-2xl shadow-card overflow-hidden">

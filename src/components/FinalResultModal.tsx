@@ -15,7 +15,9 @@ const modeLabels: Record<FinalResult['mode'], string> = {
 const positionLabels = ['1º', '2º', '3º', '4º'];
 
 export const FinalResultModal: React.FC<FinalResultModalProps> = ({ result, onClose }) => {
-  const headline = result.mode === 'match'
+  const headline = result.isTie
+    ? `Empate entre ${result.winnerLabel}`
+    : result.mode === 'match'
     ? `Ha ganado ${result.winnerLabel} por ${result.resultText}`
     : result.mode === 'parejas'
       ? `Ha ganado la pareja ${result.winnerLabel}`
@@ -38,7 +40,7 @@ export const FinalResultModal: React.FC<FinalResultModalProps> = ({ result, onCl
 
         <div className="bg-accent-soft border border-accent-ring rounded-xl p-4 mb-5">
           <p className="text-lg font-extrabold text-accent-ink">{headline}</p>
-          {result.mode === 'parejas' && (
+          {result.mode === 'parejas' && !result.isTie && (
             <span className="mt-2 inline-block bg-accent text-on-accent text-xs font-bold px-3 py-1 rounded-full">
               Resultado: {result.resultText}
             </span>

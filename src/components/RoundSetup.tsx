@@ -27,6 +27,7 @@ interface RoundSetupDraft {
   gameMode?: GameMode;
 }
 const GAME_MODES: GameMode[] = ['stableford', 'match', 'sindicato', 'parejas'];
+const isCostaAzaharCourse = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('costa azahar');
 const draftKey = (groupId?: string) => `roundSetupDraft:${groupId ? `group:${groupId}` : `quick:${getUserId()}`}`;
 const readDraft = (key: string): RoundSetupDraft => {
   try {
@@ -129,6 +130,10 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           if (holeCount === 9) {
             setNumHoles(9);
             setHolesRange('1-9');
+          } else if (course && isCostaAzaharCourse(course.name) && numHoles === 9) {
+            // Los recorridos Rojo, Mediterráneo y Masía de Costa Azahar son vueltas de 9.
+            // Al cambiar de recorrido nunca deben heredar el tramo 10-18 del anterior.
+            setHolesRange('1-9');
           }
 
         } catch (err) {
@@ -138,7 +143,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     };
 
     loadCourseDetails();
-  }, [selectedCourse, courses]);
+  }, [selectedCourse, courses, numHoles]);
 
   // La modalidad se recupera cuando se conoce el plan: Express solo permite Stableford.
   useEffect(() => {
@@ -324,7 +329,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
   const handleNumHolesChange = (newNumHoles: 9 | 18) => {
     if (newNumHoles === 9 && selectedCourseHoleCount === 18) {
-      const isCostaAzahar = selectedCourseName.includes('Costa Azahar');
+      const isCostaAzahar = isCostaAzaharCourse(selectedCourseName);
 
       if (isCostaAzahar) {
         setNumHoles(9);

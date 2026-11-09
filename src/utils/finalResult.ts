@@ -1,4 +1,5 @@
 import type { DecidedResult, GameMode, RoundPlayer, RoundScore } from '../types';
+import { competitionPosition } from './ranking.ts';
 
 export type FinalResultMode = Exclude<GameMode, 'stableford'>;
 
@@ -13,6 +14,7 @@ export interface FinalResult {
   mode: FinalResultMode;
   winnerLabel: string;
   resultText: string;
+  isTie: boolean;
   decidedByHandicap: boolean;
   standings: FinalStanding[];
 }
@@ -47,12 +49,14 @@ export const calculateFinalResult = (
     })).sort(byPointsThenHandicap);
     const [winner, loser] = teams;
     const margin = winner.points - loser.points;
+    const isTie = margin === 0 && winner.handicap === loser.handicap;
     return {
       mode,
-      winnerLabel: winner.label,
-      resultText: margin > 0 ? `${margin} UP` : 'Empate a puntos',
-      decidedByHandicap: margin === 0,
-      standings: teams.map((team, index) => ({ position: index + 1, ...team })),
+      winnerLabel: isTie ? teams.map((team) => team.label).join(' y ') : winner.label,
+      resultText: isTie ? 'Empate' : margin > 0 ? `${margin} UP` : 'Empate a puntos',
+      isTie,
+      decidedByHandicap: margin === 0 && !isTie,
+      standings: teams.map((team, index) => ({ position: competitionPosition(teams, index, (a, b) => a.points === b.points && a.handicap === b.handicap), ...team })),
     };
   }
 
@@ -66,14 +70,17 @@ export const calculateFinalResult = (
   })).sort(byPointsThenHandicap);
   const [winner, runnerUp] = ranking;
   const margin = winner.points - runnerUp.points;
+  const isTie = margin === 0 && winner.handicap === runnerUp.handicap;
+  const tiedLeaders = ranking.filter((entry) => entry.points === winner.points && entry.handicap === winner.handicap);
 
   return {
     mode,
-    winnerLabel: winner.label,
+    winnerLabel: isTie ? tiedLeaders.map((entry) => entry.label).join(' y ') : winner.label,
     resultText: mode === 'match'
-      ? (margin > 0 ? `${margin} UP` : 'Empate a puntos')
-      : `${winner.points} puntos`,
-    decidedByHandicap: margin === 0,
-    standings: ranking.map((entry, index) => ({ position: index + 1, ...entry })),
+      ? (isTie ? 'Empate' : margin > 0 ? `${margin} UP` : 'Empate a puntos')
+      : (isTie ? `${winner.points} puntos · Empate` : `${winner.points} puntos`),
+    isTie,
+    decidedByHandicap: margin === 0 && !isTie,
+    standings: ranking.map((entry, index) => ({ position: competitionPosition(ranking, index, (a, b) => a.points === b.points && a.handicap === b.handicap), ...entry })),
   };
 };

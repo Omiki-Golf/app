@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { formatAverage, sortRanking, toFairEntries, type RankingMode } from '../utils/fairRanking';
+import { competitionPosition } from '../utils/ranking';
 
 interface RankingEntry {
   player_name: string;
@@ -21,6 +22,7 @@ interface AwardRankingModalProps {
   allowFair?: boolean;
   /** Gana el valor más bajo (p. ej. «Driver de Oro»). */
   lowerIsBetter?: boolean;
+  negativeAward?: boolean;
   colorScheme: {
     bg: string;
     border: string;
@@ -58,6 +60,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
   valueLabel,
   allowFair = true,
   lowerIsBetter = false,
+  negativeAward = false,
   colorScheme,
 }) => {
   // Por defecto, la clasificación absoluta: puntos/valores totales.
@@ -74,6 +77,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
     toFairEntries(ranking.map((entry) => ({ ...entry, total_rounds: entry.rounds_played })), (entry) => entry.value),
     allowFair ? mode : 'absolute',
     lowerIsBetter,
+    negativeAward ? 'higher' : 'lower',
   );
   const showFair = allowFair && mode === 'fair';
 
@@ -111,15 +115,17 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
           {entries.length === 0 ? (
             <p className="text-center text-ink-3 py-8">No hay datos disponibles</p>
           ) : (
-            entries.map((entry, index) => (
+            entries.map((entry, index) => {
+              const position = competitionPosition(entries, index, (a, b) => (showFair ? a.average === b.average : a.total === b.total) && a.handicap === b.handicap);
+              return (
               <div
                 key={entry.key}
                 className={`p-3 sm:p-4 rounded-lg border flex items-center justify-between gap-2 transition-all ${
-                  index === 0
+                  position === 1
                     ? `${colorScheme.bg} ${colorScheme.border} border-2 shadow-card`
-                    : index === 1
+                    : position === 2
                     ? 'bg-card-2 border-line-2 border-2 shadow-soft'
-                    : index === 2
+                    : position === 3
                     ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600 border-2 shadow-soft'
                     : 'bg-card border-line hover:bg-card-2'
                 }`}
@@ -127,16 +133,16 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                 <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
                   <div
                     className={`text-base sm:text-xl font-bold w-8 h-8 sm:w-10 sm:h-10 shrink-0 flex items-center justify-center rounded-full ${
-                      index === 0
+                      position === 1
                         ? `${colorScheme.accent} ${colorScheme.text}`
-                        : index === 1
+                        : position === 2
                         ? 'bg-ink-4 text-white'
-                        : index === 2
+                        : position === 3
                         ? 'bg-amber-500 text-amber-950'
                         : 'bg-neutral-hover text-ink-2'
                     }`}
                   >
-                    {index + 1}
+                    {position}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-base sm:text-lg leading-tight text-ink break-words">{entry.name}</p>
@@ -153,7 +159,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                   {allowFair ? (
                     showFair ? (
                       <div>
-                        <p className={`font-bold text-2xl sm:text-3xl ${index === 0 ? colorScheme.text : 'text-ink'}`}>
+                        <p className={`font-bold text-2xl sm:text-3xl ${position === 1 ? colorScheme.text : 'text-ink'}`}>
                           {formatAverage(entry.average)}
                         </p>
                         <p className="text-[10px] sm:text-xs text-ink-3 mt-1">por partida</p>
@@ -163,7 +169,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                       </div>
                     ) : (
                       <div>
-                        <p className={`font-bold text-2xl sm:text-3xl ${index === 0 ? colorScheme.text : 'text-ink'}`}>
+                        <p className={`font-bold text-2xl sm:text-3xl ${position === 1 ? colorScheme.text : 'text-ink'}`}>
                           {entry.total}
                         </p>
                         <p className="text-[10px] sm:text-xs text-ink-3 mt-1">{valueLabel}</p>
@@ -174,7 +180,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                     )
                   ) : (
                     <div>
-                      <p className={`text-3xl font-bold ${index === 0 ? colorScheme.text : 'text-ink'}`}>
+                      <p className={`text-3xl font-bold ${position === 1 ? colorScheme.text : 'text-ink'}`}>
                         {entry.total}
                       </p>
                       <p className="text-xs text-ink-3 mt-1">{valueLabel}</p>
@@ -182,7 +188,8 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                   )}
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

@@ -8,6 +8,8 @@ const playerSetup = await readFile(new URL('../src/components/PlayerSetup.tsx', 
 test('a 9-hole course always starts on holes 1-9, even after a 10-18 round elsewhere', () => {
   assert.match(roundSetup, /if \(holeCount === 9\) \{\s*setNumHoles\(9\);\s*setHolesRange\('1-9'\);/);
   assert.match(roundSetup, /numHoles === 9 \? \(selectedCourseHoleCount === 18 \? holesRange : '1-9'\) : undefined/, 'the round is never created as 10-18 on a 9-hole course');
+  assert.match(roundSetup, /course && isCostaAzaharCourse\(course\.name\) && numHoles === 9[\s\S]{0,350}setHolesRange\('1-9'\)/, 'Costa Azahar resets a range inherited from another route');
+  assert.match(roundSetup, /normalize\('NFD'\)[\s\S]{0,120}includes\('costa azahar'\)/, 'accented course names are recognised too');
 });
 
 test('the "Añadirme a la partida" suggestion stays on one line', () => {

@@ -1,5 +1,6 @@
 import type { GolfHole, QuickPlayAwardsSummary, RoundPlayer, RoundScore } from '../types';
 import { calculateScoreToPar, getStrokesReceived } from './calculations.ts';
+import { competitionPosition } from './ranking.ts';
 
 // Estadísticas de una partida vistas por un solo jugador (Mis partidas): cómo jugué yo, no cómo le fue a todos.
 // Mismas reglas que la pantalla de estadísticas de la partida: resultado por golpes netos contra el par del hoyo,
@@ -191,10 +192,10 @@ export const computeMyRoundStats = (
   if (isMine(rollerCoaster) && mine.variability > 0) awards.push({ key: 'montana-rusa', title: 'Montaña Rusa', detail: `Mayor variación: ${plural(mine.variability, 'punto')}` });
   const bogeyKing = leaderBy(summaries, item => item.distribution.bogey);
   if (isMine(bogeyKing) && mine.distribution.bogey > 0) awards.push({ key: 'rey-mas-uno', title: 'Rey de +1', detail: `Más bogeys: ${mine.distribution.bogey}` });
-  if (summary.awards.reyDelBosque?.player.id === me.id) {
+  if (summary.awards.reyDelBosque?.players.some(player => player.id === me.id)) {
     awards.push({ key: 'rey-del-bosque', title: 'Rey del Bosque', detail: `Más dobles bogeys o peor: ${summary.awards.reyDelBosque.count}` });
   }
-  if (summary.awards.noPasoRojas?.player.id === me.id) {
+  if (summary.awards.noPasoRojas?.players.some(player => player.id === me.id)) {
     awards.push({ key: 'no-paso-rojas', title: 'No Pasó Rojas', detail: 'Premio a la salida más corta' });
   }
   const holeInOne = summary.awards.holeInOne?.players.find(item => item.player.id === me.id);
@@ -208,7 +209,7 @@ export const computeMyRoundStats = (
       handicap: entry.player.playing_handicap,
       points: playerSummary.points,
       toPar: playerSummary.toPar,
-      position: index + 1,
+      position: competitionPosition(summary.ranking, index, (a, b) => a.totalPoints === b.totalPoints && a.player.playing_handicap === b.player.playing_handicap),
       isMe: entry.player.id === me.id,
     };
   });

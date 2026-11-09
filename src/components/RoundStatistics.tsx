@@ -4,6 +4,7 @@ import { OmikiSpinner } from './OmikiSpinner';
 import { SelectMenu } from './SelectMenu';
 import { RoundPlayer, RoundScore, GolfHole } from '../types';
 import { golfService } from '../services/golfService';
+import { competitionPosition } from '../utils/ranking';
 
 interface RoundStatisticsProps {
   players: RoundPlayer[];
@@ -264,7 +265,9 @@ useEffect(() => {
 
         <div className="space-y-3">
           <h4 className="font-bold text-ink text-lg mb-3">Clasificación Final</h4>
-          {allPlayerStats.map((stats, index) => (
+              {allPlayerStats.map((stats, index) => {
+                const position = competitionPosition(allPlayerStats, index, (a, b) => a.totalPoints === b.totalPoints && a.player.playing_handicap === b.player.playing_handicap);
+                return (
             <div
               key={stats.player.id}
               className={`p-4 rounded-lg ${
@@ -290,7 +293,7 @@ useEffect(() => {
                         : 'bg-neutral-hover text-ink-2'
                     }`}
                   >
-                    {index + 1}
+                    {position}
                   </div>
                   <div>
                     <p className="font-bold text-lg text-ink">{stats.player.name}{stats.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
@@ -370,7 +373,8 @@ useEffect(() => {
                 </div>
               )}
             </div>
-          ))}
+                );
+              })}
         </div>
       </div>
     </div>

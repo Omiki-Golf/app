@@ -13,6 +13,8 @@ import { calculateScoreToPar } from '../utils/calculations';
 import { safeStorage } from '../utils/safeStorage';
 import { GameMode, GolfHole, RoundPlayer, RoundScore, QuickPlayCompletedRound, QuickPlayAwardsSummary } from '../types';
 import { ThemeToggle } from './ThemeToggle';
+import { tiedAwardLeaders } from '../utils/awardTies';
+import { competitionPosition } from '../utils/ranking';
 
 interface QuickPlayStatisticsProps {
   onBack: () => void;
@@ -24,6 +26,7 @@ interface QuickPlayStatisticsProps {
 interface PlayerHighlights {
   playerId: string;
   playerName: string;
+  handicap: number;
   totalPoints: number;
   totalGrossStrokes: number;
   scoreToPar: { value: number; display: string };
@@ -133,6 +136,7 @@ const calculatePlayerHighlights = (
     return {
       playerId: player.id,
       playerName: player.name,
+      handicap: player.playing_handicap,
       totalPoints,
       totalGrossStrokes,
       scoreToPar,
@@ -554,19 +558,19 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   const { ranking, awards } = stats;
   const gameMode = (round?.game_mode || 'stableford') as GameMode;
 
-  const birdieKing = highlights.reduce((max, h) => h.birdies > max.birdies ? h : max, highlights[0]);
-  const rollerCoaster = highlights.reduce((max, h) => h.variability > max.variability ? h : max, highlights[0]);
-  const bogeyKing = highlights.reduce((max, h) => h.bogeys > max.bogeys ? h : max, highlights[0]);
-  const doubleBogeyKing = highlights.reduce((max, h) => h.doubleBogeyPlus > max.doubleBogeyPlus ? h : max, highlights[0]);
+  const namesOf = (entries: PlayerHighlights[]) => entries.map((entry) => entry.playerName).join(' / ');
+  const rankingPosition = (index: number) => competitionPosition(ranking, index, (a, b) => a.totalPoints === b.totalPoints && a.player.playing_handicap === b.player.playing_handicap);
+  const rankedHighlights = [...highlights].sort((a, b) => b.totalPoints - a.totalPoints || a.handicap - b.handicap);
+  const highlightPosition = (index: number) => competitionPosition(rankedHighlights, index, (a, b) => a.totalPoints === b.totalPoints && a.handicap === b.handicap);
+  const birdieKings = tiedAwardLeaders(highlights, h => h.birdies, 'max', h => h.handicap, 'lower');
+  const rollerCoasters = tiedAwardLeaders(highlights, h => h.variability, 'max', h => h.handicap, 'higher');
+  const bogeyKings = tiedAwardLeaders(highlights, h => h.bogeys, 'max', h => h.handicap, 'higher');
+  const doubleBogeyKings = tiedAwardLeaders(highlights, h => h.doubleBogeyPlus, 'max', h => h.handicap, 'higher');
   const getPlayerGrossStrokes = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.totalGrossStrokes ?? 0;
   const getPlayerScoreToPar = (playerId: string) => highlights.find((h) => h.playerId === playerId)?.scoreToPar ?? { value: 0, display: '-' };
 
-  const bestIndividualHole = highlights.reduce((max, h) =>
-    h.bestHole.points > max.bestHole.points ? h : max, highlights[0]
-  );
-  const worstIndividualHole = highlights.reduce((min, h) =>
-    h.worstHole.points < min.worstHole.points ? h : min, highlights[0]
-  );
+  const bestIndividualHoles = tiedAwardLeaders(highlights, h => h.bestHole.points, 'max', h => h.handicap, 'lower');
+  const worstIndividualHoles = tiedAwardLeaders(highlights, h => h.worstHole.points, 'min', h => h.handicap, 'higher');
 
   const isStablefordMode = gameMode === 'stableford';
   const isMatchMode = gameMode === 'match';
@@ -647,15 +651,15 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
   const renderPodiumGrid = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-stretch">
-      {ranking.slice(0, 3).map((entry, index) => {
-        const style = podiumStyles[index];
+      {ranking.map((entry, index) => ({ entry, index, position: rankingPosition(index) })).filter(item => item.position <= 3).map(({ entry, index, position }) => {
+        const style = podiumStyles[Math.min(position - 1, podiumStyles.length - 1)];
         const toPar = getPlayerScoreToPar(entry.player.id);
         return (
           <div key={entry.player.id} className="h-full transform transition-all duration-700 hover:scale-105" style={{ animationDelay: `${index * 200}ms` }}>
             <div className={`${style.card} rounded-2xl border-2 p-3 shadow-xl h-full flex flex-col justify-between`}>
               <div className="mb-2 flex items-center gap-2">
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-black shadow ${style.badge}`}>
-                  {index + 1}
+                  {position}
                 </span>
                 <p className={`min-w-0 truncate text-lg font-black ${style.name}`}>{entry.player.name}</p>
                 <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>HCP {entry.player.playing_handicap}</span>
@@ -682,7 +686,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   );
 
   // Match y Parejas: VS y diferencia centrados encima; las dos fichas compactas en la misma fila.
-  type VersusSide = { label: string; name: string; points: number };
+  type VersusSide = { label: string; name: string; points: number; handicap: number };
   const renderVersusCards = (vsClass: string, winner: VersusSide, loser: VersusSide, difference: { text: string; label: string }) => (
     <>
       <div className="mb-3 flex justify-center">
@@ -701,6 +705,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
               <p className="break-words text-sm sm:text-base font-black leading-tight text-yellow-900 line-clamp-2">{winner.name}</p>
             </div>
+            <p className="text-xs font-bold text-yellow-800">HCP {winner.handicap}</p>
           </div>
           <div className="mt-2 pt-1 border-t border-yellow-300/40">
             <p className="text-3xl font-black leading-none text-yellow-900">{winner.points}</p>
@@ -715,6 +720,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
               <p className="break-words text-sm sm:text-base font-black leading-tight text-white line-clamp-2">{loser.name}</p>
             </div>
+            <p className="text-xs font-bold text-slate-300">HCP {loser.handicap}</p>
           </div>
           <div className="mt-2 pt-1 border-t border-slate-500/40">
             <p className="text-3xl font-black leading-none text-white">{loser.points}</p>
@@ -750,12 +756,12 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   </tr>
                 </thead>
                 <tbody>
-                  {[...highlights].sort((a, b) => b.totalPoints - a.totalPoints).map((h, index) => (
+                  {rankedHighlights.map((h, index) => (
                     <tr key={h.playerId} className="statistics-table-line statistics-table-row border-b transition-colors">
                       <td className="statistics-table-text font-semibold p-3">
                         <div className="flex items-center gap-2">
                           <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(h.playerId))}`}>
-                            {index + 1}
+                            {highlightPosition(index)}
                           </span>
                           {h.playerName}
                         </div>
@@ -896,7 +902,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                         <td className="statistics-table-text font-semibold p-2">
                           <div className="flex items-center gap-2">
                             <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(entry.player.id))}`}>
-                              {index + 1}
+                              {rankingPosition(index)}
                             </span>
                             {entry.player.name}
                           </div>
@@ -949,7 +955,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <TrendingDown size={20} className="text-rose-400" />
                       <p className="text-rose-300 font-bold text-sm">Rey del Bosque</p>
                     </div>
-                    <p className="statistics-table-text font-bold text-lg">{awards.reyDelBosque.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.reyDelBosque.players.map(player => player.name).join(' / ')}</p>
                     <p className="text-rose-300 text-sm">Mayor número de dobles bogeys o peor</p>
                   </div>
                 )}
@@ -960,7 +966,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                       <Flag size={20} className="text-amber-400" />
                       <p className="text-amber-300 font-bold text-sm">No Pasó Rojas</p>
                     </div>
-                    <p className="statistics-table-text font-bold text-lg">{awards.noPasoRojas.player.name}</p>
+                    <p className="statistics-table-text font-bold text-lg">{awards.noPasoRojas.players.map(player => player.name).join(' / ')}</p>
                     <p className="text-amber-300 text-sm">Premio a la salida más corta</p>
                   </div>
                 )}
@@ -1132,9 +1138,9 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                 {renderVersusCards(
                   'bg-red-600',
-                  { label: 'Ganador', name: matchResult.winner?.name || '—', points: matchResult.winnerPoints },
-                  { label: 'Perdedor', name: matchResult.loser?.name || '—', points: matchResult.loserPoints },
-                  { text: matchResult.displayText || `+${matchResult.margin}`, label: 'diferencia' },
+                  { label: matchResult.isTie ? 'Empate' : 'Ganador', name: matchResult.winner?.name || '—', points: matchResult.winnerPoints, handicap: matchResult.winner?.playing_handicap ?? 0 },
+                  { label: matchResult.isTie ? 'Empate' : 'Perdedor', name: matchResult.loser?.name || '—', points: matchResult.loserPoints, handicap: matchResult.loser?.playing_handicap ?? 0 },
+                  { text: matchResult.displayText || (matchResult.isTie ? '0' : `+${matchResult.margin}`), label: matchResult.isTie ? 'empate' : 'diferencia' },
                 )}
               </div>
             </div>
@@ -1157,8 +1163,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
                 {renderVersusCards(
                   'bg-blue-600',
-                  { label: teamResult.isTie ? 'Empate' : 'Ganadora', name: teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.winningTeam?.totalPoints ?? 0 },
-                  { label: teamResult.isTie ? 'Empate' : 'Perdedora', name: teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.losingTeam?.totalPoints ?? 0 },
+                  { label: teamResult.isTie ? 'Empate' : 'Ganadora', name: teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.winningTeam?.totalPoints ?? 0, handicap: teamResult.winningTeam?.handicap ?? 0 },
+                  { label: teamResult.isTie ? 'Empate' : 'Perdedora', name: teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—', points: teamResult.losingTeam?.totalPoints ?? 0, handicap: teamResult.losingTeam?.handicap ?? 0 },
                   { text: teamResult.displayText || (teamResult.isTie ? '0' : `+${teamResult.margin}`), label: teamResult.isTie ? 'empate' : 'diferencia' },
                 )}
               </div>
@@ -1191,8 +1197,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Individual</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{bestIndividualHole?.playerName}</p>
-              <p className="text-blue-100 text-sm font-semibold">Hoyo {bestIndividualHole?.bestHole.holeNumber}: {bestIndividualHole?.bestHole.points} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(bestIndividualHoles)}</p>
+              <p className="text-blue-100 text-sm font-semibold">{bestIndividualHoles.map(entry => `${entry.playerName}: Hoyo ${entry.bestHole.holeNumber}`).join(' · ')} · {bestIndividualHoles[0]?.bestHole.points} pts</p>
             </div>
 
             <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
@@ -1205,8 +1211,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Momento Difícil</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{worstIndividualHole?.playerName}</p>
-              <p className="text-rose-100 text-sm font-semibold">Hoyo {worstIndividualHole?.worstHole.holeNumber}: {worstIndividualHole?.worstHole.points} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(worstIndividualHoles)}</p>
+              <p className="text-rose-100 text-sm font-semibold">{worstIndividualHoles.map(entry => `${entry.playerName}: Hoyo ${entry.worstHole.holeNumber}`).join(' · ')} · {worstIndividualHoles[0]?.worstHole.points} pts</p>
             </div>
 
             <div className="bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
@@ -1219,8 +1225,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Birdie King</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{birdieKing?.playerName}</p>
-              <p className="text-amber-100 text-sm font-semibold">{birdieKing?.birdies} birdies</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(birdieKings)}</p>
+              <p className="text-amber-100 text-sm font-semibold">{birdieKings[0]?.birdies} birdies</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
@@ -1233,8 +1239,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Mayor Variación</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{rollerCoaster?.playerName}</p>
-              <p className="text-purple-100 text-sm font-semibold">Diferencia: {rollerCoaster?.variability} pts</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(rollerCoasters)}</p>
+              <p className="text-purple-100 text-sm font-semibold">Diferencia: {rollerCoasters[0]?.variability} pts</p>
             </div>
 
             <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
@@ -1247,8 +1253,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Rey de +1</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{bogeyKing?.playerName}</p>
-              <p className="text-orange-100 text-sm font-semibold">{bogeyKing?.bogeys} bogeys</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(bogeyKings)}</p>
+              <p className="text-orange-100 text-sm font-semibold">{bogeyKings[0]?.bogeys} bogeys</p>
             </div>
 
             <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-3 shadow-xl transform transition-all hover:scale-105 hover:rotate-1">
@@ -1261,8 +1267,8 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   <p className="text-white font-black text-xs leading-tight">Rey del Bosque</p>
                 </div>
               </div>
-              <p className="text-white text-base font-black leading-tight break-words">{doubleBogeyKing?.playerName}</p>
-              <p className="text-red-100 text-sm font-semibold">{doubleBogeyKing?.doubleBogeyPlus} doble bogeys+</p>
+              <p className="text-white text-base font-black leading-tight break-words">{namesOf(doubleBogeyKings)}</p>
+              <p className="text-red-100 text-sm font-semibold">{doubleBogeyKings[0]?.doubleBogeyPlus} doble bogeys+</p>
             </div>
           </div>
 
@@ -1295,19 +1301,21 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             {isMatchMode && matchResult && (
               <div className="flex items-center justify-between gap-6 mb-8 bg-slate-800/80 p-6 rounded-2xl border border-red-500/30">
                 <div className="flex-1 text-center bg-amber-500/20 p-6 rounded-xl border-2 border-amber-400">
-                  <span className="text-amber-300 text-xs font-black uppercase">Ganador</span>
+                  <span className="text-amber-300 text-xs font-black uppercase">{matchResult.isTie ? 'Empate' : 'Ganador'}</span>
                   <h2 className="text-3xl font-black text-white mt-1">{matchResult.winner?.name || '—'}</h2>
+                  <p className="text-sm font-bold text-amber-200">HCP {matchResult.winner?.playing_handicap ?? 0}</p>
                   <p className="text-5xl font-black text-amber-400 mt-2">{matchResult.winnerPoints} <span className="text-sm">pts</span></p>
                 </div>
 
                 <div className="text-center px-4">
                   <div className="bg-red-600 text-white font-black text-2xl px-6 py-2 rounded-xl">VS</div>
-                  <p className="text-white font-bold text-lg mt-2">+{matchResult.margin} <span className="text-xs text-white/60">dif</span></p>
+                  <p className="text-white font-bold text-lg mt-2">{matchResult.isTie ? '0' : `+${matchResult.margin}`} <span className="text-xs text-white/60">{matchResult.isTie ? 'emp' : 'dif'}</span></p>
                 </div>
 
                 <div className="flex-1 text-center bg-slate-700/40 p-6 rounded-xl border border-slate-600">
-                  <span className="text-slate-400 text-xs font-black uppercase">Perdedor</span>
+                  <span className="text-slate-400 text-xs font-black uppercase">{matchResult.isTie ? 'Empate' : 'Perdedor'}</span>
                   <h2 className="text-3xl font-black text-white mt-1">{matchResult.loser?.name || '—'}</h2>
+                  <p className="text-sm font-bold text-slate-300">HCP {matchResult.loser?.playing_handicap ?? 0}</p>
                   <p className="text-5xl font-black text-white mt-2">{matchResult.loserPoints} <span className="text-sm">pts</span></p>
                 </div>
               </div>
@@ -1324,6 +1332,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
                           : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </h2>
+                      <p className="text-sm font-bold text-amber-200">HCP {teamResult.winningTeam?.handicap ?? 0}</p>
                     </div>
                   </div>
                   <p className="text-5xl font-black text-amber-400 mt-auto">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
@@ -1343,6 +1352,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
                           : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </h2>
+                      <p className="text-sm font-bold text-slate-300">HCP {teamResult.losingTeam?.handicap ?? 0}</p>
                     </div>
                   </div>
                   <p className="text-5xl font-black text-white mt-auto">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
@@ -1352,19 +1362,19 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
 
             {(isStablefordMode || isSindicatoMode) && (
               <div className="grid grid-cols-3 gap-6 mb-8">
-                {ranking.slice(0, 3).map((entry, index) => (
+                {ranking.map((entry, index) => ({ entry, index, position: rankingPosition(index) })).filter(item => item.position <= 3).map(({ entry, index, position }) => (
                   <div 
                     key={entry.player.id} 
                     className={`p-6 rounded-2xl border-2 text-center ${
-                      index === 0 
-                        ? 'bg-amber-500/20 border-yellow-400' 
-                        : index === 1 
+                      position === 1
+                        ? 'bg-amber-500/20 border-yellow-400'
+                        : position === 2
                         ? 'bg-slate-700/40 border-slate-400' 
                         : 'bg-orange-600/20 border-orange-400'
                     }`}
                   >
                     <span className="text-xs font-black uppercase tracking-wider text-slate-300">
-                      Puesto {index + 1}
+                      Puesto {position}
                     </span>
                     <h2 className="text-2xl font-black text-white mt-1">{entry.player.name}</h2>
                     <p className="text-4xl font-black text-emerald-400 mt-2">{entry.totalPoints} <span className="text-sm">pts</span></p>
@@ -1377,38 +1387,38 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="bg-blue-600/30 border border-blue-500 p-4 rounded-xl">
                 <p className="text-blue-300 text-xs font-bold uppercase">Mejor Hoyo</p>
-                <h4 className="text-xl font-black text-white mt-1">{bestIndividualHole?.playerName}</h4>
-                <p className="text-blue-200 font-bold">Hoyo {bestIndividualHole?.bestHole.holeNumber}: {bestIndividualHole?.bestHole.points} pts</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(bestIndividualHoles)}</h4>
+                <p className="text-blue-200 font-bold">{bestIndividualHoles.map(entry => `${entry.playerName}: Hoyo ${entry.bestHole.holeNumber}`).join(' · ')} · {bestIndividualHoles[0]?.bestHole.points} pts</p>
               </div>
 
               <div className="bg-rose-600/30 border border-rose-500 p-4 rounded-xl">
                 <p className="text-rose-300 text-xs font-bold uppercase">Peor Hoyo</p>
-                <h4 className="text-xl font-black text-white mt-1">{worstIndividualHole?.playerName}</h4>
-                <p className="text-rose-200 font-bold">Hoyo {worstIndividualHole?.worstHole.holeNumber}: {worstIndividualHole?.worstHole.points} pts</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(worstIndividualHoles)}</h4>
+                <p className="text-rose-200 font-bold">{worstIndividualHoles.map(entry => `${entry.playerName}: Hoyo ${entry.worstHole.holeNumber}`).join(' · ')} · {worstIndividualHoles[0]?.worstHole.points} pts</p>
               </div>
 
               <div className="bg-amber-600/30 border border-amber-500 p-4 rounded-xl">
                 <p className="text-amber-300 text-xs font-bold uppercase">Birdie King</p>
-                <h4 className="text-xl font-black text-white mt-1">{birdieKing?.playerName}</h4>
-                <p className="text-amber-200 font-bold">{birdieKing?.birdies} birdies</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(birdieKings)}</h4>
+                <p className="text-amber-200 font-bold">{birdieKings[0]?.birdies} birdies</p>
               </div>
 
               <div className="bg-purple-600/30 border border-purple-500 p-4 rounded-xl">
                 <p className="text-purple-300 text-xs font-bold uppercase">Montaña Rusa</p>
-                <h4 className="text-xl font-black text-white mt-1">{rollerCoaster?.playerName}</h4>
-                <p className="text-purple-200 font-bold">Diferencia: {rollerCoaster?.variability} pts</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(rollerCoasters)}</h4>
+                <p className="text-purple-200 font-bold">Diferencia: {rollerCoasters[0]?.variability} pts</p>
               </div>
 
               <div className="bg-orange-600/30 border border-orange-500 p-4 rounded-xl">
                 <p className="text-orange-300 text-xs font-bold uppercase">Rey de +1</p>
-                <h4 className="text-xl font-black text-white mt-1">{bogeyKing?.playerName}</h4>
-                <p className="text-orange-200 font-bold">{bogeyKing?.bogeys} bogeys</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(bogeyKings)}</h4>
+                <p className="text-orange-200 font-bold">{bogeyKings[0]?.bogeys} bogeys</p>
               </div>
 
               <div className="bg-red-600/30 border border-red-500 p-4 rounded-xl">
                 <p className="text-red-300 text-xs font-bold uppercase">Rey del Bosque</p>
-                <h4 className="text-xl font-black text-white mt-1">{doubleBogeyKing?.playerName}</h4>
-                <p className="text-red-200 font-bold">{doubleBogeyKing?.doubleBogeyPlus} dobles+</p>
+                <h4 className="text-xl font-black text-white mt-1">{namesOf(doubleBogeyKings)}</h4>
+                <p className="text-red-200 font-bold">{doubleBogeyKings[0]?.doubleBogeyPlus} dobles+</p>
               </div>
             </div>
 

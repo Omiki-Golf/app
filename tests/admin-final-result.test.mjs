@@ -24,6 +24,16 @@ test('match tie is won by the lower handicap', () => {
   const result = calculateFinalResult('match', players, { a: scores(1, 0), b: scores(0, 1) });
   assert.equal(result.winnerLabel, 'Bea');
   assert.equal(result.decidedByHandicap, true);
+  assert.equal(result.isTie, false);
+});
+
+test('match with equal points and equal handicap is a real tie', () => {
+  const players = [player('a', 'Ana', 12), player('b', 'Bea', 12)];
+  const result = calculateFinalResult('match', players, { a: scores(1, 0), b: scores(0, 1) });
+  assert.equal(result.isTie, true);
+  assert.equal(result.winnerLabel, 'Ana y Bea');
+  assert.equal(result.resultText, 'Empate');
+  assert.equal(result.decidedByHandicap, false);
 });
 
 test('sindicato ranks first, second and third with handicap tie-break', () => {

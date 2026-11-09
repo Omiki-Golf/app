@@ -4,6 +4,7 @@ import { GolfRound, RoundPlayer, RoundScore, GameMode } from '../types';
 import { Trophy, Medal, Eye, RefreshCw, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ThemeToggle } from './ThemeToggle';
+import { competitionPosition } from '../utils/ranking';
 
 interface LeaderboardProps {
   players: RoundPlayer[];
@@ -260,7 +261,8 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
               <>
                 <div className="space-y-3">
                   {entries.map((entry, index) => {
-                    const style = getPodiumRankStyle(index, entries.length);
+                    const position = competitionPosition(entries, index, (a, b) => a.totalPoints === b.totalPoints && a.handicap === b.handicap);
+                    const style = getPodiumRankStyle(position - 1, entries.length);
                     return (
                       <div
                         key={entry.key}

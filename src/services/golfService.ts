@@ -36,6 +36,7 @@ import { storageUtils } from '../utils/storage';
 import { generateAccessCode } from '../utils/accessCode';
 import { ensureExpressIdentity } from './expressIdentity';
 import { findLatestPlayingHandicap, type CareerAccount } from '../utils/careerStats';
+import { competitionPosition } from '../utils/ranking';
 
 const getRoundOwnerId = async (): Promise<string> => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -2075,7 +2076,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }
 
     const finalRanking = sortedPlayers.map((player, index) => ({
-      position: index + 1,
+      position: competitionPosition(sortedPlayers, index, (a, b) => a.totalPoints === b.totalPoints && a.playingHandicap === b.playingHandicap),
       player_name: player.playerName,
       player_id: player.playerId,
       player_db_id: player.playerDbId,
@@ -3328,8 +3329,11 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
     }
 
     // Awards comunes
-    const reyDelBosque = [...playerRankings].sort((a, b) => b.doubleBogeysOrWorse - a.doubleBogeysOrWorse)[0];
-    const noPasoRojas = [...playerRankings].sort((a, b) => b.noPasoRojasCount - a.noPasoRojasCount)[0];
+    const maxDoubleBogeys = Math.max(0, ...playerRankings.map(player => player.doubleBogeysOrWorse));
+    const maxNoPasoRojas = Math.max(0, ...playerRankings.map(player => player.noPasoRojasCount));
+    const negativeHandicapOrder = (a: typeof playerRankings[number], b: typeof playerRankings[number]) => b.player.playing_handicap - a.player.playing_handicap;
+    const reyDelBosque = playerRankings.filter(player => player.doubleBogeysOrWorse === maxDoubleBogeys).sort(negativeHandicapOrder);
+    const noPasoRojas = playerRankings.filter(player => player.noPasoRojasCount === maxNoPasoRojas).sort(negativeHandicapOrder);
     const holeInOneWinners = playerRankings.filter(p => p.holeInOnes > 0);
 
     let hoyoMuerte = null;
@@ -3365,8 +3369,8 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
     }
 
     const baseAwards = {
-      reyDelBosque: reyDelBosque?.doubleBogeysOrWorse > 0 ? { player: reyDelBosque.player, count: reyDelBosque.doubleBogeysOrWorse } : null,
-      noPasoRojas: noPasoRojas?.noPasoRojasCount > 0 ? { player: noPasoRojas.player, count: noPasoRojas.noPasoRojasCount } : null,
+      reyDelBosque: maxDoubleBogeys > 0 ? { players: reyDelBosque.map(entry => entry.player), count: maxDoubleBogeys } : null,
+      noPasoRojas: maxNoPasoRojas > 0 ? { players: noPasoRojas.map(entry => entry.player), count: maxNoPasoRojas } : null,
       holeInOne: holeInOneWinners.length > 0 ? { players: holeInOneWinners.map(p => ({ player: p.player, count: p.holeInOnes })) } : null,
       hoyoMuerte,
       hoyoGloria,
@@ -3379,9 +3383,12 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
       const winner = playerRankings.find(entry => entry.player.id === frozenWinnerId) || playerRankings[0];
       const loser = playerRankings.find(entry => entry.player.id !== winner?.player.id) || playerRankings[1];
       const margin = winner && loser ? winner.totalPoints - loser.totalPoints : 0;
+      const isTie = !decidedResult && margin === 0
+        && winner?.player.playing_handicap === loser?.player.playing_handicap;
       return {
         ranking: playerRankings,
         matchResult: {
+          isTie,
           winner: winner?.player || null,
           loser: loser?.player || null,
           winnerPoints: winner?.totalPoints || 0,
@@ -3389,7 +3396,7 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
           margin: decidedResult?.margin ?? margin,
           displayText: decidedResult && decidedResult.holes_remaining > 0
             ? decidedResult.display_text
-            : (margin > 0 ? `${margin} UP` : null),
+            : (isTie ? 'Empate' : margin > 0 ? `${margin} UP` : null),
         },
         awards: baseAwards,
       };
@@ -3444,8 +3451,9 @@ async getQuickPlayCompletedRound(roundId?: string): Promise<QuickPlayCompletedRo
         teamRanking,
         teamResult: {
           isTie,
-          winningTeam: isTie ? null : teamRanking[0],
-          losingTeam: isTie ? null : teamRanking[1],
+          // En empate se conservan ambas parejas para poder mostrarlas, sin etiquetar ganadora.
+          winningTeam: teamRanking[0],
+          losingTeam: teamRanking[1],
           margin: decidedResult?.margin ?? (isTie ? 0 : margin),
           displayText: decidedResult && decidedResult.holes_remaining > 0
             ? decidedResult.display_text

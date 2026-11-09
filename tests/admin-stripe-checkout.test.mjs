@@ -73,3 +73,12 @@ test('Stripe database: browser cannot grant plans, checkout retries reuse attemp
   assert.equal((await db.query('SELECT * FROM public.user_subscriptions WHERE user_id=$1',[intent])).rows.length,0);
  } finally {await db.close();}
 });
+
+test('Player to Team upgrades reuse the Stripe subscription and prorate without resetting its billing cycle',async()=>{
+ const source=await readFile(new URL('../supabase/functions/stripe-checkout/index.ts',import.meta.url),'utf8');
+ assert.match(source,/stripe\.subscriptions\.update\(subscription\.id/);
+ assert.match(source,/proration_behavior:'always_invoice'/);
+ assert.match(source,/payment_behavior:'error_if_incomplete'/);
+ assert.doesNotMatch(source,/billing_cycle_anchor\s*:/);
+ assert.match(source,/Elige la misma periodicidad que tu plan Player actual/);
+});

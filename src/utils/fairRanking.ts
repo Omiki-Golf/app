@@ -40,7 +40,7 @@ export const toFairEntries = <T extends FairRankingSource>(rows: T[], getValue: 
  * Ordena por promedio por partida (justa) o por total (absoluta). Con lowerIsBetter gana el valor más bajo
  * (p. ej. «Driver de Oro»). Desempates: la otra medida, más partidas jugadas y menor hándicap.
  */
-export const sortRanking = (entries: FairRankingEntry[], mode: RankingMode, lowerIsBetter = false): FairRankingEntry[] => {
+export const sortRanking = (entries: FairRankingEntry[], mode: RankingMode, lowerIsBetter = false, handicapOrder: 'lower' | 'higher' = 'lower'): FairRankingEntry[] => {
   const direction = lowerIsBetter ? 1 : -1;
   const metric = (entry: FairRankingEntry, which: RankingMode) => which === 'fair' ? entry.average : entry.total;
   const compareBy = (a: FairRankingEntry, b: FairRankingEntry, which: RankingMode) => {
@@ -49,18 +49,18 @@ export const sortRanking = (entries: FairRankingEntry[], mode: RankingMode, lowe
     if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
     return (left - right) * direction;
   };
-  return [...entries].sort((a, b) =>
-    compareBy(a, b, mode)
-    || compareBy(a, b, mode === 'fair' ? 'absolute' : 'fair')
-    || b.rounds - a.rounds
-    || (a.handicap ?? Infinity) - (b.handicap ?? Infinity)
-    || a.name.localeCompare(b.name));
+  return entries.map((entry, index) => ({ entry, index })).sort((a, b) =>
+    compareBy(a.entry, b.entry, mode)
+    || (handicapOrder === 'lower'
+      ? (a.entry.handicap ?? Infinity) - (b.entry.handicap ?? Infinity)
+      : (b.entry.handicap ?? -Infinity) - (a.entry.handicap ?? -Infinity))
+    || a.index - b.index).map(item => item.entry);
 };
 
 /** Los dos campeones de una tarjeta: el del total absoluto y el del promedio por partida. */
-export const awardChampions = (entries: FairRankingEntry[], lowerIsBetter = false) => ({
-  absolute: sortRanking(entries, 'absolute', lowerIsBetter)[0] ?? null,
-  fair: sortRanking(entries, 'fair', lowerIsBetter)[0] ?? null,
+export const awardChampions = (entries: FairRankingEntry[], lowerIsBetter = false, handicapOrder: 'lower' | 'higher' = 'lower') => ({
+  absolute: sortRanking(entries, 'absolute', lowerIsBetter, handicapOrder)[0] ?? null,
+  fair: sortRanking(entries, 'fair', lowerIsBetter, handicapOrder)[0] ?? null,
 });
 
 const averageFormat = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

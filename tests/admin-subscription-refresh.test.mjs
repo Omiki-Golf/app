@@ -14,6 +14,7 @@ function harness({ profile = { nick: 'Jugador' }, fail = false } = {}) {
   let index = 0;
   let profileCalls = 0;
   let planCalls = 0;
+  const subscription = { plan_type: 'player', status: 'active', current_period_end: '2027-01-01', team_trial_ends_at: null };
   let user = { id: 'account', user_metadata: { registration_pending: true } };
   const context = vm.createContext({
     useState(initial) { const slot = index++; state[slot] = initial; return [initial, value => { state[slot] = value; }]; },
@@ -31,12 +32,13 @@ function harness({ profile = { nick: 'Jugador' }, fail = false } = {}) {
         return profile;
       },
       async getProfile() { throw new Error('Duplicate profile request'); },
-      async getPlanType() { planCalls++; return 'player'; },
+      async getSubscription() { planCalls++; return subscription; },
     },
+    effectivePlan: value => value?.plan_type ?? 'express',
   });
   vm.runInContext(script, context);
   const hook = context.useSubscription('account');
-  return { refresh: hook.refresh, state, calls: () => [profileCalls, planCalls], signOut: () => { user = null; } };
+  return { refresh: hook.refresh, state, subscription, calls: () => [profileCalls, planCalls], signOut: () => { user = null; } };
 }
 
 test('each refresh reuses the ensured profile and still checks the current plan', async () => {
@@ -47,7 +49,8 @@ test('each refresh reuses the ensured profile and still checks the current plan'
   assert.deepEqual(h.calls(), [2, 2]);
   assert.equal(h.state[3], profile);
   assert.equal(h.state[0], 'player');
-  assert.equal(h.state[4], 'account');
+  assert.equal(h.state[4], h.subscription);
+  assert.equal(h.state[5], 'account');
 });
 
 test('a newly provisioned profile is used immediately and a missing profile remains null', async () => {
@@ -63,7 +66,7 @@ test('profile errors fail closed without a plan request', async () => {
   const h = harness({ fail: true });
   await h.refresh();
   assert.equal(h.state[0], 'express');
-  assert.equal(h.state[4], null);
+  assert.equal(h.state[5], null);
   assert.equal(h.state[2], false);
   assert.deepEqual(h.calls(), [1, 0]);
 });
@@ -74,6 +77,7 @@ test('signing out clears the prior profile without further profile or plan reque
   h.signOut();
   await h.refresh();
   assert.equal(h.state[3], null);
+  assert.equal(h.state[4], null);
   assert.equal(h.state[0], 'express');
   assert.deepEqual(h.calls(), [1, 1]);
 });

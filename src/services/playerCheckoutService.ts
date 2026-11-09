@@ -31,8 +31,12 @@ export const playerCheckoutService = {
     };
     const subscription = await read();
     const completed = !!subscription?.stripe_subscription_id && subscription.stripe_intent_id === intent.id && subscription.plan_type === intentPlan(intent) && subscription.status === 'active' && new Date(subscription.current_period_end).getTime() > Date.now();
-    const existingPaidPlan = !!subscription && (!!subscription.stripe_subscription_id || (subscription.status === 'active' && ['player','team','premium'].includes(subscription.plan_type) && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now())));
-    return { user, intent, profile, subscription, completed, readOnly, existingPaidPlan };
+    const ranks: Record<string, number> = { player: 1, team: 2, premium: 3 };
+    const isUpgrade = !!subscription?.stripe_subscription_id && subscription.status === 'active'
+      && (ranks[intentPlan(intent)] ?? 0) > (ranks[subscription.plan_type] ?? 0)
+      && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now());
+    const existingPaidPlan = !!subscription && !isUpgrade && (!!subscription.stripe_subscription_id || (subscription.status === 'active' && ['player','team','premium'].includes(subscription.plan_type) && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now())));
+    return { user, intent, profile, subscription, completed, readOnly, existingPaidPlan, isUpgrade };
   },
   async activate(expectedUserId: string) {
     const state = await this.load(expectedUserId);

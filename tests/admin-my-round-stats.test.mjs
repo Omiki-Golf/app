@@ -25,7 +25,7 @@ const scores = [
 ];
 const summary = {
   ranking: [{ player: ana }, { player: me }],
-  awards: { reyDelBosque: { player: ana, count: 1 }, noPasoRojas: { player: me, count: 1 }, holeInOne: null, hoyoMuerte: null, hoyoGloria: null, laPaliza: null },
+  awards: { reyDelBosque: { players: [ana], count: 1 }, noPasoRojas: { players: [me], count: 1 }, holeInOne: null, hoyoMuerte: null, hoyoGloria: null, laPaliza: null },
 };
 
 test('my round stats describe only how the account player played', () => {
