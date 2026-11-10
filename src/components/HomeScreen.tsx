@@ -1,6 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
-import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical, Crown } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -9,7 +9,6 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 
 type GroupAccess = 'owner' | 'admin' | 'member';
 const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
-const ROLE_BADGE = 'shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] uppercase tracking-wide';
 
 interface HomeScreenProps {
   planType: PlanType;
@@ -167,9 +166,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             >
               <Users className="w-6 h-6" aria-hidden="true" />
               <span className="min-w-0 truncate">{group.name}</span>
-              {group.access === 'owner' && <span className={ROLE_BADGE}>Creador</span>}
-              {group.access === 'admin' && <span className={ROLE_BADGE}>Administrador</span>}
-              {group.access === 'member' && <span className={ROLE_BADGE}>Miembro</span>}
+              {group.access === 'owner' && <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>}
+              {group.access === 'admin' && <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
             </WriteButton>;
           })}
 

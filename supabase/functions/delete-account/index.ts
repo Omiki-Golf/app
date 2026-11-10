@@ -4,7 +4,7 @@ import { rateLimit } from '../_shared/admin.ts';
 
 // Baja inmediata de la cuenta que hace la petición:
 // 1) cancela la suscripción de Stripe para que no siga cobrando,
-// 2) anonimiza sus datos y traspasa sus grupos (delete_account_data),
+// 2) elimina sus datos personales, anonimiza los resultados y traspasa sus grupos,
 // 3) borra la cuenta de acceso.
 const CONFIRMATION = 'ELIMINAR CUENTA';
 
@@ -57,9 +57,9 @@ Deno.serve(async req => {
       }
     }
 
-    stage = 'anonymize';
-    const { data: summary, error: anonymizeError } = await service.rpc('delete_account_data', { p_user: user.id });
-    if (anonymizeError) throw new Error(anonymizeError.message);
+    stage = 'delete-data';
+    const { data: summary, error: deleteDataError } = await service.rpc('delete_account_data', { p_user: user.id });
+    if (deleteDataError) throw new Error(deleteDataError.message);
 
     stage = 'auth';
     const { error: deleteError } = await service.auth.admin.deleteUser(user.id);

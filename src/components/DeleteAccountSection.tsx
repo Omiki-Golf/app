@@ -57,7 +57,7 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: (
   return (
     <section className="mt-7 border-t border-line pt-6" aria-labelledby="delete-account-title">
       <h2 id="delete-account-title" className="text-lg font-bold text-ink">Darse de baja</h2>
-      <p className="mt-1 text-sm text-ink-3">Elimina tu cuenta y tus datos personales. Tus resultados se quedan en los grupos para no alterar sus clasificaciones.</p>
+      <p className="mt-1 text-sm text-ink-3">Elimina inmediatamente tu cuenta y tus datos personales. Los resultados necesarios para las clasificaciones quedan completamente anónimos.</p>
       <button type="button" onClick={() => void start()} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50">
         <Trash2 size={16} aria-hidden="true" />
         Darme de baja
@@ -85,8 +85,8 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: (
                   <ul className="list-disc space-y-1 pl-5">
                     <li>Se borran tu cuenta, tu perfil, tus avisos y tus invitaciones.</li>
                     <li>Si tienes una suscripción, se cancela y no se volverá a cobrar.</li>
-                    <li>Tus resultados se quedan en los grupos con tu nombre marcado con * (por ejemplo, <span className="text-ink-4">Fede*</span>).</li>
-                    <li>Tu nick quedará reservado 6 meses; después podrá usarlo otra persona.</li>
+                    <li>Tu nombre desaparece del historial; los resultados necesarios se muestran como «Jugador eliminado».</li>
+                    <li>Tu nick queda libre inmediatamente y podrá utilizarlo otra persona.</li>
                   </ul>
                 </div>
 

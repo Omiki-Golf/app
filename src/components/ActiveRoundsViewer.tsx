@@ -682,33 +682,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                     {currentGroup && <Eye className="text-accent-ink" size={24} />}
                   </button>
 
-                  {/* Acciones de la partida (grupos): fuera del botón de la cabecera. */}
-                  {currentGroup && (
-                    <div className="flex items-center justify-end gap-2 border-t border-line px-4 py-2 md:px-6">
-                      {isCompleted && (
-                        <WriteButton
-                          onClick={() => setRoundToArchive(roundStats.round.id)}
-                          disabled={loading}
-                          className="text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
-                          title="Archivar partida"
-                        >
-                          <Archive size={16} />
-                          <span>Archivar partida</span>
-                        </WriteButton>
-                      )}
-                      <WriteButton
-                        onClick={() => handleDeleteRoundClick(roundStats.round.id)}
-                        disabled={loading}
-                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 text-sm font-semibold"
-                        title="Borrar partida"
-                        aria-label="Borrar partida"
-                      >
-                        <Trash2 size={16} />
-                        <span>Borrar partida</span>
-                      </WriteButton>
-                    </div>
-                  )}
-
                   {isExpanded && !isCompleted && (
                     <div className="border-t bg-card-2 p-4 md:p-6 space-y-4">
                       <div>
@@ -835,6 +808,17 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           </WriteButton>
                         )}
 
+                        {currentGroup && (
+                          <WriteButton
+                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                            disabled={loading}
+                            className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={20} />
+                            Borrar partida
+                          </WriteButton>
+                        )}
+
                       </div>
                     </div>
                   )}
@@ -900,7 +884,6 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados
                           </button>
                         )}
-                        {/* En grupos, Archivar y Borrar están en la barra de acciones de la partida. */}
                         {!currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => setRoundToArchive(roundStats.round.id)}
@@ -921,6 +904,26 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             <Eye size={20} />
                             Ver Resultados Completos
                           </button>
+                        )}
+                        {currentGroup && (
+                          <WriteButton
+                            onClick={() => setRoundToArchive(roundStats.round.id)}
+                            disabled={loading}
+                            className="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Archive size={20} />
+                            Archivar partida
+                          </WriteButton>
+                        )}
+                        {currentGroup && (
+                          <WriteButton
+                            onClick={() => handleDeleteRoundClick(roundStats.round.id)}
+                            disabled={loading}
+                            className="w-full sm:flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Trash2 size={20} />
+                            Borrar partida
+                          </WriteButton>
                         )}
                         {!currentGroup && (isRoundCreator || isLinkedGuest) && (
                           <WriteButton

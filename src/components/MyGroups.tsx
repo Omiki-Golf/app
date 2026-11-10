@@ -259,7 +259,11 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-ink text-lg break-words">{group.name}</h3>
-                      <p className="text-xs font-medium text-ink-3">{accessLabel[group.access]}</p>
+                      <p className="flex items-center gap-1 text-xs font-medium text-ink-3">
+                        {group.access === 'owner' && <span className="relative inline-block h-4 w-6 text-amber-500" aria-hidden="true"><Crown size={14} fill="currentColor" className="absolute left-0 top-0.5" /><Crown size={14} fill="currentColor" className="absolute right-0 top-0" /></span>}
+                        {group.access === 'admin' && <Crown size={14} fill="currentColor" className="text-amber-500" aria-hidden="true" />}
+                        {accessLabel[group.access]}
+                      </p>
                       {group.archived_at && <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800">Archivado</span>}
                     </div>
                     {(group.access === 'owner' || group.access === 'admin') && (

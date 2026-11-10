@@ -4,7 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 
-const migration = await readFile(new URL('../supabase/migrations/20261025100000_account_deletion.sql', import.meta.url), 'utf8');
+const migration = [
+  await readFile(new URL('../supabase/migrations/20261025100000_account_deletion.sql', import.meta.url), 'utf8'),
+  await readFile(new URL('../supabase/migrations/20261110100000_immediate_account_deletion.sql', import.meta.url), 'utf8'),
+].join('\n');
 
 // Esquema mínimo con las protecciones reales que afectan a la baja.
 const schema = `
@@ -54,7 +57,7 @@ const triggers = `
   CREATE TRIGGER linked_handicap_ledger BEFORE INSERT OR DELETE OR UPDATE ON public.handicap_adjustments FOR EACH ROW EXECUTE FUNCTION public.guard_linked_handicap_ledger();
 `;
 
-test('account deletion anonymizes results, hands groups over and reserves the nick', async () => {
+test('account deletion removes the name immediately, hands groups over and releases the nick', async () => {
   const db = new PGlite();
   const [fede, admin, member, rival, groupA, groupB] = Array.from({ length: 6 }, () => randomUUID());
   const ids = { fede, admin, member, rival };
@@ -108,13 +111,13 @@ test('account deletion anonymizes results, hands groups over and reserves the ni
       [rival, 'TERRASSES se ha quedado sin creador'],
     ].sort());
 
-    // Resultados conservados con el nombre marcado y sin cuenta.
-    assert.deepEqual((await db.query('SELECT name, auth_user_id FROM public.players')).rows, [{ name: 'Fede*', auth_user_id: null }]);
-    assert.deepEqual((await db.query('SELECT name, user_id FROM public.round_players')).rows, [{ name: 'Fede*', user_id: null }]);
+    // Resultados conservados sin nombre ni cuenta.
+    assert.deepEqual((await db.query('SELECT name, auth_user_id FROM public.players')).rows, [{ name: 'Jugador eliminado', auth_user_id: null }]);
+    assert.deepEqual((await db.query('SELECT name, user_id FROM public.round_players')).rows, [{ name: 'Jugador eliminado', user_id: null }]);
     const ranking = (await db.query('SELECT final_ranking FROM public.archived_rounds')).rows[0].final_ranking;
-    assert.deepEqual(ranking.map((row) => row.player_name), ['Fede*', 'Pepe']);
-    assert.equal((await db.query('SELECT player_name FROM public.daily_rankings')).rows[0].player_name, 'Fede*');
-    assert.equal((await db.query('SELECT player_name FROM public.handicap_adjustments')).rows[0].player_name, 'Fede*');
+    assert.deepEqual(ranking.map((row) => row.player_name), ['Jugador eliminado', 'Pepe']);
+    assert.equal((await db.query('SELECT player_name FROM public.daily_rankings')).rows[0].player_name, 'Jugador eliminado');
+    assert.equal((await db.query('SELECT player_name FROM public.handicap_adjustments')).rows[0].player_name, 'Jugador eliminado');
     assert.equal((await db.query('SELECT created_by FROM public.golf_rounds')).rows[0].created_by, null);
     assert.equal((await db.query('SELECT purchased_by FROM public.pro_shop_purchases')).rows[0].purchased_by, null);
     for (const table of ['user_profiles', 'user_subscriptions', 'group_invitations']) {
@@ -122,9 +125,9 @@ test('account deletion anonymizes results, hands groups over and reserves the ni
     }
     assert.equal((await db.query('SELECT count(*)::int AS n FROM public.group_members WHERE user_id = $1', [fede])).rows[0].n, 0);
 
-    // Nick reservado: ni disponible ni registrable.
-    assert.equal((await db.query("SELECT public.is_nick_available('fede') AS ok")).rows[0].ok, false);
-    await assert.rejects(db.query("INSERT INTO public.user_profiles(user_id, nick) VALUES ($1, 'FEDE')", [rival]), /no está disponible/);
+    // El nick queda libre en la misma transacción.
+    assert.equal((await db.query("SELECT public.is_nick_available('fede') AS ok")).rows[0].ok, true);
+    await db.query("INSERT INTO public.user_profiles(user_id, nick) VALUES ($1, 'FEDE')", [rival]);
 
     // La cuenta de acceso ya se puede borrar sin arrastrar partidas ni resultados.
     await db.query('DELETE FROM auth.users WHERE id = $1', [fede]);
