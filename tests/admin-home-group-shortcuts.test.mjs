@@ -26,3 +26,21 @@ test('home group shortcuts show two crowns for creator, one for admin and none f
   assert.match(source, /group\.access === 'admin' && <Crown/);
   assert.doesNotMatch(source, /group\.access === 'member' &&/);
 });
+
+test('home content starts with extra space below the top icon row', async () => {
+  const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  assert.match(source, /relative mb-8 flex items-center justify-between gap-3/);
+});
+
+test('the shared app link and QR always default to the production app domain', async () => {
+  const source = await readFile(new URL('../src/components/ShareModal.tsx', import.meta.url), 'utf8');
+  assert.match(source, /const OMIKI_APP_URL = 'https:\/\/app\.omikigolf\.com'/);
+  assert.match(source, /shareUrl = OMIKI_APP_URL/);
+  assert.doesNotMatch(source, /shareUrl = window\.location\.origin/);
+});
+
+test('adding a player does not flash a light handicap input in dark mode', async () => {
+  const source = await readFile(new URL('../src/components/PlayerSetup.tsx', import.meta.url), 'utf8');
+  assert.match(source, /className="w-full bg-card px-4 py-3 text-ink/);
+  assert.doesNotMatch(source, /disabled:bg-gray-100/);
+});

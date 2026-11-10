@@ -71,7 +71,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
       <div className="max-w-md w-full">
         {/* Top bar */}
-        <div className="relative mb-5 flex items-center justify-between gap-3">
+        <div className="relative mb-8 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 max-[360px]:gap-1">
             <button
               type="button"

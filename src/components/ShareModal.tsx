@@ -10,9 +10,11 @@ interface ShareModalProps {
   title?: string;
 }
 
+const OMIKI_APP_URL = 'https://app.omikigolf.com';
+
 export default function ShareModal({ 
   onClose, 
-  shareUrl = window.location.origin, 
+  shareUrl = OMIKI_APP_URL,
   title
 }: ShareModalProps) {
   const { t } = useTranslation();

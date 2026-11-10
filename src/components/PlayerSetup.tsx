@@ -746,7 +746,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                 onChange={(e) => setHandicap(e.target.value)}
                 placeholder={numHoles === 9 ? "Ej: 7 (para 9 hoyos)" : "Ej: 14 (para 18 hoyos)"}
                 disabled={adding || loading || !canAddMorePlayers}
-                className="w-full px-4 py-3 border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent transition-colors disabled:bg-gray-100"
+                className="w-full bg-card px-4 py-3 text-ink border-2 border-line-2 rounded-lg focus:outline-none focus:border-accent transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               />
               {useSlope && (
                 <div className="mt-2 p-3 bg-card-2 rounded-lg border border-line">
