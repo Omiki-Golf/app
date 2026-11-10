@@ -342,22 +342,17 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
               </button>
               <div className="text-sm text-ink-3">
                 {t('auth.noAccount')}{' '}
+                {/* Sin cuenta: se elige plan primero; el registro llega desde los planes. */}
                 <button
                   type="button"
-                  onClick={() => setMode('register')}
+                  onClick={() => (onShowPlans ? onShowPlans() : setMode('register'))}
                   className="text-accent-ink hover:text-accent-ink font-medium"
                 >
-                  {t('auth.registerLink')}
+                  {onShowPlans ? t('auth.plansLink') : t('auth.registerLink')}
                 </button>
               </div>
             </div>
           </form>
-          {onShowPlans && (
-            <button type="button" onClick={onShowPlans}
-              className="mt-6 w-full rounded-xl border border-line bg-card-2 px-6 py-3 font-semibold text-ink-2 transition-colors hover:bg-neutral-hover">
-              {t('auth.plans')}
-            </button>
-          )}
         </div>
       </div>
     );

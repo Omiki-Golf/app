@@ -10,7 +10,8 @@ const intent = { id: '11111111-1111-4111-8111-111111111111', period: 'annual' };
 const fields = { nick: 'Prueba', email: 'test@example.com', password: 'Test!123', handicap: '', age: '', over14: true, acceptedTerms: true };
 test('Player registration validates credentials, age consistency and billing dates', () => {
   assert.equal(registrationError(fields), null);
-  for (const patch of [{email:''},{password:''},{password:'abcdef'},{age:'13'},{age:'20.5'},{handicap:'NaN'},{over14:false},{acceptedTerms:false}]) assert.ok(registrationError({...fields,...patch}));
+  for (const patch of [{email:''},{password:''},{password:'abcdef'},{age:'13'},{age:'20.5'},{handicap:'NaN'},{handicap:'12.4'},{handicap:'-3'},{handicap:'55'},{over14:false},{acceptedTerms:false}]) assert.ok(registrationError({...fields,...patch}));
+  for (const handicap of ['0', '18', '54']) assert.equal(registrationError({ ...fields, handicap }), null);
   assert.equal(periodEnd(new Date('2028-02-29T12:00:00Z'), 'annual'), '2029-02-28T12:00:00.000Z');
   assert.equal(periodEnd(new Date('2026-01-31T12:00:00Z'), 'monthly'), '2026-02-28T12:00:00.000Z');
   assert.equal(playerIntent({player_checkout:{...intent,period:'weekly'}}), null);

@@ -13,7 +13,8 @@ export function registrationError(fields: { nick: string; email: string; passwor
   if (fields.nick.trim().length < 3) return 'El nick debe tener al menos 3 caracteres.';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) return 'Introduce un correo válido.';
   if (fields.password.length < 6 || !/[A-Z]/.test(fields.password) || !/[a-z]/.test(fields.password) || !/[^a-zA-Z0-9]/.test(fields.password)) return 'La contraseña debe tener al menos 6 caracteres, mayúscula, minúscula y un carácter especial.';
-  if (fields.handicap && !Number.isFinite(Number(fields.handicap))) return 'Introduce un hándicap válido.';
+  // Hándicap de juego en 18 hoyos: número entero entre 0 y 54, sin decimales.
+  if (fields.handicap && (!/^\d{1,2}$/.test(fields.handicap.trim()) || Number(fields.handicap) > 54)) return 'Introduce tu hándicap de juego en 18 hoyos, sin decimales (0 a 54).';
   if (fields.age && (!Number.isInteger(Number(fields.age)) || Number(fields.age) < 14)) return 'La edad debe ser un número entero de al menos 14 años.';
   if (!fields.over14) return 'Debes confirmar que tienes al menos 14 años.';
   if (!fields.acceptedTerms) return 'Debes aceptar los términos y la política de privacidad.';

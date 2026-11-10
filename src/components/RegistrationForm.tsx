@@ -28,6 +28,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
   const [nickStatus, setNickStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [displayName, setDisplayName] = useState('');
   const [handicap, setHandicap] = useState('');
+  const [showHandicapInfo, setShowHandicapInfo] = useState(false);
   const [checkoutId] = useState(() => crypto.randomUUID());
   const submitting = useRef(false);
   const [country, setCountry] = useState('España');
@@ -215,13 +216,36 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
               />
             </div>
             <div>
-              <label htmlFor="register-handicap" className="block text-sm font-medium text-ink-2 mb-1">Handicap exacto</label>
+              <div className="mb-1 flex items-center gap-1.5">
+                <label htmlFor="register-handicap" className="block text-sm font-medium text-ink-2">Handicap de juego 18 hoyos</label>
+                <button
+                  type="button"
+                  onClick={() => setShowHandicapInfo(current => !current)}
+                  aria-expanded={showHandicapInfo}
+                  aria-controls="register-handicap-info"
+                  aria-label="Qué hándicap poner"
+                  className="rounded-full p-0.5 text-ink-3 transition-colors hover:text-ink"
+                >
+                  <Info size={15} />
+                </button>
+              </div>
+              {showHandicapInfo && (
+                <p id="register-handicap-info" className="mb-2 rounded-lg border border-line bg-card-2 p-2.5 text-xs leading-relaxed text-ink-2">
+                  Tu golf, tu hándicap, tus cervezas. Aquí no buscamos tu hándicap oficial con decimales:
+                  pon el hándicap con el que juegas 18 hoyos. El grupo lo irá ajustando partida a partida.
+                </p>
+              )}
               <input id="register-handicap"
                 type="number"
-                step="0.1"
+                inputMode="numeric"
+                step="1"
+                min="0"
+                max="54"
                 value={handicap}
-                onChange={(e) => setHandicap(e.target.value)}
-                placeholder="Ej: 12.4"
+                // Solo enteros: se descarta cualquier decimal o signo al escribir.
+                onChange={(e) => setHandicap(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                onKeyDown={(e) => { if (['.', ',', '-', '+', 'e', 'E'].includes(e.key)) e.preventDefault(); }}
+                placeholder="Ej: 18"
                 className="w-full px-4 py-2.5 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
               />
             </div>
