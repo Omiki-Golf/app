@@ -10,6 +10,7 @@ import AvatarPicker from './AvatarPicker';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { CurrencySelector } from './CurrencySelector';
 import { DeleteAccountSection } from './DeleteAccountSection';
 
 interface ProfileDetailsProps {
@@ -414,6 +415,10 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
                   <span className="font-medium text-ink-2">{t('profile.appearance')}</span>
                   <ThemeToggle alwaysVisible />
+                </div>
+                <div className="flex items-center justify-between gap-4 border-t border-line px-4 py-3">
+                  <span className="font-medium text-ink-2">{t('currency.label')}</span>
+                  <CurrencySelector />
                 </div>
               </div>
               <p className="mt-2 text-xs text-ink-3">{t('profile.preferencesHelp')}</p>

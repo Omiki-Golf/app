@@ -1354,6 +1354,7 @@ function App() {
           <TeamCreation
             userId={user.id}
             weekendUntil={subscription?.weekend_mode_until}
+            weekendActivatedAt={subscription?.updated_at}
             onBack={() => setCurrentView('main')}
             onTeamCreated={() => {
               refreshSubscription();
@@ -1451,6 +1452,8 @@ function App() {
             profile={profile}
             handicap9={latestHandicap.handicap9}
             handicap18={latestHandicap.handicap18}
+            weekendUntil={subscription?.weekend_mode_until}
+            weekendActivatedAt={subscription?.updated_at}
             onQuickPlay={() => setCurrentView('setup')}
             onJoinQuickPlay={() => {
               setPendingRoundId(null);

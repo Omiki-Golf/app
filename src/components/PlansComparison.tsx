@@ -5,7 +5,7 @@ import { planCatalog, planPrice, DisplayPlan } from '../data/planCatalog';
 import { type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
 import { ThemeToggle } from './ThemeToggle';
 import { useTranslation } from 'react-i18next';
-import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
+import { useDisplayCurrency } from './CurrencySelector';
 import { formatDisplayPrice } from '../utils/currency';
 
 interface PlansComparisonProps {
@@ -81,10 +81,8 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             </button>
           ))}
         </div>
-        <div className="mb-5">
-          <CurrencySelector />
-          {currency === 'GBP' && <p className="mt-2 text-center text-[10px] leading-relaxed text-ink-3">{t('currency.adaptive')}</p>}
-        </div>
+        {/* La moneda se elige en Mis datos de registro, junto al idioma y el tema. */}
+        {currency === 'GBP' && <p className="mb-5 text-center text-[10px] leading-relaxed text-ink-3">{t('currency.adaptive')}</p>}
         <div className="space-y-2">
           {visiblePlans.map(item => {
             const current = styles[item.id];

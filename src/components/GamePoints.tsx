@@ -386,18 +386,20 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                             return (
                               <div
                                 key={standing.playerId}
-                                className={`${colorClass} border-2 rounded-lg p-4 flex justify-between items-center`}
+                                className={`${colorClass} border-2 rounded-lg px-3 py-3 flex justify-between items-center gap-3`}
                               >
-                                <div className="flex items-center gap-3">
-                                  <span className="font-bold text-lg text-ink-2 w-8">
-                                    {position}º
-                                  </span>
-                                  <span className="font-medium text-ink">
+                                <span className="font-bold text-lg text-ink-2 w-8 shrink-0">
+                                  {position}º
+                                </span>
+                                {/* Nombre arriba; HCP e insignias debajo, para que la fila no se parta en móvil. */}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate font-medium text-ink">
                                     {standing.playerName}
                                     {standing.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
-                                  </span>
+                                  </p>
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                                   <span className="text-sm text-ink-3">
-                                    (HCP juego: {standing.playingHandicap})
+                                    HCP: {standing.playingHandicap}
                                   </span>
                                   {standing.noPasoRojasHoles && standing.noPasoRojasHoles.length > 0 && (
                                     <div className="flex items-center gap-1">
@@ -426,8 +428,9 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                       ))}
                                     </div>
                                   )}
+                                  </div>
                                 </div>
-                                <span className="text-xl font-bold text-title">
+                                <span className="shrink-0 whitespace-nowrap text-xl font-bold text-title">
                                   {standing.totalPoints} pts
                                 </span>
                               </div>

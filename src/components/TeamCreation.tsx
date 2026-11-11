@@ -6,12 +6,15 @@ import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
+import { useTranslation } from 'react-i18next';
+import { weekendDuration } from '../utils/weekendMode';
 
 interface TeamCreationProps {
   userId: string;
   onBack: () => void;
   onTeamCreated: (groupId: string) => void;
   weekendUntil?: string | null;
+  weekendActivatedAt?: string | null;
 }
 
 interface TooltipProps {
@@ -47,7 +50,9 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil }) => {
+export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt }) => {
+  const { t } = useTranslation();
+  const weekend = weekendDuration(weekendUntil, weekendActivatedAt);
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
@@ -256,7 +261,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 1: Group name + code */}
         {step === 1 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-1">Crear Team</h2>
+            <h2 className="text-xl font-bold text-ink mb-1">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t('home.createTeam')}</h2>
             <p className="text-sm text-ink-3 mb-5">Configura tu grupo de juego</p>
 
             <div className="mb-4">
@@ -278,11 +283,12 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                   value={groupCode}
                   onChange={(e) => setGroupCode(e.target.value)}
                   placeholder="Auto-generado"
-                  className="flex-1 px-4 py-2.5 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
+                  className="min-w-0 flex-1 px-4 py-2.5 border border-line-2 rounded-xl focus:ring-2 focus:ring-accent focus:border-transparent"
                 />
                 <button
+                  type="button"
                   onClick={() => setGroupCode(generateCode())}
-                  className="px-4 py-2.5 bg-card-2 hover:bg-neutral-hover rounded-xl text-sm font-medium text-ink-2"
+                  className="shrink-0 px-4 py-2.5 bg-card-2 hover:bg-neutral-hover rounded-xl text-sm font-medium text-ink-2"
                 >
                   Generar
                 </button>
@@ -302,7 +308,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 2: 3 questions */}
         {step === 2 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-5">Configuración del Team</h2>
+            <h2 className="text-xl font-bold text-ink mb-5">{weekend ? t(weekend === 90 ? 'home.configureWeekend90' : 'home.configureWeekend7') : 'Configuración del Team'}</h2>
 
             <div className="space-y-4 mb-6">
               {/* Q1: Add players now */}

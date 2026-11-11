@@ -18,7 +18,7 @@ async function setup() {
   await db.exec('GRANT USAGE ON SCHEMA public,auth TO anon,authenticated; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO anon,authenticated;');
   // Como en producción (20260915210000_group_messages): helper interno, no ejecutable con sesión.
   await db.exec('REVOKE ALL ON FUNCTION can_manage_group_messages(uuid) FROM PUBLIC, anon, authenticated;');
-  for (const file of ['20261109120000_group_gamification.sql', '20261109130000_activate_group_gamification.sql', '20261109140000_fix_group_gamification_selection.sql', '20261109150000_group_gamification_rls_helper.sql']) {
+  for (const file of ['20261109120000_group_gamification.sql', '20261109130000_activate_group_gamification.sql', '20261109140000_fix_group_gamification_selection.sql', '20261109150000_group_gamification_rls_helper.sql', '20261111120000_spanish_hand_not_default.sql']) {
     await migration(db, file);
   }
   const as = async id => {
@@ -42,8 +42,13 @@ test('Pro-Shop selection is saved only in the chosen group and deselected titles
     const saved = await rows(group);
     assert.deepEqual(saved.filter(r => r.purchased).map(r => r.product_id).sort(), ['buceador', 'minero', 'no-paso-rojas', 'spanish-hand']);
     assert.ok(saved.filter(r => r.purchased).every(r => r.enabled));
-    // El otro grupo del mismo creador no recibe la selección.
-    assert.deepEqual((await rows(otherGroup)).filter(r => r.purchased).map(r => r.product_id).sort(), ['no-paso-rojas', 'spanish-hand']);
+    // El otro grupo del mismo creador no recibe la selección: solo Rojas, incluido por defecto.
+    assert.deepEqual((await rows(otherGroup)).filter(r => r.purchased).map(r => r.product_id).sort(), ['no-paso-rojas']);
+    // Un grupo nuevo tampoco recibe Spanish Hand: se contrata desde el Pro-Shop.
+    const newGroup = randomUUID();
+    await db.exec('RESET ROLE');
+    await db.query('INSERT INTO groups(id,user_auth_id,hoyo_19_enabled) VALUES($1,$2,true)', [newGroup, owner]);
+    assert.deepEqual((await rows(newGroup)).filter(r => r.purchased).map(r => r.product_id), ['no-paso-rojas']);
 
     // Desactivado en Configuración del grupo: volver a guardar en el Pro-Shop lo respeta.
     await as(owner);
@@ -118,9 +123,9 @@ test('No paso de Rojas toggled in group settings updates hoyo_19_enabled, and ne
 
     const fresh = randomUUID();
     await db.query('INSERT INTO groups(id,user_auth_id,hoyo_19_enabled) VALUES($1,$2,true)', [fresh, owner]);
+    // Solo Rojas viene por defecto; Spanish Hand se contrata desde el Pro-Shop.
     assert.deepEqual(await rows(fresh), [
       { product_id: 'no-paso-rojas', purchased: true, enabled: true },
-      { product_id: 'spanish-hand', purchased: true, enabled: true },
     ]);
   } finally { await db.close(); }
 });

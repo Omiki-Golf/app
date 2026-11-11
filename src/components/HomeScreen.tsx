@@ -6,6 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
+import { weekendDuration } from '../utils/weekendMode';
 
 type GroupAccess = 'owner' | 'admin' | 'member';
 const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
@@ -29,6 +30,9 @@ interface HomeScreenProps {
   messagesButton?: React.ReactNode;
   handicap9?: number;
   handicap18?: number;
+  /** Omiki Weekend activo: fin y momento de activación (para saber si es de 7 días o 3 meses). */
+  weekendUntil?: string | null;
+  weekendActivatedAt?: string | null;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -50,10 +54,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   messagesButton,
   handicap9,
   handicap18,
+  weekendUntil,
+  weekendActivatedAt,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
+  // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
+  const weekend = weekendDuration(weekendUntil, weekendActivatedAt);
   const fallbackHcp18 = profile?.exact_handicap !== undefined && profile?.exact_handicap !== null
     ? Math.round(profile.exact_handicap)
     : 0;
@@ -174,10 +182,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {isTeam && groupShortcuts.every(group => group.access !== 'owner') && (
             <WriteButton
               onClick={onCreateTeam}
-              className="w-full flex items-center justify-center gap-3 bg-amber-500 text-amber-950 px-6 py-4 rounded-2xl hover:bg-amber-600 transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
+              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${weekend
+                ? 'bg-orange-700 text-white hover:bg-orange-800'
+                : 'bg-amber-500 text-amber-950 hover:bg-amber-600'}`}
             >
               <Plus className="w-6 h-6" aria-hidden="true" />
-              <span className="truncate">{t('home.createTeam')}</span>
+              <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t('home.createTeam')}</span>
             </WriteButton>
           )}
         </div>

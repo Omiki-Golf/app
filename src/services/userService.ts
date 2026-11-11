@@ -117,10 +117,11 @@ export const userService = {
     team_trial_ends_at: string | null;
     weekend_mode_until: string | null;
     stripe_subscription_id: string | null;
+    updated_at: string | null;
   } | null> {
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .select('plan_type, status, current_period_start, current_period_end, team_trial_started_at, team_trial_ends_at, weekend_mode_until, stripe_subscription_id')
+      .select('plan_type, status, current_period_start, current_period_end, team_trial_started_at, team_trial_ends_at, weekend_mode_until, stripe_subscription_id, updated_at')
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle();
