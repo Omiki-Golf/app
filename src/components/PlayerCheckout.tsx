@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { intentPlan } from '../utils/playerRegistration';
+import { TEAM_TRIAL_OFFER_PRICE } from '../utils/teamTrialOffer';
 import { CheckCircle2, FlaskConical } from 'lucide-react';
 import { playerCheckoutService } from '../services/playerCheckoutService';
 import { planCatalog, planPrice } from '../data/planCatalog';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
+import { useTranslation } from 'react-i18next';
+import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
+import { formatDisplayPrice } from '../utils/currency';
 
 type CheckoutState = Awaited<ReturnType<typeof playerCheckoutService.load>>;
 interface Props {
@@ -16,6 +20,8 @@ interface Props {
   service?: typeof playerCheckoutService;
 }
 export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, service = playerCheckoutService }: Props) {
+  const { t, i18n } = useTranslation();
+  const currency = useDisplayCurrency();
   const [state, setState] = useState<CheckoutState | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,7 +48,8 @@ export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, 
   };
   const plan = planCatalog.find(plan => plan.id === (state ? intentPlan(state.intent) : 'player'))!;
   const annual = state?.intent.period === 'annual';
-  const amount = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(planPrice(plan, annual));
+  const offer = state?.intent.offer === 'team_trial';
+  const amount = formatDisplayPrice(offer ? TEAM_TRIAL_OFFER_PRICE : planPrice(plan, annual), currency, i18n.resolvedLanguage);
   return <main className="min-h-screen bg-app px-4 py-6">
     <div className="mx-auto max-w-md">
       <div className="mb-6 flex items-center justify-between"><NavigationButton destination="home" onClick={onBack} /><ThemeToggle /></div>
@@ -58,9 +65,11 @@ export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, 
               <div className="min-w-0"><p className="break-words font-bold text-ink">{state.profile.nick}</p><p className="text-sm text-ink-3">HCP {state.profile.exact_handicap ?? 0}</p></div>
             </div>
             <p className="mt-4 font-bold text-accent-ink">{plan.name} {state.completed ? '· Activo' : '· Pendiente de activación'}</p>
-            <p className="mt-1 text-sm text-ink-2">{annual ? 'Anual' : 'Mensual'} · {amount}{annual ? '/año' : '/mes'}</p>
+            <p className="mt-1 text-sm text-ink-2">{annual ? 'Anual' : 'Mensual'} · {amount}{annual ? '/año' : '/mes'}{offer && ' el primer año'}</p>
+            {offer && <p className="mt-1 text-xs text-ink-3">Oferta fin de prueba · después {formatDisplayPrice(planPrice(plan, true), currency, i18n.resolvedLanguage)}/año</p>}
           </div>
-          <p className="mb-5 text-center text-sm text-ink-3">{state.completed ? 'Stripe ha confirmado el pago de prueba. No se ha realizado ningún cobro real.' : state.isUpgrade ? 'Stripe calculará la diferencia proporcional y conservará la fecha de renovación de tu plan actual.' : `Tu correo está confirmado. Continúa a Stripe para activar ${plan.name} con una tarjeta de prueba.`}</p>
+          {!state.completed && <div className="mb-5 space-y-2"><CurrencySelector />{currency === 'GBP' && <p className="text-center text-[10px] leading-relaxed text-ink-3">{t('currency.adaptive')}</p>}</div>}
+          <p className="mb-5 text-center text-sm text-ink-3">{state.completed ? 'Stripe ha confirmado el pago de prueba. No se ha realizado ningún cobro real.' : state.isUpgrade ? (offer ? `Tu año de ${plan.name} empieza hoy. Stripe descontará lo que te quede sin usar de Player, así que pagarás ${amount} o menos.` : 'Stripe calculará la diferencia proporcional y conservará la fecha de renovación de tu plan actual.') : `Tu correo está confirmado. Continúa a Stripe para activar ${plan.name} con una tarjeta de prueba.`}</p>
           {!state.completed && !state.isUpgrade && <p className="mb-4 text-center text-sm text-ink-3">Tarjeta de prueba: 4242 4242 4242 4242. Usa una fecha futura y cualquier CVC de 3 cifras.</p>}
           {checkoutReturn === 'cancelled' &&!state.completed && <p role="status" className="mb-4 text-sm text-ink-3">Has vuelto sin completar el pago. Puedes retomarlo.</p>}
           {state.readOnly && <p className="mb-4 text-sm text-ink-3">Esta cuenta tiene permisos de solo lectura.</p>}

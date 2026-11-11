@@ -115,11 +115,12 @@ export const userService = {
     current_period_end: string | null;
     team_trial_started_at: string | null;
     team_trial_ends_at: string | null;
+    weekend_mode_until: string | null;
     stripe_subscription_id: string | null;
   } | null> {
     const { data, error } = await supabase
       .from('user_subscriptions')
-      .select('plan_type, status, current_period_start, current_period_end, team_trial_started_at, team_trial_ends_at, stripe_subscription_id')
+      .select('plan_type, status, current_period_start, current_period_end, team_trial_started_at, team_trial_ends_at, weekend_mode_until, stripe_subscription_id')
       .eq('user_id', userId)
       .eq('status', 'active')
       .maybeSingle();
@@ -141,6 +142,13 @@ export const userService = {
     const { data, error } = await supabase.rpc('start_team_trial');
     if (error) throw new Error(error.message || 'No se ha podido activar la prueba Team.');
     if (typeof data !== 'string') throw new Error('No se ha podido confirmar la prueba Team.');
+    return data;
+  },
+
+  async startWeekendForTesting(days: 7 | 90): Promise<string> {
+    const { data, error } = await supabase.rpc('activate_weekend_for_testing', { p_days: days });
+    if (error) throw new Error(error.message || 'No se ha podido activar Weekend.');
+    if (typeof data !== 'string') throw new Error('No se ha podido confirmar Weekend.');
     return data;
   },
 

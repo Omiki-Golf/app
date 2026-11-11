@@ -6,12 +6,14 @@ export const prices = {
 } as const;
 export type Plan = keyof typeof prices;
 export type Period = 'monthly' | 'annual';
+export { teamTrialOffer, teamTrialOfferActive } from './team-trial-offer.ts';
 export function checkoutIntent(metadata: Record<string, unknown>) {
-  const value = metadata.player_checkout as {id?: string; plan?: string; period?: string} | undefined;
+  const value = metadata.player_checkout as {id?: string; plan?: string; period?: string; offer?: string} | undefined;
   const plan = value?.plan ?? 'player';
   if (!value?.id || !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value.id) ||
       !Object.hasOwn(prices, plan) || !['monthly','annual'].includes(value.period ?? '')) throw new Error('Registro de plan no válido.');
-  return { id: value.id, plan: plan as Plan, period: value.period as Period };
+  if (value.offer !== undefined && (value.offer !== 'team_trial' || plan !== 'team' || value.period !== 'annual')) throw new Error('Oferta no válida.');
+  return { id: value.id, plan: plan as Plan, period: value.period as Period, offer: value.offer as 'team_trial' | undefined };
 }
 export function allowedOrigin(origin: string) {
   return [

@@ -52,6 +52,7 @@ export interface Group {
   premium_branding?: boolean;
   weekend_mode_until?: string | null;
   group_type?: string;
+  simultaneous_season_enabled?: boolean;
   archived_at?: string | null;
 }
 
@@ -120,7 +121,7 @@ export interface ProShopPurchase {
   id: string;
   group_id: string;
   purchased_by: string;
-  product_type: 'extra_players' | 'premium_branding' | 'weekend_mode';
+  product_type: 'extra_players' | 'premium_branding' | 'weekend_mode' | 'grupo-adicional' | 'ampliacion-plantilla' | 'temporada-simultanea';
   amount_paid: number;
   payment_method: 'lightning' | 'stripe';
   payment_ref?: string;

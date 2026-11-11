@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { checkoutIntent, prices, allowedOrigin, subscriptionStatus } from '../supabase/functions/_shared/stripe-domain.ts';
+import { checkoutIntent, prices, allowedOrigin, subscriptionStatus, teamTrialOffer, teamTrialOfferActive } from '../supabase/functions/_shared/stripe-domain.ts';
 import { planCatalog } from '../src/data/planCatalog.ts';
 import { serverKeys, isServerRequest } from '../supabase/functions/_shared/server-credentials.ts';
 test('Stripe setup accepts only a provisioned server secret on apikey',()=>{
@@ -79,6 +79,29 @@ test('Player to Team upgrades reuse the Stripe subscription and prorate without 
  assert.match(source,/stripe\.subscriptions\.update\(subscription\.id/);
  assert.match(source,/proration_behavior:'always_invoice'/);
  assert.match(source,/payment_behavior:'error_if_incomplete'/);
- assert.doesNotMatch(source,/billing_cycle_anchor\s*:/);
+ // Un cambio de plan normal conserva la fecha de renovación; solo la oferta de fin de prueba la reinicia.
+ assert.equal(source.match(/billing_cycle_anchor\s*:/g)?.length,1);
+ assert.match(source,/\.\.\.\(offer\?\{billing_cycle_anchor:'now'/);
  assert.match(source,/Elige la misma periodicidad que tu plan Player actual/);
+});
+
+test('Team trial offer: only days 25-30 of an active Player trial, annual Team, and 29,99 EUR the first year',async()=>{
+ const day=86_400_000;
+ const start=Date.parse('2026-11-01T10:00:00Z');
+ const sub={plan_type:'player',status:'active',team_trial_ends_at:new Date(start+30*day).toISOString()};
+ assert.equal(teamTrialOfferActive(sub,start+23*day),false,'dia 24');
+ assert.equal(teamTrialOfferActive(sub,start+24*day),true,'empieza el dia 25');
+ assert.equal(teamTrialOfferActive(sub,start+30*day-1),true,'ultimo instante de la prueba');
+ assert.equal(teamTrialOfferActive(sub,start+30*day),false,'prueba terminada');
+ for(const patch of [{plan_type:'team'},{status:'expired'},{team_trial_ends_at:null},{team_trial_ends_at:'no-date'}]) assert.equal(teamTrialOfferActive({...sub,...patch},start+26*day),false,JSON.stringify(patch));
+ assert.equal(teamTrialOfferActive(null,start),false);
+ assert.equal(checkoutIntent({player_checkout:{id:intent,plan:'team',period:'annual',offer:'team_trial'}}).offer,'team_trial');
+ for(const patch of [{plan:'premium'},{period:'monthly'},{offer:'other'}]) assert.throws(()=>checkoutIntent({player_checkout:{id:intent,plan:'team',period:'annual',offer:'team_trial',...patch}}),/Oferta no válida/);
+ assert.equal(prices.team.annual-teamTrialOffer.amountOff,2999);
+ const client=await readFile(new URL('../src/utils/teamTrialOffer.ts',import.meta.url),'utf8');
+ assert.match(client,/TEAM_TRIAL_OFFER_PRICE = 29\.99;/);
+ const checkout=await readFile(new URL('../supabase/functions/stripe-checkout/index.ts',import.meta.url),'utf8');
+ assert.match(checkout,/teamTrialOfferActive\(currentSubscription\)/,'el servidor comprueba la ventana');
+ assert.match(checkout,/billing_cycle_anchor:'now'/);
+ assert.match(checkout,/discounts:\[\{coupon:teamTrialOffer\.coupon\}\]/);
 });

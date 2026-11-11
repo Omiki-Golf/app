@@ -9,6 +9,7 @@ import { GroupInvitation, QuickRoundInvitation } from '../types';
 import type { ActivityEvent, ActivityScope } from '../services/messageService';
 import { useTranslation } from 'react-i18next';
 import { gamificationProduct } from '../data/gamification';
+import { TeamTrialOfferCard, type TeamTrialOffer } from './TeamTrialOfferCard';
 
 interface NotificationsBellProps {
   userId: string | null;
@@ -16,9 +17,11 @@ interface NotificationsBellProps {
   onInvitationResolved: () => void;
   onInvitationAccepted: () => void;
   activityScope: ActivityScope;
+  /** Oferta de fin de prueba Team (días 25 a 30 de la prueba). */
+  teamOffer?: TeamTrialOffer | null;
 }
 
-export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, onInvitationAccepted, activityScope }) => {
+export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, onBack, onInvitationResolved, onInvitationAccepted, activityScope, teamOffer }) => {
   const { t } = useTranslation();
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
   const [quickRoundInvitations, setQuickRoundInvitations] = useState<QuickRoundInvitation[]>([]);
@@ -139,6 +142,8 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
           <Bell size={24} className="text-ink-2" />
           <h1 className="text-2xl font-bold text-ink">Notificaciones</h1>
         </div>
+
+        {teamOffer && <TeamTrialOfferCard offer={teamOffer} className="mb-6" />}
 
         {(activityScope.roundId || activityScope.groupId) && <section className="mb-7 space-y-3 text-ink">
           <h2 className="font-bold text-lg">{t('activity.title')}</h2>

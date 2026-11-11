@@ -34,6 +34,7 @@ import { ProfileScreen } from './components/ProfileScreen';
 import { ProfileDetails } from './components/ProfileDetails';
 import { TeamCreation } from './components/TeamCreation';
 import { NotificationsBell } from './components/NotificationsBell';
+import { teamTrialOfferActive } from './utils/teamTrialOffer';
 import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
 import { PaymentSelector } from './components/PaymentSelector';
@@ -1080,7 +1081,21 @@ function App() {
 
   const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
     || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-round-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points';
-  const inlineMessagesButton = <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} variant="inline" />;
+  // Oferta de fin de prueba Team (días 25 a 30): cuenta como un aviso más en la campana.
+  const teamOffer = teamTrialOfferActive(subscription) && subscription?.team_trial_ends_at
+    ? { endsAt: new Date(subscription.team_trial_ends_at), onAccept: async () => {
+        const intent = { id: crypto.randomUUID(), plan: 'team' as const, period: 'annual' as const, offer: 'team_trial' as const };
+        const { error } = await supabase.auth.updateUser({ data: { player_checkout: intent } });
+        if (error) throw error;
+        setRegistrationPlan('team');
+        setRegistrationPeriod('annual');
+        setCheckoutReturn(null);
+        setMessagesOpen(false);
+        setCurrentView('player-checkout');
+      } }
+    : null;
+  const notificationCount = pendingInvitations + (teamOffer ? 1 : 0);
+  const inlineMessagesButton = <GlobalMessagesButton count={notificationCount} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
     {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
     {showExitHint && (
@@ -1088,8 +1103,9 @@ function App() {
         Pulsa atrás otra vez para salir
       </div>
     )}
-    {!usesInlineMessages && <GlobalMessagesButton count={pendingInvitations} onClick={openMessages} belowWarning={isIncognito} />}
+    {!usesInlineMessages && <GlobalMessagesButton count={notificationCount} onClick={openMessages} belowWarning={isIncognito} />}
     {messagesOpen && <NotificationsBell
+      teamOffer={teamOffer}
       key={`${user?.id || 'express'}-${activityScope.groupId || activityScope.roundId || 'general'}`}
       userId={user?.id ?? null}
       activityScope={activityScope}
@@ -1147,6 +1163,12 @@ function App() {
               await refreshSubscription();
               setReturnToProfile(false);
               setCurrentView('profile');
+            } : undefined}
+            onStartWeekend={user ? async days => {
+              await userService.startWeekendForTesting(days);
+              await refreshSubscription();
+              setReturnToProfile(false);
+              setCurrentView('team-creation');
             } : undefined}
             onSelectPlan={(plan) => {
               if (plan === 'express') {
@@ -1219,6 +1241,7 @@ function App() {
             profile={profile}
             planType={activePlanType}
             subscription={subscription}
+            teamOffer={teamOffer}
             handicap9={latestHandicap.handicap9}
             handicap18={latestHandicap.handicap18}
             onBack={() => {
@@ -1330,6 +1353,7 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <TeamCreation
             userId={user.id}
+            weekendUntil={subscription?.weekend_mode_until}
             onBack={() => setCurrentView('main')}
             onTeamCreated={() => {
               refreshSubscription();

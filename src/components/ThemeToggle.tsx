@@ -25,9 +25,9 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '', always
       onClick={toggle}
       title={label}
       aria-label={label}
-      className={`inline-flex h-10 w-10 items-center justify-center rounded-full border border-line bg-card text-accent-ink shadow-soft transition-all hover:bg-card-2 active:scale-95 ${className}`}
+      className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-card text-accent-ink shadow-soft transition-all hover:bg-card-2 active:scale-95 max-[360px]:h-10 max-[360px]:w-10 ${className}`}
     >
-      {isDark ? <Sun size={19} /> : <Moon size={19} />}
+      {isDark ? <Sun size={21} /> : <Moon size={21} />}
     </button>
   );
 };

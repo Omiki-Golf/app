@@ -71,28 +71,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
       <div className="max-w-md w-full">
         {/* Top bar */}
-        <div className="relative mb-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 max-[360px]:gap-1">
+        <div className="relative mb-8 flex min-h-11 items-center justify-between gap-3">
+          <div className="flex h-11 items-center gap-2 max-[360px]:h-10 max-[360px]:gap-1">
             <button
               type="button"
               onClick={onShowShare}
               title={t('common.share')}
               aria-label={t('common.share')}
-              className="relative p-2.5 bg-card border border-line rounded-full shadow-soft hover:bg-card-2 transition-all"
+              className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line bg-card shadow-soft transition-all hover:bg-card-2 active:scale-95 max-[360px]:h-10 max-[360px]:w-10"
             >
-              <Share2 size={20} className="text-ink-2" />
+              <Share2 size={21} className="text-ink-2" />
             </button>
 
             {!isAuthenticated && <ThemeToggle />}
           </div>
 
-          <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute left-1/2 top-1/2 z-10 flex h-11 -translate-x-1/2 -translate-y-1/2 items-center max-[360px]:h-10">
             {messagesButton}
           </div>
 
           {/* Acceso / Perfil */}
           {!isAuthenticated ? (
-            <div className="flex items-center gap-2 max-[360px]:gap-1">
+            <div className="flex h-11 items-center gap-2 max-[360px]:h-10 max-[360px]:gap-1">
               <LanguageSwitcher />
               {isExpress && <ResetExpressRounds />}
               <button
@@ -102,11 +102,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 aria-label={t('common.signIn')}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent bg-accent text-on-accent shadow-soft transition-all hover:bg-accent-hover active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current max-[360px]:h-10 max-[360px]:w-10"
               >
-                <LogIn size={22} aria-hidden="true" />
+                <LogIn size={21} aria-hidden="true" />
               </button>
             </div>
           ) : (
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex h-11 shrink-0 items-center gap-2 max-[360px]:h-10">
               <div className="min-w-0 text-right">
                 <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
                 <p className="text-xs text-ink-3">HCP {displayHcp9}/{displayHcp18}</p>
@@ -115,7 +115,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 onClick={onShowProfile}
                 title={t('common.profile')}
                 aria-label={t('common.openProfile')}
-                className={`flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-soft transition-all ${profile ? avatarPlanClasses[planType] : 'border-line bg-card-2'}`}
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 shadow-soft transition-all max-[360px]:h-10 max-[360px]:w-10 ${profile ? avatarPlanClasses[planType] : 'border-line bg-card-2'}`}
               >
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />

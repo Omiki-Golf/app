@@ -36,6 +36,19 @@ const getLocalSettings = (groupId: string): GroupSettings | null => {
 };
 
 export const groupSettingsService = {
+  async getAddons(groupId: string): Promise<{ maxPlayers: number; additionalGroup: boolean; simultaneousSeason: boolean } | null> {
+    const [group, purchases] = await Promise.all([
+      supabase.from('groups').select('max_players, simultaneous_season_enabled').eq('id', groupId).maybeSingle(),
+      supabase.from('pro_shop_purchases').select('product_type').eq('group_id', groupId).eq('status', 'completed').in('product_type', ['grupo-adicional', 'ampliacion-plantilla', 'temporada-simultanea']),
+    ]);
+    if (group.error || purchases.error || !group.data) return null;
+    const active = new Set((purchases.data || []).map(row => row.product_type));
+    return {
+      maxPlayers: group.data.max_players ?? 20,
+      additionalGroup: active.has('grupo-adicional'),
+      simultaneousSeason: Boolean(group.data.simultaneous_season_enabled) && active.has('temporada-simultanea'),
+    };
+  },
   /** Títulos contratados del grupo, en el orden del catálogo. `null` si no se han podido leer. */
   async getGamification(groupId: string): Promise<Array<{ product_id: string; enabled: boolean }> | null> {
     const { data, error } = await supabase.from('group_gamification').select('product_id, enabled').eq('group_id', groupId).eq('purchased', true);

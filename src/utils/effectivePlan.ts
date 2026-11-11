@@ -5,9 +5,21 @@ export function effectivePlan(
     status: string;
     current_period_end?: string | null;
     team_trial_ends_at?: string | null;
+    weekend_mode_until?: string | null;
   } | null,
   now = Date.now(),
 ): PlanType {
+  if (
+    subscription?.status === "active" &&
+    subscription.plan_type === "premium" &&
+    (!subscription.current_period_end || Date.parse(subscription.current_period_end) > now)
+  )
+    return "premium";
+  if (
+    subscription?.weekend_mode_until &&
+    Date.parse(subscription.weekend_mode_until) > now
+  )
+    return "team";
   if (
     subscription?.status === "active" &&
     subscription.team_trial_ends_at &&

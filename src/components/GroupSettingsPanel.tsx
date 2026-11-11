@@ -17,15 +17,17 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
   const [gamification, setGamification] = useState<Array<{ product_id: string; enabled: boolean }>>([]);
   const [gamificationError, setGamificationError] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [addons, setAddons] = useState<{ maxPlayers: number; additionalGroup: boolean; simultaneousSeason: boolean } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([groupSettingsService.getGroupSettings(groupId), groupSettingsService.getGamification(groupId)]).then(([settings, products]) => {
+    Promise.all([groupSettingsService.getGroupSettings(groupId), groupSettingsService.getGamification(groupId), groupSettingsService.getAddons(groupId)]).then(([settings, products, activeAddons]) => {
       if (!cancelled) {
         setMinRounds(settings.min_rounds_for_awards);
         setHcpVariation(settings.handicap_variation_mode);
         setGamification(products ?? []);
         setGamificationError(products === null);
+        setAddons(activeAddons);
         setLoading(false);
       }
     });
@@ -33,10 +35,13 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
     const reloadGamification = (event: Event) => {
       const detail = (event as CustomEvent<{ groupId?: string }>).detail;
       if (detail?.groupId && detail.groupId !== groupId) return;
-      void groupSettingsService.getGamification(groupId).then(products => {
-        if (cancelled || !products) return;
-        setGamification(products);
-        setGamificationError(false);
+      void Promise.all([groupSettingsService.getGamification(groupId), groupSettingsService.getAddons(groupId)]).then(([products, activeAddons]) => {
+        if (cancelled) return;
+        if (products) {
+          setGamification(products);
+          setGamificationError(false);
+        }
+        setAddons(activeAddons);
       });
     };
     window.addEventListener(GAMIFICATION_UPDATED_EVENT, reloadGamification);
@@ -161,6 +166,16 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
           })}
           {gamificationError && <p className="text-xs text-red-600">No se han podido cargar los títulos del grupo.</p>}
           {!gamificationError && gamification.length === 0 && <p className="text-xs text-ink-3">Activa títulos desde el Pro-Shop para que aparezcan aquí.</p>}
+        </div>
+      </div>
+
+      <div className="border-t border-line pt-4">
+        <h3 className="text-sm font-bold text-ink">Ampliaciones del Pro-Shop</h3>
+        <p className="mb-2 text-xs text-ink-3">Se aplican automáticamente al activarlas para este grupo.</p>
+        <div className="grid gap-2 text-sm">
+          <div className="flex items-center justify-between rounded-lg border border-line bg-card-2 px-3 py-2"><span>Plantilla</span><strong>{addons?.maxPlayers ?? 20} jugadores</strong></div>
+          <div className="flex items-center justify-between rounded-lg border border-line bg-card-2 px-3 py-2"><span>Grupo adicional</span><strong>{addons?.additionalGroup ? 'Activo' : 'No activo'}</strong></div>
+          <div className="flex items-center justify-between rounded-lg border border-line bg-card-2 px-3 py-2"><span>Temporada simultánea</span><strong>{addons?.simultaneousSeason ? 'Activa' : 'No activa'}</strong></div>
         </div>
       </div>
 

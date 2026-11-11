@@ -9,7 +9,8 @@ import { EmailSentModal } from './EmailSentModal';
 import { ExistingAccountNotice } from './ExistingAccountNotice';
 import { isExistingAccountSignup } from '../utils/playerRegistration';
 import { userService } from '../services/userService';
-import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
+import { DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
+import AvatarPicker from './AvatarPicker';
 import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../utils/errorMessage';
 
@@ -437,22 +438,7 @@ export default function Auth({ onShowPlans, onAuthSuccess, recoveryRequested = f
 
             <div>
               <label className="block text-sm font-medium text-ink-2 mb-2">{t('auth.avatar')}</label>
-              <div className="grid grid-cols-5 gap-2">
-                {AVATAR_OPTIONS.map((avatar) => (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    onClick={() => setAvatarUrl(avatar.url)}
-                    className={`aspect-square rounded-full overflow-hidden border-2 transition-all ${
-                      avatarUrl === avatar.url ? 'border-accent ring-2 ring-accent-ring' : 'border-line'
-                    }`}
-                    aria-label={t('auth.selectAvatar', { name: avatar.name })}
-                    aria-pressed={avatarUrl === avatar.url}
-                  >
-                    <img src={avatar.url} alt="" loading="lazy" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+              <AvatarPicker value={avatarUrl} onSelect={setAvatarUrl} gapClassName="gap-2" />
             </div>
 
             <div>

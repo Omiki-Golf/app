@@ -1,24 +1,34 @@
 // Keep the player_checkout metadata key and legacy Player references so pending registrations can resume.
 export type BillingPeriod = 'monthly' | 'annual';
 export type PaidPlan = 'player' | 'team' | 'premium';
-export interface PlayerIntent { id: string; period: BillingPeriod; plan?: PaidPlan }
+export interface PlayerIntent { id: string; period: BillingPeriod; plan?: PaidPlan; offer?: 'team_trial' }
 export const intentPlan = (intent: PlayerIntent): PaidPlan => intent.plan ?? 'player';
 export function playerIntent(metadata: Record<string, unknown>): PlayerIntent | null {
   const value = metadata.player_checkout as Partial<PlayerIntent> | undefined;
   return value && typeof value.id === 'string' && /^[0-9a-f-]{36}$/i.test(value.id) &&
     (value.plan === undefined || value.plan === 'player' || value.plan === 'team' || value.plan === 'premium') &&
-    (value.period === 'monthly' || value.period === 'annual') ? value as PlayerIntent : null;
+    (value.period === 'monthly' || value.period === 'annual') &&
+    (value.offer === undefined || (value.offer === 'team_trial' && value.plan === 'team' && value.period === 'annual')) ? value as PlayerIntent : null;
 }
-export function registrationError(fields: { nick: string; email: string; password: string; handicap: string; age: string; over14: boolean; acceptedTerms: boolean }): string | null {
-  if (fields.nick.trim().length < 3) return 'El nick debe tener al menos 3 caracteres.';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) return 'Introduce un correo válido.';
-  if (fields.password.length < 6 || !/[A-Z]/.test(fields.password) || !/[a-z]/.test(fields.password) || !/[^a-zA-Z0-9]/.test(fields.password)) return 'La contraseña debe tener al menos 6 caracteres, mayúscula, minúscula y un carácter especial.';
+export type RegistrationField = 'nick' | 'email' | 'password' | 'handicap' | 'age' | 'over14' | 'acceptedTerms';
+type RegistrationFields = { nick: string; email: string; password: string; handicap: string; age: string; over14: boolean; acceptedTerms: boolean };
+
+/** Errores de cada campo del alta, en el mismo orden en que aparecen en el formulario. */
+export function registrationFieldErrors(fields: RegistrationFields): Partial<Record<RegistrationField, string>> {
+  const errors: Partial<Record<RegistrationField, string>> = {};
+  if (fields.nick.trim().length < 3) errors.nick = 'El nick debe tener al menos 3 caracteres.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) errors.email = 'Introduce un correo válido.';
+  if (fields.password.length < 6 || !/[A-Z]/.test(fields.password) || !/[a-z]/.test(fields.password) || !/[^a-zA-Z0-9]/.test(fields.password)) errors.password = 'Mínimo 6 caracteres, con mayúscula, minúscula y un carácter especial.';
   // Hándicap de juego en 18 hoyos: número entero entre 0 y 54, sin decimales.
-  if (fields.handicap && (!/^\d{1,2}$/.test(fields.handicap.trim()) || Number(fields.handicap) > 54)) return 'Introduce tu hándicap de juego en 18 hoyos, sin decimales (0 a 54).';
-  if (fields.age && (!Number.isInteger(Number(fields.age)) || Number(fields.age) < 14)) return 'La edad debe ser un número entero de al menos 14 años.';
-  if (!fields.over14) return 'Debes confirmar que tienes al menos 14 años.';
-  if (!fields.acceptedTerms) return 'Debes aceptar los términos y la política de privacidad.';
-  return null;
+  if (fields.handicap && (!/^\d{1,2}$/.test(fields.handicap.trim()) || Number(fields.handicap) > 54)) errors.handicap = 'Número entero de 0 a 54, sin decimales.';
+  if (fields.age && (!Number.isInteger(Number(fields.age)) || Number(fields.age) < 14)) errors.age = 'Número entero, mínimo 14.';
+  if (!fields.over14) errors.over14 = 'Debes confirmar que tienes al menos 14 años.';
+  if (!fields.acceptedTerms) errors.acceptedTerms = 'Debes aceptar los términos y la política de privacidad.';
+  return errors;
+}
+
+export function registrationError(fields: RegistrationFields): string | null {
+  return Object.values(registrationFieldErrors(fields))[0] ?? null;
 }
 // Con la protección contra enumeración de correos, Supabase no da error si el correo ya existe:
 // devuelve un usuario sin identidades y no envía ningún correo.

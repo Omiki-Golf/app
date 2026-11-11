@@ -1,5 +1,5 @@
 import { checkedStripe, config, serviceClient, synchronize } from '../_shared/stripe.ts';
-import { allowedOrigin, checkoutIntent } from '../_shared/stripe-domain.ts';
+import { allowedOrigin, checkoutIntent, teamTrialOffer, teamTrialOfferActive } from '../_shared/stripe-domain.ts';
 import { rateLimit } from '../_shared/admin.ts';
 
 Deno.serve(async req => {
@@ -35,23 +35,30 @@ Deno.serve(async req => {
     stage='configuration';
     const settings=await config(service);
     const {data:currentSubscription,error:currentSubscriptionError}=await service.from('user_subscriptions')
-      .select('plan_type,status,current_period_end,stripe_subscription_id').eq('user_id',user.id).maybeSingle();
+      .select('plan_type,status,current_period_end,stripe_subscription_id,team_trial_ends_at').eq('user_id',user.id).maybeSingle();
     if(currentSubscriptionError) throw new Error('No se pudo comprobar la suscripción actual.');
+    const offer=intent.offer==='team_trial';
     const ranks:Record<string,number>={player:1,team:2,premium:3};
     const isUpgrade=input.action==='create' && currentSubscription?.stripe_subscription_id && currentSubscription.status==='active'
       && (!currentSubscription.current_period_end || Date.parse(currentSubscription.current_period_end)>Date.now())
       && (ranks[intent.plan]??0)>(ranks[currentSubscription.plan_type]??0);
+    // La oferta de fin de prueba solo existe como mejora de una suscripción Player de Stripe.
+    if(offer && input.action==='create' && (!isUpgrade || !teamTrialOfferActive(currentSubscription)))
+      return reply({error:'La oferta de Team ya no está disponible para esta cuenta.'},409);
     if(isUpgrade) {
       stage='subscription-upgrade';
       const targetPrice=settings.prices[`${intent.plan}_${intent.period}`];
-      const currentPrice=settings.prices[`${currentSubscription.plan_type}_${intent.period}`];
-      if(!targetPrice || !currentPrice) throw new Error('Precio no configurado.');
+      // Con la oferta se puede pasar de Player mensual o anual a Team anual.
+      const currentPrices=offer
+        ? [settings.prices.player_monthly,settings.prices.player_annual]
+        : [settings.prices[`${currentSubscription.plan_type}_${intent.period}`]];
+      if(!targetPrice || currentPrices.some(price=>!price)) throw new Error('Precio no configurado.');
       const subscription=await stripe.subscriptions.retrieve(currentSubscription.stripe_subscription_id,{expand:['latest_invoice']});
       if(subscription.livemode || subscription.metadata.app!=='omiki-sandbox' || subscription.metadata.user_id!==user.id || subscription.items.data.length!==1)
         throw new Error('Suscripción no válida para mejorar.');
-      if(subscription.items.data[0].price.id!==currentPrice)
+      if(!currentPrices.includes(subscription.items.data[0].price.id))
         return reply({error:'Elige la misma periodicidad que tu plan Player actual.'},409);
-      const metadata={app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id};
+      const metadata={app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id,...(offer?{offer:'team_trial'}:{})};
       if(subscription.metadata.intent_id!==intent.id) {
         const {error:clearError}=await service.from('stripe_checkout_state').delete().eq('user_id',user.id);
         if(clearError) throw new Error('No se pudo preparar el cambio de plan.');
@@ -63,6 +70,9 @@ Deno.serve(async req => {
         await stripe.subscriptions.update(subscription.id,{
           metadata,items:[{id:subscription.items.data[0].id,price:targetPrice,quantity:1}],
           proration_behavior:'always_invoice',payment_behavior:'error_if_incomplete',expand:['latest_invoice'],
+          // Oferta: empieza un año de Team desde hoy, con 10 € menos en esa primera factura
+          // y descontando lo que quedaba sin usar de Player.
+          ...(offer?{billing_cycle_anchor:'now' as const,discounts:[{coupon:teamTrialOffer.coupon}]}:{}),
         },{idempotencyKey:`omiki-upgrade:${intent.id}`});
       }
       await synchronize(stripe,service,subscription.id);
@@ -100,8 +110,8 @@ Deno.serve(async req => {
     const metadata={app:'omiki-sandbox',user_id:user.id,intent_id:checkout.intent_id,attempt_id:checkout.attempt_id};
     stage='stripe-session';
     const sessionParams={
-      mode:'subscription' as const,payment_method_types:['card' as const],managed_payments:{enabled:false},customer_email:checkout.email,client_reference_id:user.id,
-      line_items:[{price:checkout.price_id,quantity:1}],metadata,subscription_data:{metadata},locale:'es' as const,
+      mode:'subscription' as const,payment_method_types:['card' as const],managed_payments:{enabled:false},adaptive_pricing:{enabled:true},customer_email:checkout.email,client_reference_id:user.id,
+      line_items:[{price:checkout.price_id,quantity:1}],metadata,subscription_data:{metadata},locale:'auto' as const,
       success_url:`${checkout.origin}/?stripe_checkout=success`,cancel_url:`${checkout.origin}/?stripe_checkout=cancelled`,
     };
     const session=await stripe.checkout.sessions.create(sessionParams,{idempotencyKey:`omiki-sandbox:${checkout.attempt_id}`});

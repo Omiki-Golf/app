@@ -11,6 +11,7 @@ interface TeamCreationProps {
   userId: string;
   onBack: () => void;
   onTeamCreated: (groupId: string) => void;
+  weekendUntil?: string | null;
 }
 
 interface TooltipProps {
@@ -46,7 +47,7 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated }) => {
+export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil }) => {
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
@@ -95,18 +96,18 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
 
   useEffect(() => {
     let active = true;
-    supabase
-      .from('groups')
-      .select('id, name')
-      .eq('user_auth_id', userId)
-      .is('archived_at', null)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .then(({ data }) => {
+    void (async () => {
+      const { data: groups } = await supabase.from('groups').select('id, name').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
+      const ids = (groups || []).map(group => group.id);
+      let extraCapacity = 0;
+      if (ids.length) {
+        const { count } = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed');
+        extraCapacity = count || 0;
+      }
         if (!active) return;
-        setExistingGroup(data?.[0] ?? null);
+        setExistingGroup((groups?.length || 0) >= 1 + extraCapacity ? groups?.[0] ?? null : null);
         setCheckingExisting(false);
-      });
+    })();
     return () => { active = false; };
   }, [userId]);
 
@@ -128,7 +129,8 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
           user_auth_id: userId,
           hoyo_19_enabled: hoyo19,
           max_players: 20,
-          group_type: 'team',
+          group_type: weekendUntil && Date.parse(weekendUntil) > Date.now() ? 'weekend' : 'team',
+          weekend_mode_until: weekendUntil && Date.parse(weekendUntil) > Date.now() ? weekendUntil : null,
         })
         .select()
         .single();

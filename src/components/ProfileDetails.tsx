@@ -5,7 +5,8 @@ import React, { useEffect, useState } from 'react';
 import { Check, CheckCircle2, Copy, Loader2, Save, User, X } from 'lucide-react';
 import { UserProfile } from '../types';
 import { userService } from '../services/userService';
-import { AVATAR_OPTIONS, DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
+import { DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
+import AvatarPicker from './AvatarPicker';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -376,26 +377,14 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
 
               <fieldset>
                 <legend className="block text-sm font-medium text-ink-2 mb-3">{t('auth.avatar')}</legend>
-                <div className="grid grid-cols-5 gap-3">
-                  {AVATAR_OPTIONS.map((avatar) => (
-                    <button
-                      key={avatar.id}
-                      type="button"
-                      onClick={() => {
-                        setAvatarUrl(avatar.url);
-                        setShowSelectedAvatar(true);
-                        setSaved(false);
-                      }}
-                      className={`aspect-square rounded-full overflow-hidden border-2 transition-all ${
-                        avatarUrl === avatar.url ? 'border-accent ring-2 ring-accent-ring' : 'border-line'
-                      }`}
-                      aria-label={t('auth.selectAvatar', { name: avatar.name })}
-                      aria-pressed={avatarUrl === avatar.url}
-                    >
-                      <img src={avatar.url} alt="" loading="lazy" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
+                <AvatarPicker
+                  value={avatarUrl}
+                  onSelect={(url) => {
+                    setAvatarUrl(url);
+                    setShowSelectedAvatar(true);
+                    setSaved(false);
+                  }}
+                />
               </fieldset>
 
               {error && <p className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</p>}

@@ -14,7 +14,7 @@ const languageOptions: ReadonlyArray<{ code: SupportedLanguage }> = [
 ];
 
 function FlagIcon({ language, size = 'md' }: { language: SupportedLanguage; size?: 'sm' | 'md' }) {
-  const dimensions = size === 'md' ? 'h-8 w-8' : 'h-7 w-7';
+  const dimensions = size === 'md' ? 'h-7 w-7' : 'h-7 w-7';
 
   return (
     <span className={`inline-flex shrink-0 overflow-hidden rounded-full border border-black/15 bg-white shadow-sm ${dimensions}`} aria-hidden="true">

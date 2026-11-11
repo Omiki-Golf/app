@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Settings, BarChart3, LandPlot, Crown, ChevronRight, CreditCard, Gem, Info, LogOut, X } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
+import { TeamTrialOfferCard, type TeamTrialOffer } from './TeamTrialOfferCard';
 
 interface ProfileScreenProps {
   profile: UserProfile | null;
@@ -10,6 +11,7 @@ interface ProfileScreenProps {
   subscription?: {
     plan_type: string;
     team_trial_ends_at: string | null;
+    weekend_mode_until: string | null;
   } | null;
   onBack: () => void;
   onLogout: () => void;
@@ -22,6 +24,8 @@ interface ProfileScreenProps {
   hasGroups?: boolean;
   onShowSettings: () => void;
   messagesButton?: React.ReactNode;
+  /** Oferta de fin de prueba Team (días 25 a 30 de la prueba). */
+  teamOffer?: TeamTrialOffer | null;
   handicap9?: number;
   handicap18?: number;
 }
@@ -40,6 +44,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   hasGroups = false,
   onShowSettings,
   messagesButton,
+  teamOffer,
   handicap9: propHandicap9,
   handicap18: propHandicap18,
 }) => {
@@ -50,6 +55,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     && Date.parse(subscription.team_trial_ends_at) > Date.now()
     ? new Date(subscription.team_trial_ends_at) : null;
   const trialDaysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000)) : 0;
+  const weekendEnd = subscription?.weekend_mode_until && Date.parse(subscription.weekend_mode_until) > Date.now()
+    ? new Date(subscription.weekend_mode_until) : null;
+  const weekendDaysLeft = weekendEnd ? Math.max(1, Math.ceil((weekendEnd.getTime() - Date.now()) / 86_400_000)) : 0;
   const nick = profile?.nick || t('profile.player');
   const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
   const fallbackHandicap18 = profile?.exact_handicap;
@@ -168,11 +176,20 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </div>
         </div>
 
+        {teamOffer && <TeamTrialOfferCard offer={teamOffer} className="mb-4" />}
         {trialEnd && (
           <div className="mb-5 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-soft dark:bg-amber-950/40 dark:text-amber-100" role="status">
             <div className="flex items-center gap-2 font-bold"><Crown size={18} fill="currentColor" /> Team de prueba</div>
             <p className="mt-1 text-sm">Te quedan {trialDaysLeft} días. La prueba termina el {trialEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
             <p className="mt-1 text-xs opacity-80">Después volverás automáticamente a tu plan Player si no te suscribes a Team.</p>
+          </div>
+        )}
+
+        {weekendEnd && (
+          <div className="mb-5 rounded-2xl border-2 border-orange-400 bg-orange-50 p-4 text-orange-950 shadow-soft dark:bg-orange-950/40 dark:text-orange-100" role="status">
+            <div className="flex items-center gap-2 font-bold"><Crown size={18} fill="currentColor" /> Omiki Weekend activo</div>
+            <p className="mt-1 text-sm">Te quedan {weekendDaysLeft} días. Termina el {weekendEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+            <p className="mt-1 text-xs opacity-80">Durante este periodo tienes disponibles las funciones Team.</p>
           </div>
         )}
 
@@ -216,10 +233,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               <button type="button" onClick={closeHandicapInfo} className="rounded-full p-2 text-ink-3 hover:bg-card-2" aria-label={t('common.close')}><X size={20} /></button>
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap18')}</dt><dd className="mt-1 text-xl font-bold">{handicap18}</dd></div>
-              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap9')}</dt><dd className="mt-1 text-xl font-bold">{handicap9}</dd></div>
+              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap9')}</dt><dd className="mt-1 text-xl font-bold text-amber-700 dark:text-amber-400">{handicap9}</dd></div>
+              <div className="rounded-xl bg-card-2 p-3"><dt className="text-xs text-ink-3">{t('profile.handicap18')}</dt><dd className="mt-1 text-xl font-bold text-accent-ink">{handicap18}</dd></div>
             </dl>
-            <p className="mt-3 text-sm text-ink-3">{t('profile.handicapHelp')}</p>
+            <p className="mt-3 text-sm text-ink-3">{t('profile.handicapHelp', { section: t('profile.details') })}</p>
           </section>
         </div>
       )}

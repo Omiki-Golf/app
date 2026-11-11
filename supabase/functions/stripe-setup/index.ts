@@ -1,5 +1,5 @@
 import { checkedStripe, serviceClient } from '../_shared/stripe.ts';
-import { prices } from '../_shared/stripe-domain.ts';
+import { prices, teamTrialOffer } from '../_shared/stripe-domain.ts';
 import { isServerRequest } from '../_shared/server-credentials.ts';
 
 // Deployment-only operation. Never accepts a player's JWT or browser request.
@@ -25,6 +25,18 @@ Deno.serve(async req => {
         catalog[`${plan}_${period}`]=price.id;
       }
     }
+    stage='coupon';
+    // Cupón de la oferta de fin de prueba Team: 10 € una sola vez (primera factura de Team anual).
+    let coupon;
+    try {
+      coupon=await stripe.coupons.retrieve(teamTrialOffer.coupon);
+    } catch(error) {
+      if((error as {code?:string}).code!=='resource_missing') throw error;
+      coupon=await stripe.coupons.create({
+        id:teamTrialOffer.coupon,amount_off:teamTrialOffer.amountOff,currency:'eur',duration:'once',name:'Oferta fin de prueba Team',
+      },{idempotencyKey:teamTrialOffer.coupon});
+    }
+    if(coupon.livemode || coupon.amount_off!==teamTrialOffer.amountOff || coupon.currency!=='eur' || coupon.duration!=='once') throw new Error('El cupón no coincide.');
     stage='read-config';
     const {data:saved,error:readError}=await service.from('stripe_private_config').select('value').eq('key','sandbox').maybeSingle();
     if(readError) throw new Error('No se pudo leer la configuración.');
@@ -46,8 +58,8 @@ Deno.serve(async req => {
     // Verify account readiness without charging a card or creating a customer.
     stage='checkout-readiness';
     try {
-      const probeParams={mode:'subscription' as const,payment_method_types:['card' as const],managed_payments:{enabled:false},
-        line_items:[{price:catalog.player_monthly,quantity:1}],locale:'es' as const,
+      const probeParams={mode:'subscription' as const,payment_method_types:['card' as const],managed_payments:{enabled:false},adaptive_pricing:{enabled:true},
+        line_items:[{price:catalog.player_monthly,quantity:1}],locale:'auto' as const,
         success_url:'http://localhost:5173/?stripe_checkout=success',cancel_url:'http://localhost:5173/?stripe_checkout=cancelled'};
       const probe=await stripe.checkout.sessions.create(probeParams);
       await stripe.checkout.sessions.expire(probe.id);

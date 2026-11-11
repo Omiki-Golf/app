@@ -2,11 +2,14 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarDays, Check, Info, Mail, Save, ShoppingCart, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { CalendarDays, Check, Info, Save, ShoppingCart, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { notifyGamificationUpdated } from '../services/groupSettingsService';
 import { gamificationProduct } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
+import { useTranslation } from 'react-i18next';
+import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
+import { formatDisplayPrice } from '../utils/currency';
 
 interface ProShopProps {
   groupId: string | null;
@@ -27,7 +30,7 @@ interface ShopItem {
 }
 
 interface Addon extends ShopItem {
-  price: string;
+  price: number;
   note: string;
 }
 
@@ -50,17 +53,17 @@ const titles: ShopItem[] = [
 ];
 
 const addons: Addon[] = [
-  { id: 'grupo-adicional', name: 'Grupo Adicional', icon: Users, price: '24,99 € / año', note: 'Máximo 3 grupos adicionales', info: '¿Tienes varios grupos? Amigos del club, compañeros del trabajo, la familia. Cada uno con su propio ranking y jugadores independientes.' },
-  { id: 'ampliacion-plantilla', name: 'Ampliación de Plantilla', icon: UserPlus, price: '19,99 € / año', note: '+12 jugadores sobre el base', info: 'Pasa de 20 a 32 jugadores registrados, con participación máxima de 16 a 24 en cada jornada.' },
-  { id: 'temporada-simultanea', name: 'Temporada Simultánea', icon: CalendarDays, price: '14,99 € / año', note: '2 clasificaciones paralelas', info: 'Dos clasificaciones al mismo tiempo dentro del mismo grupo. Liga anual y Match Play a la vez, o una Copa de verano paralela.' },
+  { id: 'grupo-adicional', name: 'Grupo Adicional', icon: Users, price: 24.99, note: '+1 grupo activo', info: '¿Tienes varios grupos? Amigos del club, compañeros del trabajo, la familia. Cada uno con su propio ranking y jugadores independientes.' },
+  { id: 'ampliacion-plantilla', name: 'Ampliación de Plantilla', icon: UserPlus, price: 19.99, note: '+12 jugadores sobre el base', info: 'Pasa de 20 a 32 jugadores registrados, con participación máxima de 16 a 24 en cada jornada.' },
+  { id: 'temporada-simultanea', name: 'Temporada Simultánea', icon: CalendarDays, price: 14.99, note: '2 clasificaciones paralelas', info: 'Dos clasificaciones al mismo tiempo dentro del mismo grupo. Liga anual y Match Play a la vez, o una Copa de verano paralela.' },
 ];
 
-const formatEuros = (value: number) => `${value.toFixed(2).replace('.', ',')} €`;
 // Precio escalonado de la web: 1,99 € el primer título de pago y 1 € más por cada uno adicional.
 const titlesPrice = (paidCount: number) => (paidCount === 0 ? 0 : 1.99 + (paidCount - 1));
-const CONTACT_EMAIL = 'hola@omikigolf.com';
-
-export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, onBack, messagesButton }) => {
+export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, onBack, messagesButton }) => {
+  const { t, i18n } = useTranslation();
+  const currency = useDisplayCurrency();
+  const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
   const [selectedTitles, setSelectedTitles] = useState<Set<string>>(() => new Set(titles.filter(item => item.free).map(item => item.id)));
   const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -70,11 +73,14 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
   useEffect(() => {
     if (!groupId) return;
     let cancelled = false;
-    void supabase.from('group_gamification').select('product_id').eq('group_id', groupId).eq('purchased', true)
-      .then(({ data, error }) => {
-        if (cancelled || error) return;
-        setSelectedTitles(new Set(['no-paso-rojas', ...(data || []).map(row => row.product_id)]));
-      });
+    void Promise.all([
+      supabase.from('group_gamification').select('product_id').eq('group_id', groupId).eq('purchased', true),
+      supabase.from('pro_shop_purchases').select('product_type').eq('group_id', groupId).eq('status', 'completed').in('product_type', addons.map(item => item.id)),
+    ]).then(([gamification, purchases]) => {
+      if (cancelled) return;
+      if (!gamification.error) setSelectedTitles(new Set(['no-paso-rojas', ...(gamification.data || []).map(row => row.product_id)]));
+      if (!purchases.error) setSelectedAddons(new Set((purchases.data || []).map(row => row.product_type)));
+    });
     return () => { cancelled = true; };
   }, [groupId]);
 
@@ -95,25 +101,14 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
     try {
       const { error } = await supabase.rpc('activate_group_gamification', { p_group: groupId, p_product_ids: paidTitles.map(item => item.id) });
       if (error) throw error;
+      const { error: addonsError } = await supabase.rpc('activate_group_addons_for_testing', { p_group: groupId, p_product_ids: chosenAddons.map(item => item.id) });
+      if (addonsError) throw addonsError;
       setSaved(true);
       notifyGamificationUpdated(groupId);
     } catch (error) {
       console.error('Error activating group gamification:', error);
       setSaveError('No se ha podido guardar la selección en tu grupo. Inténtalo de nuevo.');
     } finally { setSaving(false); }
-  };
-
-  const requestHref = () => {
-    const lines = [
-      'Hola, queremos añadir a nuestro Team:',
-      '',
-      ...(paidTitles.length ? ['Pack de Gamificación:', ...paidTitles.map(item => `- ${item.name}`), `Total títulos: ${formatEuros(titlesPrice(paidTitles.length))} (precio escalonado)`, ''] : []),
-      ...(chosenAddons.length ? ['Ampliaciones:', ...chosenAddons.map(item => `- ${item.name} (${item.price})`), ''] : []),
-      `Grupo: ${groupName || '(sin nombre)'}`,
-      `Referencia del grupo: ${groupId}`,
-      `Cuenta: ${userId}`,
-    ];
-    return `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Pro-Shop: solicitud para ${groupName || 'mi Team'}`)}&body=${encodeURIComponent(lines.join('\n'))}`;
   };
 
   return (
@@ -124,6 +119,10 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-ink">Pro-Shop</h1>
           <p className="text-sm text-ink-3">{groupName ? `Ampliaciones para ${groupName}` : 'Ampliaciones para tu Team'}</p>
+        </div>
+        <div className="mb-6 space-y-2">
+          <CurrencySelector />
+          {currency === 'GBP' && <p className="text-center text-[10px] leading-relaxed text-ink-3">{t('currency.adaptive')}</p>}
         </div>
 
         {!groupId ? (
@@ -145,7 +144,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                     item={item}
                     first={index === 0}
                     checked={selectedTitles.has(item.id)}
-                    price={item.free ? 'Incluido' : '1,99 €*'}
+                    price={item.free ? 'Incluido' : `${money(1.99)}*`}
                     onToggle={() => toggle(selectedTitles, setSelectedTitles, item.id)}
                   />
                 ))}
@@ -163,7 +162,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                     item={item}
                     first={index === 0}
                     checked={selectedAddons.has(item.id)}
-                    price={item.price}
+                    price={`${money(item.price)} / año`}
                     note={item.note}
                     onToggle={() => toggle(selectedAddons, setSelectedAddons, item.id)}
                   />
@@ -177,8 +176,8 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                 <div className="min-w-0 flex-1 text-sm">
                   {hasRequest ? (
                     <>
-                      {paidTitles.length > 0 && <p className="text-ink"><span className="font-semibold">{paidTitles.length} {paidTitles.length === 1 ? 'título' : 'títulos'}</span> · {formatEuros(titlesPrice(paidTitles.length))}</p>}
-                      {chosenAddons.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {item.price}</p>)}
+                      {paidTitles.length > 0 && <p className="text-ink"><span className="font-semibold">{paidTitles.length} {paidTitles.length === 1 ? 'título' : 'títulos'}</span> · {money(titlesPrice(paidTitles.length))}</p>}
+                      {chosenAddons.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {money(item.price)} / año</p>)}
                     </>
                   ) : (
                     <p className="text-ink-3">"No paso de Rojas" va incluido. Selecciona títulos o ampliaciones para solicitarlos.</p>
@@ -196,9 +195,8 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId, groupName, userId, on
                 {saving ? 'Guardando…' : saved ? 'Selección guardada' : 'Guardar selección (pruebas)'}
               </WriteButton>
               {saved && <p role="status" className="text-center text-xs font-semibold text-accent-ink">Guardado en {groupName || 'tu grupo'}. Actívalos o desactívalos en Configuración del grupo.</p>}
-              {chosenAddons.length > 0 && <a href={requestHref()} className="flex items-center justify-center gap-2 text-sm font-semibold text-accent-ink underline"><Mail size={16} />Solicitar ampliaciones por email</a>}
               {saveError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{saveError}</p>}
-              <p className="text-xs text-ink-3">Los títulos de gamificación están desbloqueados para pruebas. Tras activarlos aparecerán en Configuración del grupo.</p>
+              <p className="text-xs text-ink-3">Los títulos y ampliaciones están desbloqueados para pruebas. La plantilla pasa a 32 jugadores, Grupo Adicional permite otro grupo activo y Temporada Simultánea habilita su configuración.</p>
             </section>
           </div>
         )}

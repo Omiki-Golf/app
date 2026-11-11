@@ -14,8 +14,13 @@ test('a Player can subscribe to Team directly and a used trial is not offered ag
  const source=await readFile(new URL('../src/components/PlansComparison.tsx',import.meta.url),'utf8');
  assert.match(source,/teamTrialUsed/);
  assert.match(source,/canStartTeamTrial[^;]*!teamTrialUsed/);
- assert.match(source,/Suscribirse a Team/);
- assert.match(source,/Mejorar de Player a Team/);
- assert.match(source,/diferencia proporcional/);
- assert.doesNotMatch(source,/Suscribirse a Team[\s\S]{0,300}setComingSoon\(true\)/);
+ // Los textos viven en las traducciones de la ventana de planes.
+ const texts=await readFile(new URL('../src/i18n/plans.ts',import.meta.url),'utf8');
+ assert.match(source,/p\('subscribeTeam'\)/);
+ assert.match(source,/p\('upgradeTitle'\)/);
+ assert.match(source,/p\('upgradeText'/);
+ assert.match(texts,/subscribeTeam: 'Suscribirse a Team'/);
+ assert.match(texts,/upgradeTitle: 'Mejorar de Player a Team'/);
+ assert.match(texts,/diferencia proporcional/);
+ assert.doesNotMatch(source,/p\('subscribeTeam'\)[\s\S]{0,300}setComingSoon\(true\)/);
 });

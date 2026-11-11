@@ -29,7 +29,20 @@ test('home group shortcuts show two crowns for creator, one for admin and none f
 
 test('home content starts with extra space below the top icon row', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
-  assert.match(source, /relative mb-8 flex items-center justify-between gap-3/);
+  assert.match(source, /relative mb-8 flex min-h-11 items-center justify-between gap-3/);
+});
+
+test('home top icons share one size and vertical alignment', async () => {
+  const home = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  const theme = await readFile(new URL('../src/components/ThemeToggle.tsx', import.meta.url), 'utf8');
+  const language = await readFile(new URL('../src/components/LanguageSwitcher.tsx', import.meta.url), 'utf8');
+  const reset = await readFile(new URL('../src/components/ResetExpressRounds.tsx', import.meta.url), 'utf8');
+  const messages = await readFile(new URL('../src/components/GlobalMessagesButton.tsx', import.meta.url), 'utf8');
+  assert.match(home, /relative mb-8 flex min-h-11 items-center/);
+  assert.match(home, /inline-flex h-11 w-11 shrink-0 items-center justify-center/);
+  for (const source of [theme, language, reset, messages]) assert.match(source, /h-11 w-11/);
+  assert.match(theme, /<Sun size=\{21\}/);
+  assert.match(reset, /<Trash2 size=\{21\}/);
 });
 
 test('the shared app link and QR always default to the production app domain', async () => {
