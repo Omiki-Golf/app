@@ -8,6 +8,7 @@ import { UserProfile } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
 import { useTranslation } from 'react-i18next';
 import { weekendDuration } from '../utils/weekendMode';
+import { nextGroupKind, type NewGroupKind } from '../utils/groupCapacity';
 
 interface TeamCreationProps {
   userId: string;
@@ -15,6 +16,8 @@ interface TeamCreationProps {
   onTeamCreated: (groupId: string) => void;
   weekendUntil?: string | null;
   weekendActivatedAt?: string | null;
+  /** Plan Team/Premium (o prueba Team) pagado, sin contar el Weekend. */
+  hasTeamPlan?: boolean;
 }
 
 interface TooltipProps {
@@ -50,9 +53,11 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt }) => {
+export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt, hasTeamPlan = true }) => {
   const { t } = useTranslation();
-  const weekend = weekendDuration(weekendUntil, weekendActivatedAt);
+  // Tipo de grupo que se va a crear: Weekend (extra aparte) o el del plan/grupo adicional.
+  const [kind, setKind] = useState<NewGroupKind | null>(null);
+  const weekend = kind === 'weekend' ? weekendDuration(weekendUntil, weekendActivatedAt) : null;
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
@@ -102,19 +107,21 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   useEffect(() => {
     let active = true;
     void (async () => {
-      const { data: groups } = await supabase.from('groups').select('id, name').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
+      const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
       const ids = (groups || []).map(group => group.id);
       let extraCapacity = 0;
       if (ids.length) {
         const { count } = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed');
         extraCapacity = count || 0;
       }
-        if (!active) return;
-        setExistingGroup((groups?.length || 0) >= 1 + extraCapacity ? groups?.[0] ?? null : null);
-        setCheckingExisting(false);
+      if (!active) return;
+      const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekendUntil, hasTeamPlan });
+      setKind(next);
+      setExistingGroup(next ? null : groups?.[0] ?? null);
+      setCheckingExisting(false);
     })();
     return () => { active = false; };
-  }, [userId]);
+  }, [userId, weekendUntil, hasTeamPlan]);
 
   const handleCreate = async () => {
     if (!groupName.trim()) { setError('El nombre del grupo es obligatorio'); return; }
@@ -134,15 +141,16 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
           user_auth_id: userId,
           hoyo_19_enabled: hoyo19,
           max_players: 20,
-          group_type: weekendUntil && Date.parse(weekendUntil) > Date.now() ? 'weekend' : 'team',
-          weekend_mode_until: weekendUntil && Date.parse(weekendUntil) > Date.now() ? weekendUntil : null,
+          group_type: kind === 'weekend' ? 'weekend' : 'team',
+          weekend_mode_until: kind === 'weekend' ? weekendUntil : null,
         })
         .select()
         .single();
 
       if (groupError) {
+        // Los avisos de capacidad del servidor mencionan "grupo"; el código duplicado no.
+        if (/grupo|Weekend/.test(groupError.message || '')) throw new Error(groupError.message);
         if (groupError.code === '23505') throw new Error('Ese código de acceso ya lo usa otro grupo. Vuelve al primer paso y elige otro o pulsa Generar.');
-        if (groupError.message?.includes('un grupo')) throw new Error(groupError.message);
         throw groupError;
       }
       setCreatedGroupId(groupData.id);

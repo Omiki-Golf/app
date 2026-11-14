@@ -35,3 +35,83 @@ test('Weekend and every Pro-Shop add-on are wired to test activation and server 
   assert.match(migration, /SELECT max_players INTO v_limit/);
   assert.match(migration, /activate_weekend_for_testing/);
 });
+
+test('Weekend and Grupo adicional each allow one more owned group alongside the plan group', async () => {
+  const source = await read('../src/utils/groupCapacity.ts');
+  const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const module = { exports: {} };
+  Function('module', 'exports', js)(module, module.exports);
+  const { nextGroupKind } = module.exports;
+  const now = Date.parse('2026-11-14T10:00:00Z');
+  const team = { group_type: 'team', weekend_mode_until: null };
+  const weekendGroup = { group_type: 'weekend', weekend_mode_until: '2026-11-18T10:00:00Z' };
+  const until = '2026-11-18T10:00:00Z';
+  // Team con su grupo: Weekend sigue disponible como extra.
+  assert.equal(nextGroupKind({ ownedGroups: [team], extraGroups: 0, weekendUntil: until, hasTeamPlan: true, now }), 'weekend');
+  // Con el grupo Weekend ya creado no hay otro Weekend; el del plan sigue ocupado.
+  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 0, weekendUntil: until, hasTeamPlan: true, now }), null);
+  // Grupo adicional: un segundo grupo de plan, sin contar el Weekend.
+  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 1, weekendUntil: until, hasTeamPlan: true, now }), 'team');
+  assert.equal(nextGroupKind({ ownedGroups: [team, team], extraGroups: 1, hasTeamPlan: true, now }), null);
+  // Solo Weekend (sin plan Team): un único grupo, el Weekend.
+  assert.equal(nextGroupKind({ ownedGroups: [], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), 'weekend');
+  assert.equal(nextGroupKind({ ownedGroups: [weekendGroup], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), null);
+});
+
+test('server keeps Weekend groups outside the plan capacity and the home offers the next group', async () => {
+  const [migration, app, home, members] = await Promise.all([
+    read('../supabase/migrations/20261114100000_weekend_group_outside_plan_capacity.sql'),
+    read('../src/App.tsx'),
+    read('../src/components/HomeScreen.tsx'),
+    read('../src/components/GroupMemberList.tsx'),
+  ]);
+  assert.match(migration, /g\.group_type IS DISTINCT FROM 'weekend'/);
+  assert.match(migration, /NEW\.weekend_mode_until:=v_weekend_until/);
+  assert.match(migration, /UPDATE OF user_auth_id,archived_at,group_type/);
+  assert.match(app, /createGroupKind=\{nextGroupKind\(/);
+  assert.match(home, /\{canCreateGroup && \(/);
+  assert.match(members, /\$\{rosterCount\} de \$\{maxPlayers\}/);
+});
+
+test('database trigger allows the Weekend group and Grupo adicional next to the plan group', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const db = new PGlite();
+  const migration = await read('../supabase/migrations/20261114100000_weekend_group_outside_plan_capacity.sql');
+  await db.exec(`
+    CREATE ROLE anon; CREATE ROLE authenticated;
+    CREATE TABLE groups(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_auth_id uuid,archived_at timestamptz,group_type text NOT NULL DEFAULT 'team',weekend_mode_until timestamptz);
+    CREATE TABLE user_subscriptions(user_id uuid PRIMARY KEY,weekend_mode_until timestamptz);
+    CREATE TABLE pro_shop_purchases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),group_id uuid,product_type text,status text);
+  `);
+  await db.exec(migration);
+  const owner = '00000000-0000-0000-0000-000000000001';
+  const insert = (type, until = null) => db.query('INSERT INTO groups(user_auth_id,group_type,weekend_mode_until) VALUES($1,$2,$3) RETURNING id,weekend_mode_until', [owner, type, until]);
+  const plan = await insert('team');
+  await assert.rejects(insert('team'), /más grupos activos/);
+  await assert.rejects(insert('weekend'), /Weekend activo/);
+  await db.query(`INSERT INTO user_subscriptions VALUES($1, now() + interval '7 days')`, [owner]);
+  // El cliente no decide la fecha de fin del grupo Weekend.
+  const weekend = await insert('weekend', '2099-01-01T00:00:00Z');
+  assert.notEqual(new Date(weekend.rows[0].weekend_mode_until).getUTCFullYear(), 2099);
+  await assert.rejects(insert('weekend'), /grupo Weekend activo/);
+  await db.query(`INSERT INTO pro_shop_purchases(group_id,product_type,status) VALUES($1,'grupo-adicional','completed')`, [plan.rows[0].id]);
+  await insert('team');
+  await assert.rejects(insert('team'), /más grupos activos/);
+  await db.close();
+});
+
+test('group rounds never change the personal handicap and the Pro-Shop lets you pick the groups', async () => {
+  const [setup, i18n, shop, home] = await Promise.all([
+    read('../src/components/PlayerSetup.tsx'),
+    read('../src/i18n/index.ts'),
+    read('../src/components/ProShop.tsx'),
+    read('../src/components/HomeScreen.tsx'),
+  ]);
+  assert.match(setup, /if \(addingSelf && !currentGroup\) \{/);
+  assert.match(i18n, /No afecta a los grupos, en cada grupo tienes tu HCP por separado\./);
+  assert.doesNotMatch(i18n, /Cada grupo guarda el tuyo por separado/);
+  assert.match(shop, /¿Para qué grupo\?/);
+  assert.match(shop, /for \(const otherId of alsoApplyTo\)/);
+  assert.match(shop, /item\.id !== 'grupo-adicional'/);
+  assert.match(home, /group\.weekend\s*\n?\s*\? \(managesGroup/);
+});

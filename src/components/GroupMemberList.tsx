@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Crown, Search, Trash2, UserPlus, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { golfService } from '../services/golfService';
+import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import type { GroupMember, UserProfile } from '../types';
 import { WriteButton, useReadOnly } from '../context/ReadOnlyContext';
@@ -30,6 +31,8 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
   const [handicap, setHandicap] = useState('');
   const [confirm, setConfirm] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  // Plantilla del grupo: 20 jugadores, o 32 con la ampliación del Pro-Shop.
+  const [maxPlayers, setMaxPlayers] = useState<number | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [searchName, setSearchName] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
@@ -43,15 +46,17 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
     let active = true;
     const load = async () => {
       try {
-        const [rawMembers, invitations, gamePlayers] = await Promise.all([
+        const [rawMembers, invitations, gamePlayers, capacity] = await Promise.all([
           userService.getGroupMembers(groupId),
           userService.getGroupInvitationStatuses(groupId),
           golfService.getAllPlayers(groupId).catch(() => []),
+          supabase.from('groups').select('max_players').eq('id', groupId).maybeSingle(),
         ]);
         const guestPlayerIds = new Set(gamePlayers.filter(player => player.is_guest).map(player => player.id));
         const members = rawMembers.filter(member => member.user_id || !member.player_id || !guestPlayerIds.has(member.player_id));
         if (active) {
           setState({ identity, members });
+          setMaxPlayers(capacity.data?.max_players ?? 20);
           setInvitationStatuses(Object.fromEntries(invitations.map(invitation => [invitation.userId, invitation.status])));
           setInvitedProfiles(invitations.filter(invitation => invitation.profile).map(invitation => ({ profile: invitation.profile!, status: invitation.status })));
           setLoadError('');
@@ -147,6 +152,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
 
   const visibleInvitations = invitedProfiles.filter(item => !members?.some(member => member.user_id === item.profile.user_id));
   const rosterCount = (members?.length ?? 0) + visibleInvitations.length;
+  const rosterLabel = maxPlayers ? `${rosterCount} de ${maxPlayers}` : `${rosterCount}`;
   const invitationSections = (['accepted', 'pending', 'rejected'] as const).map(status => ({
     status,
     items: visibleInvitations.filter(item => item.status === status),
@@ -167,7 +173,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
           <h2 className="text-2xl font-semibold text-title">Jugadores</h2>
           {members && (
             <span className="ml-3 text-sm text-accent-ink font-medium">
-              ({rosterCount})
+              ({rosterLabel})
             </span>
           )}
         </div>
@@ -179,7 +185,7 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
       </button>
     ) : (
       <div className="flex flex-wrap items-center justify-between gap-2 bg-accent-soft p-3 rounded-lg">
-        <h2 className="flex items-center gap-2 text-lg font-semibold text-title"><Users size={20} />Jugadores{members && ` (${rosterCount})`}</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-title"><Users size={20} />Jugadores{members && ` (${rosterLabel})`}</h2>
         <div className="flex gap-2">{!archived && canManage && <WriteButton className="text-sm bg-accent text-on-accent rounded-lg px-3 py-1.5" onClick={() => setShowAdd(value => !value)}><UserPlus size={16} className="inline mr-1" />Añadir</WriteButton>}<button className="text-sm border border-line rounded-lg px-3 py-1.5" onClick={() => setRefresh(value => value + 1)}>Actualizar</button></div>
       </div>
     )}

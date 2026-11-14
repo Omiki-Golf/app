@@ -18,7 +18,7 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member' }>;
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; weekend?: boolean }>;
   onOpenGroup?: (groupId: string) => void;
   onShowProfile: () => void;
   onShowAuth: () => void;
@@ -33,6 +33,8 @@ interface HomeScreenProps {
   /** Omiki Weekend activo: fin y momento de activación (para saber si es de 7 días o 3 meses). */
   weekendUntil?: string | null;
   weekendActivatedAt?: string | null;
+  /** Grupo que el usuario puede crear ahora (Weekend aparte o el del plan/grupo adicional); null si ninguno. */
+  createGroupKind?: 'weekend' | 'team' | null;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -56,12 +58,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   handicap18,
   weekendUntil,
   weekendActivatedAt,
+  createGroupKind,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
   // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
-  const weekend = weekendDuration(weekendUntil, weekendActivatedAt);
+  const weekend = createGroupKind === 'weekend' ? weekendDuration(weekendUntil, weekendActivatedAt) : null;
+  // Sin dato explícito se mantiene la regla anterior: Team/Premium sin grupo propio.
+  const canCreateGroup = createGroupKind !== undefined
+    ? createGroupKind !== null
+    : isTeam && groupShortcuts.every(group => group.access !== 'owner');
   const fallbackHcp18 = profile?.exact_handicap !== undefined && profile?.exact_handicap !== null
     ? Math.round(profile.exact_handicap)
     : 0;
@@ -168,9 +175,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             return <WriteButton
               key={group.id}
               onClick={() => onOpenGroup?.(group.id)}
-              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup
-                ? 'border-amber-500 bg-amber-500 text-amber-950 shadow-card hover:bg-amber-600'
-                : 'border-amber-500 bg-card text-amber-500 hover:bg-amber-500/10'}`}
+              // Weekend usa su naranja de Planes para distinguirse de los grupos Team (ámbar).
+              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${group.weekend
+                ? (managesGroup
+                  ? 'border-orange-700 bg-orange-700 text-white shadow-card hover:bg-orange-800'
+                  : 'border-orange-600 bg-card text-orange-500 hover:bg-orange-600/10')
+                : managesGroup
+                  ? 'border-amber-500 bg-amber-500 text-amber-950 shadow-card hover:bg-amber-600'
+                  : 'border-amber-500 bg-card text-amber-500 hover:bg-amber-500/10'}`}
             >
               <Users className="w-6 h-6" aria-hidden="true" />
               <span className="min-w-0 truncate">{group.name}</span>
@@ -179,7 +191,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </WriteButton>;
           })}
 
-          {isTeam && groupShortcuts.every(group => group.access !== 'owner') && (
+          {canCreateGroup && (
             <WriteButton
               onClick={onCreateTeam}
               className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${weekend

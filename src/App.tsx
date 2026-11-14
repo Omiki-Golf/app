@@ -35,6 +35,8 @@ import { ProfileDetails } from './components/ProfileDetails';
 import { TeamCreation } from './components/TeamCreation';
 import { NotificationsBell } from './components/NotificationsBell';
 import { teamTrialOfferActive } from './utils/teamTrialOffer';
+import { effectivePlan } from './utils/effectivePlan';
+import { nextGroupKind } from './utils/groupCapacity';
 import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
 import { PaymentSelector } from './components/PaymentSelector';
@@ -78,6 +80,7 @@ function App() {
   const [currentGroup, setCurrentGroup] = useState<Group | null>(null);
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
+  const [ownedExtraGroups, setOwnedExtraGroups] = useState(0);
   const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member' }>>([]);
   // Pro-Shop: el grupo abierto si soy su creador; si no, mi primer grupo creado.
   const proShopGroup = (currentGroup && homeGroups.some(item => item.access === 'owner' && item.group.id === currentGroup.id))
@@ -160,6 +163,9 @@ function App() {
   const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
   const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, subscription, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
+  // Plan Team/Premium propio (o prueba Team), sin contar el Weekend, que da un grupo aparte.
+  const basePlanType = effectivePlan(subscription ? { ...subscription, weekend_mode_until: null } : null);
+  const hasTeamPlan = basePlanType === 'team' || basePlanType === 'premium';
   const latestHandicap = useLatestPlayingHandicap(user?.id, profile, currentView);
 
   // Arranque: la app se muestra cuando ya se conocen la sesión, el perfil, el plan y sus imágenes
@@ -620,7 +626,13 @@ function App() {
         if (joined.error) throw joined.error;
         joinedGroups = (joined.data || []) as Group[];
       }
+      let extraGroups = 0;
+      if (ownedIds.size) {
+        const extras = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', [...ownedIds]).eq('product_type', 'grupo-adicional').eq('status', 'completed');
+        extraGroups = extras.count || 0;
+      }
       if (!active) return;
+      setOwnedExtraGroups(extraGroups);
       setOwnedTeam(ownedGroups[0] ?? null);
       setHomeGroups([
         ...ownedGroups.map(group => ({ group, access: 'owner' as const })),
@@ -1355,6 +1367,7 @@ function App() {
             userId={user.id}
             weekendUntil={subscription?.weekend_mode_until}
             weekendActivatedAt={subscription?.updated_at}
+            hasTeamPlan={hasTeamPlan}
             onBack={() => setCurrentView('main')}
             onTeamCreated={() => {
               refreshSubscription();
@@ -1460,8 +1473,14 @@ function App() {
               setShowAccessCodeModal(true);
               setAccessCodeError('');
             }}
-            onCreateTeam={() => ownedTeam ? void handleGroupJoined(ownedTeam) : setCurrentView('team-creation')}
-            groupShortcuts={homeGroups.map(({ group, access }) => ({ id: group.id, name: group.name || group.group_code, access }))}
+            createGroupKind={nextGroupKind({
+              ownedGroups: homeGroups.filter(item => item.access === 'owner').map(item => item.group),
+              extraGroups: ownedExtraGroups,
+              weekendUntil: subscription?.weekend_mode_until,
+              hasTeamPlan,
+            })}
+            onCreateTeam={() => setCurrentView('team-creation')}
+            groupShortcuts={homeGroups.map(({ group, access }) => ({ id: group.id, name: group.name || group.group_code, access, weekend: group.group_type === 'weekend' }))}
             onOpenGroup={(groupId) => {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
               if (selectedGroup) void handleGroupJoined(selectedGroup);

@@ -327,7 +327,9 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       const linkedUserId = pickedAccount ? pickedAccount.user_id : isAccountName(playerName) && !accountInRound ? account!.userId : undefined;
 
       const addingSelf = !!user && (linkedUserId === user.id || selectedPlayer?.auth_user_id === user.id);
-      if (addingSelf) {
+      // Solo las partidas rápidas actualizan tu HCP personal: en un grupo se usa el HCP del grupo
+      // y lo que pasa en el grupo se queda en el grupo.
+      if (addingSelf && !currentGroup) {
         const profile = await userService.getProfile(user.id);
         if (!profile) throw new Error('No se ha encontrado tu perfil.');
         const change = personalHandicapChange(profile.exact_handicap, handicapNum, numHoles);
