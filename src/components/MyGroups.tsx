@@ -9,7 +9,6 @@ import { Group } from '../types';
 import { userService } from '../services/userService';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
 import { ConfirmModal } from './ConfirmModal';
-import { PremiumModal } from './PremiumModal';
 import { GroupMemberList } from './GroupMemberList';
 import { GroupSettingsPanel } from './GroupSettingsPanel';
 import { useSubscription } from '../hooks/useSubscription';
@@ -26,6 +25,7 @@ interface MyGroupsProps {
   onGroupDeleted?: (groupId: string) => void;
   onGroupLeft?: (groupId: string) => void;
   messagesButton?: React.ReactNode;
+  onShowPlans?: () => void;
 }
 
 interface GroupWithCode {
@@ -53,7 +53,7 @@ const sortGroups = (items: MyGroup[]) => [...items].sort((a, b) => {
   return archiveOrder || b.created_at.localeCompare(a.created_at);
 });
 
-export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, onGroupLeft, messagesButton }: MyGroupsProps) {
+export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, onGroupLeft, messagesButton, onShowPlans }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
   const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +69,6 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [user, setUser] = useState<User | null>(null);
 
   // ─── PREMIUM ───
-  const [showPremium, setShowPremium] = useState(false);
   const { isPremium, profile: userProfile, loading: subLoading } = useSubscription(user?.id ?? null);
 
   const loadGroups = useCallback(async () => {
@@ -231,9 +230,9 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
             center={messagesButton}
             right={<>
               {/* Icono Premium (solo si NO es premium y terminó de cargar) */}
-              {!subLoading && !isPremium && (
+              {!subLoading && !isPremium && onShowPlans && (
                 <button
-                  onClick={() => setShowPremium(true)}
+                  onClick={onShowPlans}
                   className="relative group bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-full p-2 transition-all hover:scale-110"
                   title={t('groups.premium')}
                 >
@@ -437,14 +436,6 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         />
       )}
 
-      {/* ─── MODAL PREMIUM ─── */}
-      {showPremium && (
-        <PremiumModal
-          isOpen={showPremium}
-          onClose={() => setShowPremium(false)}
-          userId={user?.id || ''}
-        />
-      )}
     </div>
   );
 }

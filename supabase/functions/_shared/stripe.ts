@@ -11,7 +11,9 @@ export function serviceClient() {
 export function stripeClient() {
   const key = Deno.env.get('STRIPE_SECRET_KEY') || '';
   if (!key.startsWith('sk_test_')) throw new Error('Falta configurar la clave de Stripe Sandbox.');
-  return new Stripe(key, {apiVersion:'2025-08-27.basil', httpClient:Stripe.createFetchHttpClient()});
+  // 10 s por llamada y un reintento: la función responde antes de que el navegador
+  // agote su margen (45 s) aunque encadene varias llamadas a Stripe.
+  return new Stripe(key, {apiVersion:'2025-08-27.basil', httpClient:Stripe.createFetchHttpClient(), timeout:10000, maxNetworkRetries:1});
 }
 export async function checkedStripe() {
   const stripe = stripeClient();

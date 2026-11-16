@@ -3,11 +3,16 @@ import { getReadOnly } from './userRestriction';
 import { userService } from './userService';
 import { intentPlan, playerIntent, type SimulatedSubscription } from '../utils/playerRegistration';
 
+class UncertainCheckoutError extends Error {}
+
 async function callCheckout(action: 'create' | 'status') {
   const { data, error } = await supabase.functions.invoke('stripe-checkout', { body: { action } });
   if (error) {
     let message = 'No se ha podido conectar con Stripe Sandbox. Reintenta.';
-    try { message = (await error.context.json()).error || message; } catch { /* Network failure. */ }
+    // Sin respuesta (red caída o tiempo agotado) no sabemos si el servidor llegó a
+    // completar la operación en Stripe: se marca para comprobarlo antes de avisar.
+    if (!(error.context instanceof Response)) throw new UncertainCheckoutError(message);
+    try { message = (await error.context.json()).error || message; } catch { /* Respuesta sin JSON. */ }
     throw new Error(message);
   }
   if (data?.error) throw new Error(data.error);
@@ -41,11 +46,21 @@ export const playerCheckoutService = {
   async activate(expectedUserId: string) {
     const state = await this.load(expectedUserId);
     if (state.readOnly) throw new Error('Esta cuenta tiene permisos de solo lectura.');
-    const result = await callCheckout('create');
+    let result: Awaited<ReturnType<typeof callCheckout>>;
+    try { result = await callCheckout('create'); }
+    catch (cause) {
+      // Una mejora pudo aplicarse aunque la respuesta no llegara: comprobarlo una vez.
+      if (cause instanceof UncertainCheckoutError) {
+        const after = await this.refresh(expectedUserId).catch(() => null);
+        if (after?.completed) return after;
+      }
+      throw cause;
+    }
     if (result.url) {
       const url = new URL(result.url);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com') throw new Error('Stripe devolvió una dirección de pago no válida.');
       window.location.assign(url.href);
+      return 'redirecting' as const;
     }
     return this.load(expectedUserId);
   },

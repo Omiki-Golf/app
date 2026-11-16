@@ -39,7 +39,6 @@ import { effectivePlan } from './utils/effectivePlan';
 import { nextGroupKind } from './utils/groupCapacity';
 import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
-import { PaymentSelector } from './components/PaymentSelector';
 import { useSubscription } from './hooks/useSubscription';
 import { useLatestPlayingHandicap } from './hooks/useLatestPlayingHandicap';
 import { userService } from './services/userService';
@@ -206,9 +205,6 @@ function App() {
     void refreshGroupMembership();
   }, [refreshNotifications, refreshGroupMembership]);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showPayment, setShowPayment] = useState(false);
-  const [paymentAmount] = useState(0);
-  const [paymentDescription] = useState('');
   const [simulatorEnabled, setSimulatorEnabled] = useState(false);
   const [simulatedPlan, setSimulatedPlan] = useState<PlanType | null>(null);
   const [simulatorUpdating, setSimulatorUpdating] = useState(false);
@@ -1419,6 +1415,7 @@ function App() {
         <IncognitoWarning />
         <div className={isIncognito ? 'pt-10' : ''}>
           <MyGroups backDestination={returnToProfile ? 'back' : 'home'}
+            onShowPlans={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onBack={() => backFromProfileSection('main')}
             onGroupArchived={(groupId, archivedAt) => {
               setOwnedTeam(current => current?.id === groupId ? null : current);
@@ -1509,20 +1506,6 @@ function App() {
           )}
           {showShareModal && (
             <ShareModal onClose={() => setShowShareModal(false)} />
-          )}
-          {showPayment && user && (
-            <PaymentSelector
-              isOpen={showPayment}
-              onClose={() => setShowPayment(false)}
-              planType={activePlanType}
-              userId={user.id}
-              amount={paymentAmount}
-              description={paymentDescription}
-              onSuccess={() => {
-                refreshSubscription();
-                setShowPayment(false);
-              }}
-            />
           )}
         </div>
       </>

@@ -48,9 +48,8 @@ consulta la [documentacion oficial](https://github.com/getumbrel/umbrel-apps).
 - La base de datos, autenticacion y funciones siguen en Supabase. Este Compose
   no instala un Supabase local ni aplica migraciones. Las escrituras de la web
   afectan al proyecto configurado, igual que la web actual.
-- Los pagos siguen dependiendo de los servicios externos del proyecto. El codigo
-  existente de Lightning incluye una credencial BTCPay en el frontend; Docker no
-  la oculta. Este Compose no configura otro BTCPay ni un nodo Lightning de Umbrel.
+- Los pagos dependen de Stripe, configurado en las funciones de Supabase del
+  proyecto. La web ya no usa BTCPay ni Lightning.
 - Para enlaces de autenticacion, revisa las URL de redireccion autorizadas en
   Supabase si utilizas una direccion nueva. Los retornos y webhooks de pagos
   necesitan su configuracion propia y no se reconfiguran con este Compose.
