@@ -1,6 +1,6 @@
 export type TierColor = 'express' | 'player' | 'team' | 'premium' | 'weekend';
 
-/** Paleta oficial de omikigolf.com: sky, lime, gold, fuchsia y orange para Weekend. */
+/** Paleta de tiers de Omiki: Team usa el verde #A3E635 y Weekend conserva el naranja. */
 export const tierColors: Record<TierColor, {
   ink: string;
   border: string;
@@ -26,12 +26,12 @@ export const tierColors: Record<TierColor, {
     outlineButton: 'border-lime-400 text-lime-700 hover:bg-lime-400/10 dark:text-lime-300',
   },
   team: {
-    ink: 'text-amber-700 dark:text-amber-400',
-    border: 'border-amber-400',
-    button: 'bg-amber-400 hover:bg-amber-500 text-slate-950',
-    soft: 'bg-amber-400/10 text-amber-800 dark:text-amber-300',
-    card: 'border-amber-400/70 bg-amber-400/10',
-    outlineButton: 'border-amber-400 text-amber-800 hover:bg-amber-400/10 dark:text-amber-300',
+    ink: 'text-lime-700 dark:text-lime-400',
+    border: 'border-lime-400',
+    button: 'bg-lime-400 hover:bg-lime-500 text-slate-950',
+    soft: 'bg-lime-400/10 text-lime-700 dark:text-lime-300',
+    card: 'border-lime-400/70 bg-lime-400/10',
+    outlineButton: 'border-lime-400 text-lime-700 hover:bg-lime-400/10 dark:text-lime-300',
   },
   premium: {
     ink: 'text-fuchsia-700 dark:text-fuchsia-400',

@@ -13,9 +13,10 @@ test('plans and group cards share the omikigolf.com tier palette', async () => {
     read('../src/App.tsx'),
   ]);
 
-  for (const color of ['sky-400', 'lime-400', 'amber-400', 'fuchsia-400', 'orange-500']) {
+  for (const color of ['sky-400', 'lime-400', 'fuchsia-400', 'orange-500']) {
     assert.match(palette, new RegExp(color));
   }
+  assert.match(palette, /team: \{[\s\S]*?border: 'border-lime-400'[\s\S]*?button: 'bg-lime-400/);
   assert.match(plans, /tierColors\.express/);
   assert.match(plans, /tierColors\.weekend/);
   assert.match(home, /groupTier\(group\)/);
