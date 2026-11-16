@@ -1744,8 +1744,9 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     });
 
     const dateRankings = new Map<string, DailyRankingHistoryRow[]>();
+    // Cada jornada del día (partidas distintas el mismo día) es una entrada del historial.
     dailyRankingsData.forEach((ranking) => {
-      const date = ranking.ranking_date;
+      const date = `${ranking.ranking_date}#${ranking.ranking_session ?? 1}`;
       if (!dateRankings.has(date)) {
         dateRankings.set(date, []);
       }
@@ -1798,12 +1799,14 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       });
     });
 
-    const sortedDates = Array.from(dateRankings.keys()).sort((a, b) =>
-      new Date(b).getTime() - new Date(a).getTime()
-    );
+    const sortedDates = Array.from(dateRankings.keys()).sort((a, b) => {
+      const [dateA, sessionA] = a.split('#');
+      const [dateB, sessionB] = b.split('#');
+      return new Date(dateB).getTime() - new Date(dateA).getTime() || Number(sessionB) - Number(sessionA);
+    });
 
     return sortedDates.map((date) => ({
-      date,
+      date: date.split('#')[0],
       handicaps: historyByDate[date],
       playerNames: Array.from(allPlayerNames).sort(),
     }));
@@ -1976,7 +1979,26 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }
   },
 
-  async archiveRound(roundId: string): Promise<void> {
+  // Última jornada archivada del grupo en el mismo día natural (UTC, como la clasificación diaria). 0 si no hay ninguna.
+  async latestArchivedSession(groupId: string, playedAt: string): Promise<number> {
+    const day = playedAt.split('T')[0];
+    const { data, error } = await supabase
+      .from('archived_rounds')
+      .select('ranking_session')
+      .eq('group_id', groupId)
+      .gte('played_at', `${day}T00:00:00.000Z`)
+      .lte('played_at', `${day}T23:59:59.999Z`)
+      .order('ranking_session', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    return Number(data?.[0]?.ranking_session ?? 0);
+  },
+
+  /**
+   * sessionChoice: 'same' suma la partida a la última jornada del día (2ª vuelta o salidas simultáneas);
+   * 'new' abre una clasificación aparte. Sin elección se suma, como hasta ahora.
+   */
+  async archiveRound(roundId: string, sessionChoice: 'same' | 'new' = 'same'): Promise<void> {
     const { data: previousArchive, error: archiveLookupError } = await supabase.from('archived_rounds').select('id').eq('source_round_id', roundId).maybeSingle();
     if (archiveLookupError) throw archiveLookupError;
     if (previousArchive) {
@@ -2148,12 +2170,15 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     }).filter(Boolean);
 
     const currentSeason = await this.getCurrentSeason(round.group_id);
+    const latestSession = await this.latestArchivedSession(round.group_id, round.created_at);
+    const rankingSession = latestSession === 0 ? 1 : sessionChoice === 'new' ? latestSession + 1 : latestSession;
 
     const { error } = await supabase
       .from('archived_rounds')
       .insert([
         {
           group_id: round.group_id,
+          ranking_session: rankingSession,
           source_round_id: round.id,
           course_name: course.name,
           played_at: round.created_at,
@@ -3000,15 +3025,17 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return best;
   },
 
-  async getDailyRankingForDate(groupId: string, date: Date): Promise<ArchivedDailyRanking[]> {
+  // session: jornada dentro del día (varias partidas distintas el mismo día). Sin ella, todo el día.
+  async getDailyRankingForDate(groupId: string, date: Date, session?: number): Promise<ArchivedDailyRanking[]> {
     const dateString = date.toISOString().split('T')[0];
 
-    const { data: dailyRanking, error: rankingError } = await supabase
+    let rankingQuery = supabase
       .from('daily_rankings')
       .select('*')
       .eq('group_id', groupId)
-      .eq('ranking_date', dateString)
-      .order('position', { ascending: true });
+      .eq('ranking_date', dateString);
+    if (session) rankingQuery = rankingQuery.eq('ranking_session', session);
+    const { data: dailyRanking, error: rankingError } = await rankingQuery.order('position', { ascending: true });
 
     if (rankingError) throw rankingError;
 
@@ -3016,12 +3043,14 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       return [];
     }
 
-    const { data: rounds, error: roundsError } = await supabase
+    let roundsQuery = supabase
       .from('group_statistics_rounds')
       .select('*')
       .eq('group_id', groupId)
       .gte('archived_at', `${dateString}T00:00:00`)
       .lte('archived_at', `${dateString}T23:59:59`);
+    if (session) roundsQuery = roundsQuery.eq('ranking_session', session);
+    const { data: rounds, error: roundsError } = await roundsQuery;
 
     if (roundsError) throw roundsError;
 
@@ -3059,16 +3088,17 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return rankingWithAwards;
   },
 
-  async getArchivedRoundsForDate(groupId: string, date: Date): Promise<ArchivedRound[]> {
+  async getArchivedRoundsForDate(groupId: string, date: Date, session?: number): Promise<ArchivedRound[]> {
     const dateString = date.toISOString().split('T')[0];
 
-    const { data: rounds, error: roundsError } = await supabase
+    let roundsQuery = supabase
       .from('archived_rounds')
       .select('*')
       .eq('group_id', groupId)
       .gte('played_at', `${dateString}T00:00:00`)
-      .lte('played_at', `${dateString}T23:59:59`)
-      .order('played_at', { ascending: true });
+      .lte('played_at', `${dateString}T23:59:59`);
+    if (session) roundsQuery = roundsQuery.eq('ranking_session', session);
+    const { data: rounds, error: roundsError } = await roundsQuery.order('played_at', { ascending: true });
 
     if (roundsError) throw roundsError;
 

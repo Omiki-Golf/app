@@ -39,8 +39,8 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
       try {
         setLoadingData(true);
         const [ranking, rounds] = await Promise.all([
-          golfService.getDailyRankingForDate(round.group_id, new Date(round.played_at)),
-          golfService.getArchivedRoundsForDate(round.group_id, new Date(round.played_at)),
+          golfService.getDailyRankingForDate(round.group_id, new Date(round.played_at), round.ranking_session),
+          golfService.getArchivedRoundsForDate(round.group_id, new Date(round.played_at), round.ranking_session),
         ]);
         setDailyRanking(ranking);
         setAllRounds(rounds);

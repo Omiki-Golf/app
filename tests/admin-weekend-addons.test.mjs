@@ -36,6 +36,26 @@ test('Weekend and every Pro-Shop add-on are wired to test activation and server 
   assert.match(migration, /activate_weekend_for_testing/);
 });
 
+test('Weekend asks Express or signed-out users for a paid plan instead of opening sign-in', async () => {
+  const [plans, i18n] = await Promise.all([read('../src/components/PlansComparison.tsx'), read('../src/i18n/plans.ts')]);
+  assert.match(plans, /if \(!hasPaidPlan \|\| !onStartWeekend\) \{ setWeekendNeedsPlan\(true\); return; \}/);
+  assert.doesNotMatch(plans, /if \(!onStartWeekend\) \{ onShowAuth/);
+  assert.match(plans, /setSelected\('player'\)/);
+  assert.equal(i18n.match(/weekendNeedsPlan:/g)?.length, 4);
+  assert.match(i18n, /Para activar Omiki Weekend necesitas estar suscrito a un plan Omiki: Player o Team\./);
+});
+
+test('Mis datos de registro only accepts whole handicaps and explains why', async () => {
+  const [details, i18n] = await Promise.all([read('../src/components/ProfileDetails.tsx'), read('../src/i18n/index.ts')]);
+  assert.doesNotMatch(details, /inputMode="decimal"/);
+  assert.doesNotMatch(details, /step="0\.1"/);
+  assert.match(details, /raw\.replace\(\/\\D\/g, ''\)\.slice\(0, 2\)/);
+  assert.equal(details.match(/onKeyDown=\{blockNonDigits\}/g)?.length, 2);
+  assert.match(details, /t\('profile\.noDecimals'\)/);
+  assert.equal(i18n.match(/noDecimals:/g)?.length, 4);
+  assert.match(i18n, /Aquí los decimales no son para nosotros/);
+});
+
 test('Weekend and Grupo adicional each allow one more owned group alongside the plan group', async () => {
   const source = await read('../src/utils/groupCapacity.ts');
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;

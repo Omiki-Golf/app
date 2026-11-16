@@ -550,7 +550,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                         <tbody>
                           {handicapHistory.map((entry, index) => (
                             <tr
-                              key={entry.date}
+                              key={`${entry.date}-${index}`}
                               className={index % 2 === 0 ? 'bg-card' : 'bg-card-2'}
                             >
                               <td className={`py-3 pl-5 pr-4 font-medium text-ink sticky left-0 z-20 border-r border-line min-w-[120px] w-[120px] ${index % 2 === 0 ? 'bg-card' : 'bg-card-2'}`} style={{ boxShadow: '2px 0 4px rgba(0,0,0,0.1)' }}>

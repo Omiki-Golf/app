@@ -47,8 +47,22 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   const [saved, setSaved] = useState(false);
   const [supportIdCopied, setSupportIdCopied] = useState(false);
   const [showSupportId, setShowSupportId] = useState(false);
-  const [handicap, setHandicap] = useState(profile?.exact_handicap?.toString() ?? '');
-  const [handicap9, setHandicap9] = useState(profile ? Math.ceil(profile.exact_handicap / 2).toString() : '');
+  // Solo hándicap de juego entero: los perfiles antiguos con decimal se muestran redondeados.
+  const [handicap, setHandicap] = useState(profile ? Math.round(profile.exact_handicap).toString() : '');
+  const [handicap9, setHandicap9] = useState(profile ? Math.ceil(Math.round(profile.exact_handicap) / 2).toString() : '');
+  const [decimalHint, setDecimalHint] = useState(false);
+  const blockNonDigits = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['.', ',', '-', '+', 'e', 'E'].includes(event.key)) {
+      event.preventDefault();
+      if (event.key === '.' || event.key === ',') setDecimalHint(true);
+    }
+  };
+  // Devuelve solo dígitos (máx. 2) y avisa si había que quitar algo, p. ej. al pegar "10,1".
+  const wholeHandicap = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 2);
+    setDecimalHint(/[.,]/.test(raw));
+    return digits;
+  };
   const [country, setCountry] = useState(profile?.country ?? '');
   const [postalCode, setPostalCode] = useState(profile?.postal_code ?? '');
   const [age, setAge] = useState(profile?.age?.toString() ?? '');
@@ -75,8 +89,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setNick(profile?.nick ?? '');
     setAvatarUrl(normalizeAvatarUrl(profile?.avatar_url ?? DEFAULT_AVATAR_URL));
     setShowSelectedAvatar(Boolean(profile?.avatar_url));
-    setHandicap(profile?.exact_handicap?.toString() ?? '');
-    setHandicap9(profile ? Math.ceil(profile.exact_handicap / 2).toString() : '');
+    setHandicap(profile ? Math.round(profile.exact_handicap).toString() : '');
+    setHandicap9(profile ? Math.ceil(Math.round(profile.exact_handicap) / 2).toString() : '');
     setCountry(profile?.country ?? '');
     setPostalCode(profile?.postal_code ?? '');
     setAge(profile?.age?.toString() ?? '');
@@ -296,12 +310,13 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       <label htmlFor="profile-handicap-9" className="block text-sm font-medium text-ink-2 mb-2">HCP 9</label>
                       <input
                         id="profile-handicap-9"
-                        type="number"
-                        step="1"
+                        type="text"
                         inputMode="numeric"
+                        pattern="[0-9]*"
                         value={handicap9}
+                        onKeyDown={blockNonDigits}
                         onChange={(event) => {
-                          const value = event.target.value;
+                          const value = wholeHandicap(event.target.value);
                           setHandicap9(value);
                           setHandicap(value === '' ? '' : (Number(value) * 2).toString());
                           setSaved(false);
@@ -314,12 +329,13 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">HCP 18</label>
                       <input
                         id="profile-handicap"
-                        type="number"
-                        step="0.1"
-                        inputMode="decimal"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={handicap}
+                        onKeyDown={blockNonDigits}
                         onChange={(event) => {
-                          const value = event.target.value;
+                          const value = wholeHandicap(event.target.value);
                           setHandicap(value);
                           setHandicap9(value === '' ? '' : Math.ceil(Number(value) / 2).toString());
                           setSaved(false);
@@ -329,6 +345,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       />
                     </div>
                   </div>
+                  {decimalHint && <p role="status" className="-mt-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300">{t('profile.noDecimals')}</p>}
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>

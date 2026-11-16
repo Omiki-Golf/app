@@ -49,6 +49,9 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
   const [annual, setAnnual] = useState(currentBillingPeriod ? currentBillingPeriod === 'annual' : true);
   const [weekendDays, setWeekendDays] = useState<7 | 90>(7);
   const [comingSoon, setComingSoon] = useState(false);
+  // Weekend es un extra: solo se contrata sobre un plan de pago (Player o Team).
+  const [weekendNeedsPlan, setWeekendNeedsPlan] = useState(false);
+  const hasPaidPlan = currentPlan === 'player' || currentPlan === 'team' || currentPlan === 'premium';
   const [confirmPlayer, setConfirmPlayer] = useState(false);
   const [paidTeamUpgrade, setPaidTeamUpgrade] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -91,7 +94,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             const isCurrent = currentPlan === item.id;
             const isIncluded = currentPlan !== undefined && planRank[item.id] < planRank[currentPlan];
             return (
-              <button key={item.id} id={`plan-${item.id}`} type="button" disabled={isCurrent || isIncluded} aria-expanded={active} aria-controls="plan-details" onClick={() => { setSelected(item.id); setComingSoon(false); }} className={`w-full rounded-2xl border bg-card-2 p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:cursor-not-allowed ${isIncluded ? 'border-line opacity-55' : active ? current.border : 'border-line hover:border-line-2'}`}>
+              <button key={item.id} id={`plan-${item.id}`} type="button" disabled={isCurrent || isIncluded} aria-expanded={active} aria-controls="plan-details" onClick={() => { setSelected(item.id); setComingSoon(false); setWeekendNeedsPlan(false); }} className={`w-full rounded-2xl border bg-card-2 p-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current disabled:cursor-not-allowed ${isIncluded ? 'border-line opacity-55' : active ? current.border : 'border-line hover:border-line-2'}`}>
                 <div className="flex items-center gap-2">
                   <Icon size={20} className={`shrink-0 ${current.ink}`} />
                   <div className="min-w-0 flex-1">
@@ -150,7 +153,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             if (isCurrentPlan) return;
             if (selected === 'express') onSelectPlan('express');
             else if (selected === 'weekend') {
-              if (!onStartWeekend) { onShowAuth?.(); return; }
+              if (!hasPaidPlan || !onStartWeekend) { setWeekendNeedsPlan(true); return; }
               setUpdating(true);
               void onStartWeekend(weekendDays).catch(error => setUpdateError(error instanceof Error ? error.message : p('errors.weekend'))).finally(() => setUpdating(false));
             }
@@ -158,6 +161,14 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             else setComingSoon(true);
           }} className={`mt-4 w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${style.button}`}>{isCurrentPlan ? p('current') : catalogText(plan.id, 'action', plan.action)}</button>
         )}
+        {weekendNeedsPlan && <div role="status" className="mt-3 rounded-xl border border-orange-500 bg-card-2 p-3 text-center">
+          <p className="text-sm font-semibold text-ink">{p('weekendNeedsPlan')}</p>
+          <button type="button" onClick={() => {
+            setWeekendNeedsPlan(false);
+            setSelected('player');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-on-accent">{p('seePlans')}</button>
+        </div>}
         {comingSoon && <p role="status" className="mt-3 rounded-xl bg-accent-soft p-3 text-center text-sm font-semibold text-accent-ink">{p('comingSoon')}</p>}
         {updateError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm text-red-700">{updateError}</p>}
         {!expressLimit && onShowAuth && <button type="button" onClick={onShowAuth} className="mt-6 flex w-full items-center justify-center gap-2 border-t border-line pt-5 text-sm text-ink-2 hover:text-accent-ink"><LogIn size={18} className="shrink-0" /><span>{p('alreadyRegistered')} <span className="font-semibold underline">{p('signIn')}</span></span></button>}

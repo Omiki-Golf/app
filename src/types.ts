@@ -271,6 +271,8 @@ export interface ArchivedRound {
   holes_range?: '1-9' | '10-18' | null;
   total_players?: number;
   decided_result?: DecidedResult | null;
+  /** Jornada dentro del día: partidas con la misma jornada se suman en la clasificación diaria. */
+  ranking_session?: number;
 }
 
 export interface ArchivedDailyRanking {
@@ -308,6 +310,7 @@ export interface DailyRankingHistoryRow {
   id: string;
   group_id: string;
   ranking_date: string;
+  ranking_session?: number;
   player_id: string;
   player_name: string;
   position: number;

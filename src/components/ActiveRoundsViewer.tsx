@@ -68,6 +68,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
   const [roundToArchive, setRoundToArchive] = useState<string | null>(null);
   const [roundToDelete, setRoundToDelete] = useState<string | null>(null);
   const [roundToFinishAndArchive, setRoundToFinishAndArchive] = useState<string | null>(null);
+  // Partida de grupo de 9 hoyos pendiente de decidir si se suma a la jornada del día o va aparte.
+  const [sessionChoiceFor, setSessionChoiceFor] = useState<string | null>(null);
   const [showAddPlayerModal, setShowAddPlayerModal] = useState<string | null>(null);
   const [availablePlayers, setAvailablePlayers] = useState<Player[]>([]);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string>('');
@@ -125,12 +127,20 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     };
   }, [currentGroup?.id, loadActiveRounds]);
 
-  const handleArchiveRoundClick = async (roundId: string) => {
+  const handleArchiveRoundClick = async (roundId: string, sessionChoice?: 'same' | 'new') => {
     try {
       setLoading(true);
       setError('');
       const target = rounds.find(item => item.round.id === roundId);
-      if (target?.round.group_id) await golfService.archiveRound(roundId);
+      if (target?.round.group_id) {
+        // Una partida de 9 hoyos con otra ya archivada ese día: puede ser la 2ª vuelta o una partida distinta.
+        if (!sessionChoice && target.round.num_holes === 9
+          && await golfService.latestArchivedSession(target.round.group_id, target.round.created_at) > 0) {
+          setSessionChoiceFor(roundId);
+          return;
+        }
+        await golfService.archiveRound(roundId, sessionChoice ?? 'same');
+      }
       else await golfService.archiveQuickPlayRound(roundId);
       await loadActiveRounds();
     } catch (err) {
@@ -976,6 +986,29 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
           onConfirm={() => { const id = roundToArchive; setRoundToArchive(null); void handleArchiveRoundClick(id); }}
           onCancel={() => setRoundToArchive(null)}
         />
+      )}
+
+      {sessionChoiceFor && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="session-choice-title"
+          onKeyDown={event => { if (event.key === 'Escape') setSessionChoiceFor(null); }}>
+          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-card">
+            <h2 id="session-choice-title" className="text-lg font-bold text-ink">¿Esta partida es la 2ª vuelta o una partida diferente?</h2>
+            <p className="mt-2 text-sm text-ink-3">Ya hay otra partida archivada hoy en el grupo.</p>
+            <div className="mt-5 grid gap-2">
+              <button type="button" autoFocus onClick={() => { const id = sessionChoiceFor; setSessionChoiceFor(null); void handleArchiveRoundClick(id, 'same'); }}
+                className="w-full rounded-lg bg-blue-600 px-4 py-3 text-left font-semibold text-white hover:bg-blue-700">
+                2ª vuelta / misma partida
+                <span className="block text-xs font-normal opacity-90">Se suma a la clasificación de hoy.</span>
+              </button>
+              <button type="button" onClick={() => { const id = sessionChoiceFor; setSessionChoiceFor(null); void handleArchiveRoundClick(id, 'new'); }}
+                className="w-full rounded-lg border-2 border-blue-600 bg-card px-4 py-3 text-left font-semibold text-ink hover:bg-card-2">
+                Partida diferente
+                <span className="block text-xs font-normal text-ink-3">Clasificación y cervezas aparte.</span>
+              </button>
+              <button type="button" onClick={() => setSessionChoiceFor(null)} className="w-full rounded-lg bg-neutral py-3 font-semibold text-ink hover:bg-neutral-hover">Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {roundToFinishAndArchive && (
