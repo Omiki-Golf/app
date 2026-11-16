@@ -45,6 +45,46 @@ test('Weekend asks Express or signed-out users for a paid plan instead of openin
   assert.match(i18n, /Para activar Omiki Weekend necesitas estar suscrito a un plan Omiki: Player o Team\./);
 });
 
+test('the server only activates Weekend on a current Player, Team or Premium plan', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const db = new PGlite();
+  const migration = await read('../supabase/migrations/20261116110000_weekend_requires_paid_plan.sql');
+  await db.exec(`
+    CREATE ROLE anon; CREATE ROLE authenticated;
+    CREATE SCHEMA auth;
+    CREATE TABLE test_session(uid uuid);
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT uid FROM public.test_session LIMIT 1 $$;
+    CREATE FUNCTION public.is_app_user_read_only() RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+    CREATE TABLE user_subscriptions(user_id uuid PRIMARY KEY,plan_type text,status text,current_period_start timestamptz,
+      current_period_end timestamptz,weekend_mode_until timestamptz,updated_at timestamptz);
+  `);
+  await db.exec(migration);
+  const as = async (uid) => { await db.query('DELETE FROM test_session'); await db.query('INSERT INTO test_session VALUES($1)', [uid]); };
+  const activate = () => db.query('SELECT public.activate_weekend_for_testing(7) AS until');
+  const express = '00000000-0000-0000-0000-0000000000e1';
+  const noPlan = '00000000-0000-0000-0000-0000000000e2';
+  const player = '00000000-0000-0000-0000-0000000000e3';
+  const expired = '00000000-0000-0000-0000-0000000000e4';
+  await db.query(`INSERT INTO user_subscriptions(user_id,plan_type,status,current_period_end) VALUES
+    ($1,'express','active',NULL),($2,'player','active',now() + interval '1 month'),($3,'team','active',now() - interval '1 day')`, [express, player, expired]);
+
+  for (const uid of [express, noPlan, expired]) {
+    await as(uid);
+    await assert.rejects(activate(), /necesitas estar suscrito a un plan Omiki: Player o Team/);
+  }
+  // Sin suscripción no se crea una cuenta Express con Weekend.
+  assert.equal((await db.query('SELECT 1 FROM user_subscriptions WHERE user_id=$1', [noPlan])).rows.length, 0);
+
+  await as(player);
+  await activate();
+  const { rows } = await db.query('SELECT weekend_mode_until > now() AS active FROM user_subscriptions WHERE user_id=$1', [player]);
+  assert.equal(rows[0].active, true);
+
+  const plans = await read('../src/components/PlansComparison.tsx');
+  assert.match(plans, /if \(\/Player o Team\/\.test\(message\)\) setWeekendNeedsPlan\(true\);/);
+  await db.close();
+});
+
 test('Mis datos de registro only accepts whole handicaps and explains why', async () => {
   const [details, i18n] = await Promise.all([read('../src/components/ProfileDetails.tsx'), read('../src/i18n/index.ts')]);
   assert.doesNotMatch(details, /inputMode="decimal"/);

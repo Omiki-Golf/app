@@ -155,7 +155,12 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
             else if (selected === 'weekend') {
               if (!hasPaidPlan || !onStartWeekend) { setWeekendNeedsPlan(true); return; }
               setUpdating(true);
-              void onStartWeekend(weekendDays).catch(error => setUpdateError(error instanceof Error ? error.message : p('errors.weekend'))).finally(() => setUpdating(false));
+              void onStartWeekend(weekendDays).catch(error => {
+                const message = error instanceof Error ? error.message : '';
+                // Si el servidor rechaza por no tener plan de pago, mismo aviso con el botón Ver planes.
+                if (/Player o Team/.test(message)) setWeekendNeedsPlan(true);
+                else setUpdateError(message || p('errors.weekend'));
+              }).finally(() => setUpdating(false));
             }
             else if (!currentPlan || currentPlan === 'express') setConfirmPlayer(true);
             else setComingSoon(true);
