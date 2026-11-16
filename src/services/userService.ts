@@ -218,6 +218,11 @@ export const userService = {
     if (error) throw error;
   },
 
+  async leaveGroupMembership(groupId: string): Promise<void> {
+    const { error } = await supabase.rpc('leave_group_membership', { p_group: groupId });
+    if (error) throw error;
+  },
+
   async updateMemberRole(groupId: string, userId: string, role: 'admin' | 'member'): Promise<void> {
     const { error } = await supabase
       .from('group_members')

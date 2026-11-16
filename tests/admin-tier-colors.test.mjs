@@ -24,10 +24,10 @@ test('plans and group cards share the omikigolf.com tier palette', async () => {
   assert.match(plans, /tierColors\.express/);
   assert.match(plans, /tierColors\.weekend/);
   assert.match(home, /groupTier\(group\)/);
-  assert.match(groups, /groupTier\(\{ \.\.\.group, premium_branding:/);
+  assert.match(groups, /groupTier\(group\)/);
   assert.match(groups, /group_type, premium_branding/);
-  assert.match(app, /premium_branding: group\.premium_branding \|\| \(access === 'owner' && basePlanType === 'premium'\)/);
-  assert.match(groups, /group\.access === 'owner' && isPremium/);
+  assert.match(app, /premium_branding: group\.premium_branding/);
+  assert.doesNotMatch(app, /access === 'owner' && basePlanType === 'premium'/);
 });
 
 test('Weekend wins over Premium when choosing a group card tone', async () => {

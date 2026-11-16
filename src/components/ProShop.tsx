@@ -10,6 +10,7 @@ import { GamificationBadge } from './GamificationBadge';
 import { useTranslation } from 'react-i18next';
 import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
 import { formatDisplayPrice } from '../utils/currency';
+import { useSubscription } from '../hooks/useSubscription';
 
 interface ProShopProps {
   groupId: string | null;
@@ -69,6 +70,13 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
   const [alsoApplyTo, setAlsoApplyTo] = useState<Set<string>>(new Set());
   const groupName = ownedGroups.find(group => group.id === groupId)?.name ?? initialGroupName;
   const { t, i18n } = useTranslation();
+  const { subscription } = useSubscription(userId);
+  const hasPaidTeamPlan = subscription?.status === 'active'
+    && (subscription.plan_type === 'team' || subscription.plan_type === 'premium')
+    && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now());
+  const isTeamTrial = subscription?.plan_type === 'player'
+    && subscription.status === 'active'
+    && Boolean(subscription.team_trial_ends_at && Date.parse(subscription.team_trial_ends_at) > Date.now());
   const currency = useDisplayCurrency();
   const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
   const [selectedTitles, setSelectedTitles] = useState<Set<string>>(() => new Set(titles.filter(item => item.free).map(item => item.id)));
@@ -106,6 +114,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
   }, [groupId]);
 
   const toggle = (set: Set<string>, setter: (next: Set<string>) => void, id: string) => {
+    if (id === 'grupo-adicional' && !hasPaidTeamPlan) return;
     const next = new Set(set);
     if (next.has(id)) next.delete(id); else next.add(id);
     setter(next);
@@ -224,8 +233,11 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                     first={index === 0}
                     checked={selectedAddons.has(item.id)}
                     price={`${money(item.price)} / año`}
-                    note={item.note}
+                    note={item.id === 'grupo-adicional' && !hasPaidTeamPlan
+                      ? (isTeamTrial ? 'Hazte Team para crear un grupo extra' : 'Requiere un plan Team o Premium')
+                      : item.note}
                     onToggle={() => toggle(selectedAddons, setSelectedAddons, item.id)}
+                    disabled={item.id === 'grupo-adicional' && !hasPaidTeamPlan}
                   />
                 ))}
               </div>
@@ -294,11 +306,12 @@ const ShopRow: React.FC<{
   price: string;
   note?: string;
   onToggle: () => void;
-}> = ({ item, first, checked, price, note, onToggle }) => {
-  const locked = item.free;
+  disabled?: boolean;
+}> = ({ item, first, checked, price, note, onToggle, disabled = false }) => {
+  const locked = Boolean(item.free || disabled);
   const inputId = `shop-${item.id}`;
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'} ${disabled ? 'opacity-55' : ''}`}>
       <input
         id={inputId}
         type="checkbox"

@@ -74,16 +74,17 @@ test('Stripe database: browser cannot grant plans, checkout retries reuse attemp
  } finally {await db.close();}
 });
 
-test('all upgrades charge the full difference for two months without resetting the billing cycle',async()=>{
+test('upgrades charge the difference for two months, then the full higher plan in a new period',async()=>{
  const source=await readFile(new URL('../supabase/functions/stripe-checkout/index.ts',import.meta.url),'utf8');
  assert.match(source,/stripe\.subscriptions\.update\(subscription\.id/);
  assert.match(source,/proration_behavior:'always_invoice'/);
  assert.match(source,/payment_behavior:'error_if_incomplete'/);
  assert.match(source,/proration_date:subscription\.items\.data\[0\]\.current_period_start/);
  assert.match(source,/fullDifferenceUpgradeWindow\(subscription\.start_date\)/);
- // Un cambio de plan normal conserva la fecha de renovación; solo la oferta de fin de prueba la reinicia.
- assert.equal(source.match(/billing_cycle_anchor\s*:/g)?.length,1);
- assert.match(source,/\.\.\.\(offer\?\{billing_cycle_anchor:'now'/);
+ assert.match(source,/full_plan_new_period/);
+ assert.match(source,/proration_behavior:'none'/);
+ // Fuera de la ventana de dos meses y en la oferta de fin de prueba comienza un periodo nuevo.
+ assert.match(source,/offer[\s\S]{0,300}billing_cycle_anchor:'now'/);
  assert.match(source,/Elige la misma periodicidad que tu plan actual/);
  const start=Date.UTC(2026,0,31)/1000;
  assert.equal(fullDifferenceUpgradeWindow(start,Date.UTC(2026,2,30)),true);

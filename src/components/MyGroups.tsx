@@ -3,7 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import { OmikiLoadingScreen } from './OmikiSpinner';
 import { TopBar } from './TopBar';
 import React, { useEffect, useState, useCallback } from 'react';
-import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive, Settings } from 'lucide-react';
+import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive, Settings, LogOut } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
 import { userService } from '../services/userService';
@@ -24,6 +24,7 @@ interface MyGroupsProps {
   onGroupSelected: (group: Group) => void;
   onGroupArchived?: (groupId: string, archivedAt: string) => void;
   onGroupDeleted?: (groupId: string) => void;
+  onGroupLeft?: (groupId: string) => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -52,7 +53,7 @@ const sortGroups = (items: MyGroup[]) => [...items].sort((a, b) => {
   return archiveOrder || b.created_at.localeCompare(a.created_at);
 });
 
-export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, messagesButton }: MyGroupsProps) {
+export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, onGroupLeft, messagesButton }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
   const [groups, setGroups] = useState<MyGroup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +62,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
   const [userNick, setUserNick] = useState('');
   const [groupToDelete, setGroupToDelete] = useState<string | null>(null);
   const [groupToArchive, setGroupToArchive] = useState<string | null>(null);
+  const [groupToLeave, setGroupToLeave] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const [openMembers, setOpenMembers] = useState<string | null>(null);
   const [openSettings, setOpenSettings] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -174,6 +177,23 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
     setGroupToDelete(null);
   };
 
+  const confirmLeaveGroup = async () => {
+    if (!groupToLeave || leaving) return;
+    setLeaving(true);
+    setError('');
+    try {
+      await userService.leaveGroupMembership(groupToLeave);
+      setGroups(current => current.filter(group => group.id !== groupToLeave));
+      onGroupLeft?.(groupToLeave);
+      setGroupToLeave(null);
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, 'No se pudo abandonar el grupo'));
+      setGroupToLeave(null);
+    } finally {
+      setLeaving(false);
+    }
+  };
+
   const handleSelectGroup = async (groupWithCode: GroupWithCode) => {
     const group: Group = {
       id: groupWithCode.id,
@@ -257,7 +277,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
           ) : (
             <div className="space-y-3">
               {groups.map((group) => {
-                const tier = groupTier({ ...group, premium_branding: group.premium_branding || (group.access === 'owner' && isPremium) });
+                const tier = groupTier(group);
                 const tone = tierColors[tier];
                 return <div
                   key={group.id}
@@ -305,6 +325,18 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   >
                     {t('groups.select')}
                   </button>
+
+                  {group.access !== 'owner' && (
+                    <WriteButton
+                      type="button"
+                      disabled={leaving}
+                      onClick={() => setGroupToLeave(group.id)}
+                      className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg border border-red-500/40 bg-card px-4 py-2 font-medium text-red-500 hover:bg-red-500/10 disabled:opacity-50"
+                    >
+                      <LogOut size={18} aria-hidden="true" />
+                      Abandonar grupo
+                    </WriteButton>
+                  )}
 
                   {!group.archived_at && (
                     <button
@@ -395,6 +427,13 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
           message="El grupo quedará en modo consulta y podrás crear uno nuevo. No se podrán crear más partidas en este grupo."
           onConfirm={confirmArchiveGroup}
           onCancel={() => setGroupToArchive(null)}
+        />
+      )}
+      {groupToLeave && (
+        <ConfirmModal
+          message="Dejarás de acceder al grupo, sus partidas, clasificación y mensajes futuros. Tus resultados históricos se conservarán."
+          onConfirm={() => void confirmLeaveGroup()}
+          onCancel={() => setGroupToLeave(null)}
         />
       )}
 

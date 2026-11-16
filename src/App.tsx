@@ -161,7 +161,6 @@ function App() {
   // Partida elegida en Mis partidas al abrir sus estadísticas: se recupera al volver.
   const [myRoundsSelectedId, setMyRoundsSelectedId] = useState<string | null>(null);
   const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
-  const [showLeaveGroupConfirm, setShowLeaveGroupConfirm] = useState(false);
   const { planType, profile, subscription, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
   // Plan Team/Premium propio (o prueba Team), sin contar el Weekend, que da un grupo aparte.
   const basePlanType = effectivePlan(subscription ? { ...subscription, weekend_mode_until: null } : null);
@@ -675,20 +674,11 @@ function App() {
   };
 
   const handleLeaveGroup = () => {
-    setShowLeaveGroupConfirm(true);
-  };
-
-  const handleConfirmLeaveGroup = () => {
     golfService.leaveGroup();
     setCurrentGroup(null);
     setIsGroupCreator(false);
     setHasLimitedAccess(false);
-    setShowLeaveGroupConfirm(false);
     handleBackToMain();
-  };
-
-  const handleCancelLeaveGroup = () => {
-    setShowLeaveGroupConfirm(false);
   };
 
   const handleRoundCreated = async (roundId: string, courseId: string) => {
@@ -1443,6 +1433,15 @@ function App() {
               });
               void refreshGroupMembership();
             }}
+            onGroupLeft={(groupId) => {
+              setHomeGroups(current => current.filter(item => item.group.id !== groupId));
+              setCurrentGroup(current => {
+                if (current?.id !== groupId) return current;
+                storageUtils.clearCurrentGroup();
+                return null;
+              });
+              void refreshGroupMembership();
+            }}
             onGroupSelected={(group) => {
               setReturnToProfile(false);
               void handleGroupJoined(group);
@@ -1485,7 +1484,7 @@ function App() {
               name: group.name || group.group_code,
               access,
               group_type: group.group_type,
-              premium_branding: group.premium_branding || (access === 'owner' && basePlanType === 'premium'),
+              premium_branding: group.premium_branding,
             }))}
             onOpenGroup={(groupId) => {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
@@ -1736,15 +1735,6 @@ function App() {
           onCancel={handleAccessCodeCancel}
           error={accessCodeError}
           loading={loading}
-        />
-      )}
-
-      {showLeaveGroupConfirm && (
-        <ConfirmModal
-          message="¿Seguro que deseas salir del grupo? Tendrás que volver a unirte con el código del grupo."
-          readOnlySensitive={false}
-          onConfirm={handleConfirmLeaveGroup}
-          onCancel={handleCancelLeaveGroup}
         />
       )}
 

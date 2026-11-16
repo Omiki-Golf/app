@@ -63,7 +63,7 @@ Deno.serve(async req => {
       if(!offer && difference<=0) return reply({error:'El cambio de plan no es válido.'},409);
       const metadata={
         app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id,
-        ...(offer?{offer:'team_trial'}:{upgrade_policy:fullDifference?'full_difference_2_months':'proportional',upgrade_amount_cents:String(difference)}),
+        ...(offer?{offer:'team_trial'}:{upgrade_policy:fullDifference?'full_difference_2_months':'full_plan_new_period',upgrade_amount_cents:String(difference)}),
       };
       if(subscription.metadata.intent_id!==intent.id) {
         const {error:clearError}=await service.from('stripe_checkout_state').delete().eq('user_id',user.id);
@@ -75,13 +75,16 @@ Deno.serve(async req => {
         if(stateError) throw new Error('No se pudo registrar el cambio de plan.');
         await stripe.subscriptions.update(subscription.id,{
           metadata,items:[{id:subscription.items.data[0].id,price:targetPrice,quantity:1}],
-          proration_behavior:'always_invoice',payment_behavior:'error_if_incomplete',expand:['latest_invoice'],
-          // Durante los dos primeros meses se calcula desde el inicio del periodo:
-          // cargo del plan superior menos crédito íntegro del inferior, sin mover la renovación.
-          ...(fullDifference?{proration_date:subscription.items.data[0].current_period_start}:{}),
-          // Oferta: empieza un año de Team desde hoy, con 10 € menos en esa primera factura
-          // y descontando lo que quedaba sin usar de Player.
-          ...(offer?{billing_cycle_anchor:'now' as const,discounts:[{coupon:teamTrialOffer.coupon}]}:{}),
+          payment_behavior:'error_if_incomplete',expand:['latest_invoice'],
+          // Durante los dos primeros meses: diferencia completa y misma renovación.
+          // Después: se cobra el plan superior íntegro y empieza un periodo nuevo hoy.
+          ...(offer
+            // Oferta: empieza un año de Team desde hoy, con 10 € menos y descontando
+            // lo que quedaba sin usar de Player.
+            ? {proration_behavior:'always_invoice' as const,billing_cycle_anchor:'now' as const,discounts:[{coupon:teamTrialOffer.coupon}]}
+            : fullDifference
+              ? {proration_behavior:'always_invoice' as const,proration_date:subscription.items.data[0].current_period_start}
+              : {proration_behavior:'none' as const,billing_cycle_anchor:'now' as const}),
         },{idempotencyKey:`omiki-upgrade:${intent.id}`});
       }
       await synchronize(stripe,service,subscription.id);

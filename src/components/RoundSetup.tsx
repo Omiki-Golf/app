@@ -383,7 +383,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             <div>
               {/* Dentro de un grupo, la casita sale del grupo y vuelve al inicio, como en el resto de pantallas. */}
               {currentGroup && !isArchivedGroup
-                ? <NavigationButton destination="home" onClick={onLeaveGroup} aria-label={t('roundSetup.leaveGroup')} title={t('roundSetup.leaveGroup')} />
+                ? <NavigationButton destination="home" onClick={onLeaveGroup} aria-label="Volver al inicio" title="Volver al inicio" />
                 : onBack && <NavigationButton destination={isArchivedGroup ? "back" : "home"} onClick={onBack} />}
             </div>
             <div className="flex justify-center">{messagesButton}</div>
