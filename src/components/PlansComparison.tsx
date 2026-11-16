@@ -7,6 +7,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { useTranslation } from 'react-i18next';
 import { useDisplayCurrency } from './CurrencySelector';
 import { formatDisplayPrice } from '../utils/currency';
+import { tierColors } from '../utils/tierColors';
 
 interface PlansComparisonProps {
   onBack: () => void;
@@ -26,11 +27,11 @@ interface PlansComparisonProps {
 }
 
 const styles = {
-  express: { ink: 'text-sky-700 dark:text-sky-400', border: 'border-sky-500', button: 'bg-sky-500 hover:bg-sky-400 text-slate-950', icon: Zap },
-  player: { ink: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-500', button: 'bg-emerald-400 hover:bg-emerald-300 text-slate-950', icon: User },
-  team: { ink: 'text-amber-700 dark:text-amber-400', border: 'border-amber-500', button: 'bg-amber-400 hover:bg-amber-300 text-slate-950', icon: Users },
-  premium: { ink: 'text-purple-700 dark:text-purple-400', border: 'border-purple-500', button: 'bg-purple-600 hover:bg-purple-500 text-white', icon: Gem },
-  weekend: { ink: 'text-orange-700 dark:text-orange-400', border: 'border-orange-500', button: 'bg-orange-700 hover:bg-orange-800 text-white', icon: Plane },
+  express: { ...tierColors.express, icon: Zap },
+  player: { ...tierColors.player, icon: User },
+  team: { ...tierColors.team, icon: Users },
+  premium: { ...tierColors.premium, icon: Gem },
+  weekend: { ...tierColors.weekend, icon: Plane },
 };
 // Weekend es un pago puntual: nunca se considera "incluido" en otro plan.
 const planRank: Record<DisplayPlan, number> = { express: 0, player: 1, team: 2, premium: 3, weekend: 99 };

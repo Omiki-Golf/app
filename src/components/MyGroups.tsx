@@ -16,6 +16,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { useTranslation } from 'react-i18next';
 import type { User } from '@supabase/supabase-js';
 import { getErrorMessage } from '../utils/errorMessage';
+import { groupTier, tierColors } from '../utils/tierColors';
 
 interface MyGroupsProps {
   onBack: () => void;
@@ -35,6 +36,8 @@ interface GroupWithCode {
   user_auth_id?: string;
   hoyo_19_enabled?: boolean;
   archived_at?: string | null;
+  group_type?: string;
+  premium_branding?: boolean;
 }
 
 interface MyGroup extends GroupWithCode {
@@ -43,7 +46,7 @@ interface MyGroup extends GroupWithCode {
   handicap18?: number | null;
 }
 
-const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at';
+const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at, group_type, premium_branding';
 const sortGroups = (items: MyGroup[]) => [...items].sort((a, b) => {
   const archiveOrder = Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at));
   return archiveOrder || b.created_at.localeCompare(a.created_at);
@@ -180,6 +183,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       created_by: groupWithCode.user_auth_id || groupWithCode.created_by,
       hoyo_19_enabled: groupWithCode.hoyo_19_enabled,
       archived_at: groupWithCode.archived_at,
+      group_type: groupWithCode.group_type,
+      premium_branding: groupWithCode.premium_branding,
     };
     onGroupSelected(group);
   };
@@ -251,14 +256,19 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
             </div>
           ) : (
             <div className="space-y-3">
-              {groups.map((group) => (
-                <div
+              {groups.map((group) => {
+                const tier = groupTier({ ...group, premium_branding: group.premium_branding || (group.access === 'owner' && isPremium) });
+                const tone = tierColors[tier];
+                return <div
                   key={group.id}
-                  className="bg-card-2 rounded-xl p-4 transition-colors border border-line"
+                  className={`rounded-xl border p-4 transition-colors ${tone.card}`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-ink text-lg break-words">{group.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-ink text-lg break-words">{group.name}</h3>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${tone.soft}`}>Omiki {tier === 'weekend' ? 'Weekend' : tier === 'premium' ? 'Premium' : 'Team'}</span>
+                      </div>
                       <p className="flex items-center gap-1 text-xs font-medium text-ink-3">
                         {group.access === 'owner' && <span className="relative inline-block h-4 w-6 text-amber-500" aria-hidden="true"><Crown size={14} fill="currentColor" className="absolute left-0 top-0.5" /><Crown size={14} fill="currentColor" className="absolute right-0 top-0" /></span>}
                         {group.access === 'admin' && <Crown size={14} fill="currentColor" className="text-amber-500" aria-hidden="true" />}
@@ -291,7 +301,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
 
                   <button
                     onClick={() => handleSelectGroup(group)}
-                    className="w-full bg-accent text-on-accent px-4 py-2 rounded-lg hover:bg-accent-hover transition-colors font-medium mb-2"
+                    className={`mb-2 w-full rounded-lg px-4 py-2 font-medium transition-colors ${tone.button}`}
                   >
                     {t('groups.select')}
                   </button>
@@ -365,8 +375,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                   <p className="text-xs text-ink-3 mt-2">
                     {t('groups.created', { date: new Intl.DateTimeFormat(i18n.resolvedLanguage).format(new Date(group.created_at)) })}
                   </p>
-                </div>
-              ))}
+                </div>;
+              })}
             </div>
           )}
         </div>

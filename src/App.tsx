@@ -1480,7 +1480,13 @@ function App() {
               hasTeamPlan,
             })}
             onCreateTeam={() => setCurrentView('team-creation')}
-            groupShortcuts={homeGroups.map(({ group, access }) => ({ id: group.id, name: group.name || group.group_code, access, weekend: group.group_type === 'weekend' }))}
+            groupShortcuts={homeGroups.map(({ group, access }) => ({
+              id: group.id,
+              name: group.name || group.group_code,
+              access,
+              group_type: group.group_type,
+              premium_branding: group.premium_branding || (access === 'owner' && basePlanType === 'premium'),
+            }))}
             onOpenGroup={(groupId) => {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
               if (selectedGroup) void handleGroupJoined(selectedGroup);

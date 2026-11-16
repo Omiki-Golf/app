@@ -7,6 +7,7 @@ import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { weekendDuration } from '../utils/weekendMode';
+import { groupTier, tierColors } from '../utils/tierColors';
 
 type GroupAccess = 'owner' | 'admin' | 'member';
 const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
@@ -18,7 +19,7 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; weekend?: boolean }>;
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean }>;
   onOpenGroup?: (groupId: string) => void;
   onShowProfile: () => void;
   onShowAuth: () => void;
@@ -76,10 +77,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const displayHcp9 = handicap9 ?? fallbackHcp9;
   const displayHcp18 = handicap18 ?? fallbackHcp18;
   const avatarPlanClasses: Record<PlanType, string> = {
-    express: 'border-blue-500 bg-blue-500 hover:bg-blue-600',
-    player: 'border-emerald-500 bg-emerald-500 hover:bg-emerald-600',
-    team: 'border-orange-500 bg-orange-500 hover:bg-orange-600',
-    premium: 'border-purple-500 bg-purple-500 hover:bg-purple-600',
+    express: tierColors.express.button,
+    player: tierColors.player.button,
+    team: tierColors.team.button,
+    premium: tierColors.premium.button,
   };
 
   return (
@@ -172,17 +173,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {/* Orden por rol: Creador, Administrador y Miembro (estable dentro de cada rol). */}
           {[...groupShortcuts].sort((a, b) => ROLE_ORDER[a.access] - ROLE_ORDER[b.access]).map(group => {
             const managesGroup = group.access === 'owner' || group.access === 'admin';
+            const tier = groupTier(group);
+            const tone = tierColors[tier];
             return <WriteButton
               key={group.id}
               onClick={() => onOpenGroup?.(group.id)}
-              // Weekend usa su naranja de Planes para distinguirse de los grupos Team (ámbar).
-              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${group.weekend
-                ? (managesGroup
-                  ? 'border-orange-700 bg-orange-700 text-white shadow-card hover:bg-orange-800'
-                  : 'border-orange-600 bg-card text-orange-500 hover:bg-orange-600/10')
-                : managesGroup
-                  ? 'border-amber-500 bg-amber-500 text-amber-950 shadow-card hover:bg-amber-600'
-                  : 'border-amber-500 bg-card text-amber-500 hover:bg-amber-500/10'}`}
+              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup ? `${tone.button} ${tone.border} shadow-card` : `bg-card ${tone.outlineButton}`}`}
             >
               <Users className="w-6 h-6" aria-hidden="true" />
               <span className="min-w-0 truncate">{group.name}</span>
@@ -194,9 +190,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {canCreateGroup && (
             <WriteButton
               onClick={onCreateTeam}
-              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${weekend
-                ? 'bg-orange-700 text-white hover:bg-orange-800'
-                : 'bg-amber-500 text-amber-950 hover:bg-amber-600'}`}
+              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : (planType === 'premium' ? 'premium' : 'team')].button}`}
             >
               <Plus className="w-6 h-6" aria-hidden="true" />
               <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t('home.createTeam')}</span>

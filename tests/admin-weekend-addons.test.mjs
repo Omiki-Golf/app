@@ -173,5 +173,6 @@ test('group rounds never change the personal handicap and the Pro-Shop lets you 
   assert.match(shop, /¿Para qué grupo\?/);
   assert.match(shop, /for \(const otherId of alsoApplyTo\)/);
   assert.match(shop, /item\.id !== 'grupo-adicional'/);
-  assert.match(home, /group\.weekend\s*\n?\s*\? \(managesGroup/);
+  assert.match(home, /const tier = groupTier\(group\)/);
+  assert.match(home, /const tone = tierColors\[tier\]/);
 });

@@ -11,11 +11,12 @@ test('home loads owned, administered and member groups as direct shortcuts', asy
   assert.match(source, /handleGroupJoined\(selectedGroup\)/);
 });
 
-test('managed groups are solid amber and member groups use the outlined amber variant', async () => {
+test('managed groups use their solid tier tone and member groups use its outlined variant', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
   assert.match(source, /group\.access === 'owner' \|\| group\.access === 'admin'/);
-  assert.match(source, /border-amber-500 bg-amber-500 text-amber-950/);
-  assert.match(source, /border-amber-500 bg-card text-amber-500/);
+  assert.match(source, /const tier = groupTier\(group\)/);
+  assert.match(source, /managesGroup \? `\$\{tone\.button\} \$\{tone\.border\} shadow-card`/);
+  assert.match(source, /`bg-card \$\{tone\.outlineButton\}`/);
 });
 
 test('home group shortcuts show two crowns for creator, one for admin and none for member', async () => {
