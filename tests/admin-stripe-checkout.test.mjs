@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { checkoutIntent, prices, allowedOrigin, subscriptionStatus, teamTrialOffer, teamTrialOfferActive } from '../supabase/functions/_shared/stripe-domain.ts';
+import { checkoutIntent, prices, allowedOrigin, fullDifferenceUpgradeWindow, subscriptionStatus, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../supabase/functions/_shared/stripe-domain.ts';
 import { planCatalog } from '../src/data/planCatalog.ts';
 import { serverKeys, isServerRequest } from '../supabase/functions/_shared/server-credentials.ts';
 test('Stripe setup accepts only a provisioned server secret on apikey',()=>{
@@ -74,15 +74,24 @@ test('Stripe database: browser cannot grant plans, checkout retries reuse attemp
  } finally {await db.close();}
 });
 
-test('Player to Team upgrades reuse the Stripe subscription and prorate without resetting its billing cycle',async()=>{
+test('all upgrades charge the full difference for two months without resetting the billing cycle',async()=>{
  const source=await readFile(new URL('../supabase/functions/stripe-checkout/index.ts',import.meta.url),'utf8');
  assert.match(source,/stripe\.subscriptions\.update\(subscription\.id/);
  assert.match(source,/proration_behavior:'always_invoice'/);
  assert.match(source,/payment_behavior:'error_if_incomplete'/);
+ assert.match(source,/proration_date:subscription\.items\.data\[0\]\.current_period_start/);
+ assert.match(source,/fullDifferenceUpgradeWindow\(subscription\.start_date\)/);
  // Un cambio de plan normal conserva la fecha de renovación; solo la oferta de fin de prueba la reinicia.
  assert.equal(source.match(/billing_cycle_anchor\s*:/g)?.length,1);
  assert.match(source,/\.\.\.\(offer\?\{billing_cycle_anchor:'now'/);
- assert.match(source,/Elige la misma periodicidad que tu plan Player actual/);
+ assert.match(source,/Elige la misma periodicidad que tu plan actual/);
+ const start=Date.UTC(2026,0,31)/1000;
+ assert.equal(fullDifferenceUpgradeWindow(start,Date.UTC(2026,2,30)),true);
+ assert.equal(fullDifferenceUpgradeWindow(start,Date.UTC(2026,2,31)),false);
+ assert.deepEqual([
+  upgradeDifferenceCents('player','team','monthly'),upgradeDifferenceCents('player','team','annual'),
+  upgradeDifferenceCents('player','premium','monthly'),upgradeDifferenceCents('team','premium','annual'),
+ ],[300,2000,500,1000]);
 });
 
 test('Team trial offer: only days 25-30 of an active Player trial, annual Team, and 29,99 EUR the first year',async()=>{

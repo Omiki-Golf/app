@@ -1,5 +1,5 @@
 import { checkedStripe, config, serviceClient, synchronize } from '../_shared/stripe.ts';
-import { allowedOrigin, checkoutIntent, teamTrialOffer, teamTrialOfferActive } from '../_shared/stripe-domain.ts';
+import { allowedOrigin, checkoutIntent, fullDifferenceUpgradeWindow, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../_shared/stripe-domain.ts';
 import { rateLimit } from '../_shared/admin.ts';
 
 Deno.serve(async req => {
@@ -57,8 +57,14 @@ Deno.serve(async req => {
       if(subscription.livemode || subscription.metadata.app!=='omiki-sandbox' || subscription.metadata.user_id!==user.id || subscription.items.data.length!==1)
         throw new Error('Suscripción no válida para mejorar.');
       if(!currentPrices.includes(subscription.items.data[0].price.id))
-        return reply({error:'Elige la misma periodicidad que tu plan Player actual.'},409);
-      const metadata={app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id,...(offer?{offer:'team_trial'}:{})};
+        return reply({error:'Elige la misma periodicidad que tu plan actual.'},409);
+      const fullDifference=!offer && fullDifferenceUpgradeWindow(subscription.start_date);
+      const difference=upgradeDifferenceCents(currentSubscription.plan_type,intent.plan,intent.period);
+      if(!offer && difference<=0) return reply({error:'El cambio de plan no es válido.'},409);
+      const metadata={
+        app:'omiki-sandbox',user_id:user.id,intent_id:intent.id,attempt_id:intent.id,
+        ...(offer?{offer:'team_trial'}:{upgrade_policy:fullDifference?'full_difference_2_months':'proportional',upgrade_amount_cents:String(difference)}),
+      };
       if(subscription.metadata.intent_id!==intent.id) {
         const {error:clearError}=await service.from('stripe_checkout_state').delete().eq('user_id',user.id);
         if(clearError) throw new Error('No se pudo preparar el cambio de plan.');
@@ -70,6 +76,9 @@ Deno.serve(async req => {
         await stripe.subscriptions.update(subscription.id,{
           metadata,items:[{id:subscription.items.data[0].id,price:targetPrice,quantity:1}],
           proration_behavior:'always_invoice',payment_behavior:'error_if_incomplete',expand:['latest_invoice'],
+          // Durante los dos primeros meses se calcula desde el inicio del periodo:
+          // cargo del plan superior menos crédito íntegro del inferior, sin mover la renovación.
+          ...(fullDifference?{proration_date:subscription.items.data[0].current_period_start}:{}),
           // Oferta: empieza un año de Team desde hoy, con 10 € menos en esa primera factura
           // y descontando lo que quedaba sin usar de Player.
           ...(offer?{billing_cycle_anchor:'now' as const,discounts:[{coupon:teamTrialOffer.coupon}]}:{}),

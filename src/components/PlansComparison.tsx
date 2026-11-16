@@ -54,13 +54,15 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
   const [weekendNeedsPlan, setWeekendNeedsPlan] = useState(false);
   const hasPaidPlan = currentPlan === 'player' || currentPlan === 'team' || currentPlan === 'premium';
   const [confirmPlayer, setConfirmPlayer] = useState(false);
-  const [paidTeamUpgrade, setPaidTeamUpgrade] = useState(false);
+  const [confirmingPaidUpgrade, setConfirmingPaidUpgrade] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState('');
   const plan = planCatalog.find(item => item.id === selected)!;
   const style = styles[selected];
   const isCurrentPlan = currentPlan === selected;
   const isPlayerToTeam = currentPlan === 'player' && selected === 'team';
+  const isPaidUpgrade = currentPlan !== undefined && selected !== 'express' && selected !== 'weekend' && planRank[selected] > planRank[currentPlan];
+  const currentPlanName = planCatalog.find(item => item.id === currentPlan)?.name ?? currentPlan;
   const canStartTeamTrial = isPlayerToTeam && !!onStartTeamTrial && !teamTrialUsed;
   const visiblePlans = expressLimit
     ? planCatalog.filter(item => item.id === 'player')
@@ -141,10 +143,10 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
         {isPlayerToTeam ? (
           // Un Player que elige Team puede probarlo 30 días o suscribirse directamente.
           <div className="mt-4 grid gap-2">
-            {canStartTeamTrial && <button type="button" disabled={updating} onClick={() => { setPaidTeamUpgrade(false); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-60 ${style.button}`}>
+            {canStartTeamTrial && <button type="button" disabled={updating} onClick={() => { setConfirmingPaidUpgrade(false); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:opacity-60 ${style.button}`}>
               {p('trialButton')}
             </button>}
-            <button type="button" disabled={updating} onClick={() => { setPaidTeamUpgrade(true); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl border-2 ${style.border} bg-card px-4 py-3.5 text-sm font-bold ${style.ink} transition-colors hover:bg-card-2 disabled:opacity-60`}>
+            <button type="button" disabled={updating} onClick={() => { setConfirmingPaidUpgrade(true); setUpdateError(''); setComingSoon(false); setConfirmPlayer(true); }} className={`w-full rounded-xl border-2 ${style.border} bg-card px-4 py-3.5 text-sm font-bold ${style.ink} transition-colors hover:bg-card-2 disabled:opacity-60`}>
               {p('subscribeTeam')}
             </button>
           </div>
@@ -163,6 +165,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
                 else setUpdateError(message || p('errors.weekend'));
               }).finally(() => setUpdating(false));
             }
+            else if (isPaidUpgrade) { setConfirmingPaidUpgrade(true); setConfirmPlayer(true); }
             else if (!currentPlan || currentPlan === 'express') setConfirmPlayer(true);
             else setComingSoon(true);
           }} className={`mt-4 w-full rounded-xl px-4 py-3.5 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${style.button}`}>{isCurrentPlan ? p('current') : catalogText(plan.id, 'action', plan.action)}</button>
@@ -181,17 +184,17 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
       </div>
       {confirmPlayer && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="player-choice-title" onKeyDown={event => { if (event.key === 'Escape') setConfirmPlayer(false); }}>
         <div className="w-full max-w-sm rounded-2xl border border-line bg-card p-6 shadow-card">
-          <h2 id="player-choice-title" className="font-bold text-ink">{canStartTeamTrial && !paidTeamUpgrade ? p('trialTitle') : paidTeamUpgrade ? p('upgradeTitle') : p('chosenTitle', { plan: plan.name })}</h2>
-          <p className="mt-2 text-sm text-ink-3">{canStartTeamTrial && !paidTeamUpgrade
+          <h2 id="player-choice-title" className="font-bold text-ink">{canStartTeamTrial && !confirmingPaidUpgrade ? p('trialTitle') : confirmingPaidUpgrade ? p('upgradeTitle', { from: currentPlanName, to: plan.name }) : p('chosenTitle', { plan: plan.name })}</h2>
+          <p className="mt-2 text-sm text-ink-3">{canStartTeamTrial && !confirmingPaidUpgrade
             ? p('trialText', { start: longDate.format(new Date()), end: longDate.format(new Date(Date.now() + 30 * 86_400_000)) })
-            : paidTeamUpgrade
+            : confirmingPaidUpgrade
               ? p('upgradeText', { date: currentPeriodEnd ? longDate.format(new Date(currentPeriodEnd)) : p('nextRenewal'), period: currentBillingPeriod === 'monthly' ? p('monthlyPeriod') : p('annualPeriod') })
             : p('createAccount')}</p>
           <div className="mt-5 flex gap-3">
             <button autoFocus type="button" onClick={() => setConfirmPlayer(false)} className="flex-1 rounded-xl bg-card-2 px-4 py-3 font-semibold text-ink">{p('cancel')}</button>
             <button type="button" disabled={updating} onClick={async () => {
               if (selected === 'express' || selected === 'weekend') return;
-              if (canStartTeamTrial && !paidTeamUpgrade && onStartTeamTrial) {
+              if (canStartTeamTrial && !confirmingPaidUpgrade && onStartTeamTrial) {
                 setUpdating(true);
                 setUpdateError('');
                 try {

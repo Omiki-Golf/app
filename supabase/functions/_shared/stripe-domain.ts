@@ -7,6 +7,16 @@ export const prices = {
 export type Plan = keyof typeof prices;
 export type Period = 'monthly' | 'annual';
 export { teamTrialOffer, teamTrialOfferActive } from './team-trial-offer.ts';
+export function fullDifferenceUpgradeWindow(subscriptionStart: number, now = Date.now()) {
+  if (!Number.isFinite(subscriptionStart) || subscriptionStart <= 0) return false;
+  const start = new Date(subscriptionStart * 1000);
+  const end = new Date(start);
+  end.setUTCMonth(end.getUTCMonth() + 2);
+  return now >= start.getTime() && now < end.getTime();
+}
+export function upgradeDifferenceCents(from: Plan, to: Plan, period: Period) {
+  return Math.max(0, prices[to][period] - prices[from][period]);
+}
 export function checkoutIntent(metadata: Record<string, unknown>) {
   const value = metadata.player_checkout as {id?: string; plan?: string; period?: string; offer?: string} | undefined;
   const plan = value?.plan ?? 'player';
