@@ -61,10 +61,11 @@ test('same-day group rounds only add up when they share a ranking session', asyn
 });
 
 test('archiving a second 9-hole group round of the day asks whether it is the 2nd nine', async () => {
-  const [viewer, service, modal] = await Promise.all([
+  const [viewer, service, modal, history] = await Promise.all([
     read('../src/components/ActiveRoundsViewer.tsx'),
     read('../src/services/golfService.ts'),
     read('../src/components/ArchivedRoundDetailModal.tsx'),
+    read('../src/components/ArchivedRoundsModal.tsx'),
   ]);
   assert.match(viewer, /¿Esta partida es la 2ª vuelta o una partida diferente\?/);
   assert.match(viewer, /target\.round\.num_holes === 9/);
@@ -72,4 +73,8 @@ test('archiving a second 9-hole group round of the day asks whether it is the 2n
   assert.match(service, /sessionChoice === 'new' \? latestSession \+ 1 : latestSession/);
   assert.match(service, /ranking_session: rankingSession/);
   assert.match(modal, /round\.ranking_session\)/);
+  assert.match(modal, /round\.ranking_session\]\);/);
+  assert.match(history, /groupedBySession/);
+  assert.match(history, /Jornada \{session\}/);
+  assert.match(history, /onSelectRound\(dayRounds\[0\]\)/);
 });

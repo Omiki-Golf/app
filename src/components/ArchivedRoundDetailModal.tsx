@@ -54,7 +54,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
     };
 
     loadDayData();
-  }, [round.group_id, round.played_at]);
+  }, [round.group_id, round.played_at, round.ranking_session]);
 
   const matchesPlayer = (
     entry: { player_id?: string | null; player_name: string },

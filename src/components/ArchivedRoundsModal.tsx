@@ -17,18 +17,21 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
     new Date(b.played_at).getTime() - new Date(a.played_at).getTime()
   );
 
-  const groupedByDate = sortedRounds.reduce((acc, round) => {
+  const groupedBySession = sortedRounds.reduce((acc, round) => {
     const dateKey = new Date(round.played_at).toISOString().split('T')[0];
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
+    const sessionKey = `${dateKey}#${round.ranking_session ?? 1}`;
+    if (!acc[sessionKey]) {
+      acc[sessionKey] = [];
     }
-    acc[dateKey].push(round);
+    acc[sessionKey].push(round);
     return acc;
   }, {} as Record<string, ArchivedRound[]>);
 
-  const sortedDates = Object.keys(groupedByDate).sort((a, b) =>
-    new Date(b).getTime() - new Date(a).getTime()
-  );
+  const sortedSessions = Object.keys(groupedBySession).sort((a, b) => {
+    const [dateA, sessionA] = a.split('#');
+    const [dateB, sessionB] = b.split('#');
+    return dateB.localeCompare(dateA) || Number(sessionB) - Number(sessionA);
+  });
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -53,8 +56,10 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              {sortedDates.map((dateKey) => {
-                const dayRounds = groupedByDate[dateKey];
+              {sortedSessions.map((sessionKey) => {
+                const [dateKey, sessionValue] = sessionKey.split('#');
+                const session = Number(sessionValue);
+                const dayRounds = groupedBySession[sessionKey];
                 const date = new Date(dateKey);
                 const formattedDate = date.toLocaleDateString('es-ES', {
                   weekday: 'long',
@@ -75,7 +80,7 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
 
                 return (
                   <button
-                    key={dateKey}
+                    key={sessionKey}
                     onClick={() => onSelectRound(dayRounds[0])}
                     className="w-full bg-card-2 hover:bg-accent-soft border-2 border-line-2 hover:border-accent rounded-lg p-5 transition-all shadow-soft hover:shadow-lg text-left"
                   >
@@ -88,7 +93,7 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
                               {formattedDate}
                             </p>
                             <p className="text-sm text-ink-3">
-                              {dayRounds.length} {dayRounds.length === 1 ? 'partida' : 'partidas'}
+                              Jornada {session} · {dayRounds.length === 1 ? '1 partida' : `${dayRounds.length} vueltas`}
                             </p>
                           </div>
                         </div>
@@ -114,7 +119,7 @@ export const ArchivedRoundsModal: React.FC<ArchivedRoundsModalProps> = ({
                       </div>
 
                       <div className="text-sm text-ink-3 bg-card rounded-lg p-2 border border-line">
-                        <p className="font-semibold">Haz clic para ver la clasificación completa del día</p>
+                        <p className="font-semibold">Haz clic para ver la clasificación y las tarjetas de esta jornada</p>
                       </div>
                     </div>
                   </button>

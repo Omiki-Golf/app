@@ -7,6 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 const migration = [
   await readFile(new URL('../supabase/migrations/20261025100000_account_deletion.sql', import.meta.url), 'utf8'),
   await readFile(new URL('../supabase/migrations/20261110100000_immediate_account_deletion.sql', import.meta.url), 'utf8'),
+  await readFile(new URL('../supabase/migrations/20261116200000_retired_players_are_not_reusable.sql', import.meta.url), 'utf8'),
 ].join('\n');
 
 // Esquema mínimo con las protecciones reales que afectan a la baja.
@@ -112,7 +113,14 @@ test('account deletion removes the name immediately, hands groups over and relea
     ].sort());
 
     // Resultados conservados sin nombre ni cuenta.
-    assert.deepEqual((await db.query('SELECT name, auth_user_id FROM public.players')).rows, [{ name: 'Jugador eliminado', auth_user_id: null }]);
+    const retiredPlayer = (await db.query('SELECT name, auth_user_id, retired_at FROM public.players')).rows[0];
+    assert.equal(retiredPlayer.name, 'Jugador eliminado');
+    assert.equal(retiredPlayer.auth_user_id, null);
+    assert.ok(retiredPlayer.retired_at);
+    await assert.rejects(
+      db.query('INSERT INTO public.round_players(round_id,player_id,name) VALUES($1,$2,$3)', [groupA, fede, 'Jugador eliminado']),
+      /ya no está disponible/,
+    );
     assert.deepEqual((await db.query('SELECT name, user_id FROM public.round_players')).rows, [{ name: 'Jugador eliminado', user_id: null }]);
     const ranking = (await db.query('SELECT final_ranking FROM public.archived_rounds')).rows[0].final_ranking;
     assert.deepEqual(ranking.map((row) => row.player_name), ['Jugador eliminado', 'Pepe']);
