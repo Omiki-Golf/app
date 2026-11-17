@@ -35,7 +35,7 @@ interface HomeScreenProps {
   weekendUntil?: string | null;
   weekendActivatedAt?: string | null;
   /** Grupo que el usuario puede crear ahora (Weekend aparte o el del plan/grupo adicional); null si ninguno. */
-  createGroupKind?: 'weekend' | 'team' | null;
+  createGroupKind?: 'weekend' | 'team' | 'premium' | null;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -190,10 +190,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {canCreateGroup && (
             <WriteButton
               onClick={onCreateTeam}
-              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : (planType === 'premium' ? 'premium' : 'team')].button}`}
+              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : createGroupKind === 'premium' ? 'premium' : 'team'].button}`}
             >
               <Plus className="w-6 h-6" aria-hidden="true" />
-              <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t('home.createTeam')}</span>
+              <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(createGroupKind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</span>
             </WriteButton>
           )}
         </div>

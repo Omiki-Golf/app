@@ -18,6 +18,7 @@ interface TeamCreationProps {
   weekendActivatedAt?: string | null;
   /** Plan Team/Premium (o prueba Team) pagado, sin contar el Weekend. */
   hasTeamPlan?: boolean;
+  hasPremiumPlan?: boolean;
 }
 
 interface TooltipProps {
@@ -53,7 +54,7 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt, hasTeamPlan = true }) => {
+export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt, hasTeamPlan = true, hasPremiumPlan = false }) => {
   const { t } = useTranslation();
   // Tipo de grupo que se va a crear: Weekend (extra aparte) o el del plan/grupo adicional.
   const [kind, setKind] = useState<NewGroupKind | null>(null);
@@ -107,7 +108,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   useEffect(() => {
     let active = true;
     void (async () => {
-      const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
+      const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until, premium_branding').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
       const ids = (groups || []).map(group => group.id);
       let extraCapacity = 0;
       if (ids.length) {
@@ -115,13 +116,13 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         extraCapacity = count || 0;
       }
       if (!active) return;
-      const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekendUntil, hasTeamPlan });
+      const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekendUntil, hasTeamPlan, hasPremiumPlan });
       setKind(next);
       setExistingGroup(next ? null : groups?.[0] ?? null);
       setCheckingExisting(false);
     })();
     return () => { active = false; };
-  }, [userId, weekendUntil, hasTeamPlan]);
+  }, [userId, weekendUntil, hasTeamPlan, hasPremiumPlan]);
 
   const handleCreate = async () => {
     if (!groupName.trim()) { setError('El nombre del grupo es obligatorio'); return; }
@@ -269,7 +270,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 1: Group name + code */}
         {step === 1 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-1">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t('home.createTeam')}</h2>
+            <h2 className="text-xl font-bold text-ink mb-1">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(kind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</h2>
             <p className="text-sm text-ink-3 mb-5">Configura tu grupo de juego</p>
 
             <div className="mb-4">
@@ -316,7 +317,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         {/* Step 2: 3 questions */}
         {step === 2 && (
           <div className="bg-card rounded-2xl shadow-card p-6">
-            <h2 className="text-xl font-bold text-ink mb-5">{weekend ? t(weekend === 90 ? 'home.configureWeekend90' : 'home.configureWeekend7') : 'Configuración del Team'}</h2>
+            <h2 className="text-xl font-bold text-ink mb-5">{weekend ? t(weekend === 90 ? 'home.configureWeekend90' : 'home.configureWeekend7') : kind === 'premium' ? 'Configuración del Premium' : 'Configuración del Team'}</h2>
 
             <div className="space-y-4 mb-6">
               {/* Q1: Add players now */}

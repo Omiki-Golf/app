@@ -116,6 +116,11 @@ test('Weekend and Grupo adicional each allow one more owned group alongside the 
   // Solo Weekend (sin plan Team): un único grupo, el Weekend.
   assert.equal(nextGroupKind({ ownedGroups: [], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), 'weekend');
   assert.equal(nextGroupKind({ ownedGroups: [weekendGroup], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), null);
+
+  // Premium solo tiene un grupo rosa; cualquier capacidad adicional crea Team verde.
+  const premium = { group_type: 'team', weekend_mode_until: null, premium_branding: true };
+  assert.equal(nextGroupKind({ ownedGroups: [], extraGroups: 0, hasTeamPlan: true, hasPremiumPlan: true, now }), 'premium');
+  assert.equal(nextGroupKind({ ownedGroups: [premium], extraGroups: 1, hasTeamPlan: true, hasPremiumPlan: true, now }), 'team');
 });
 
 test('server keeps Weekend groups outside the plan capacity and the home offers the next group', async () => {
@@ -160,7 +165,7 @@ test('database trigger allows the Weekend group and Grupo adicional next to the 
   await db.close();
 });
 
-test('group rounds never change the personal handicap and the Pro-Shop lets you pick the groups', async () => {
+test('group rounds keep personal handicap separate and Pro-Shop separates account and group scope', async () => {
   const [setup, i18n, shop, home] = await Promise.all([
     read('../src/components/PlayerSetup.tsx'),
     read('../src/i18n/index.ts'),
@@ -170,9 +175,41 @@ test('group rounds never change the personal handicap and the Pro-Shop lets you 
   assert.match(setup, /if \(addingSelf && !currentGroup\) \{/);
   assert.match(i18n, /No afecta a los grupos, en cada grupo tienes tu HCP por separado\./);
   assert.doesNotMatch(i18n, /Cada grupo guarda el tuyo por separado/);
-  assert.match(shop, /¿Para qué grupo\?/);
-  assert.match(shop, /for \(const otherId of alsoApplyTo\)/);
-  assert.match(shop, /item\.id !== 'grupo-adicional'/);
+  assert.doesNotMatch(shop, /¿Para qué grupo\?/);
+  assert.match(shop, /Configurar grupo/);
+  assert.match(shop, /activate_account_gamification/);
+  assert.match(shop, /set_additional_group_for_testing/);
+  assert.match(shop, /Weekend solo permite un grupo temporal/);
+  assert.doesNotMatch(shop, /alsoApplyTo/);
   assert.match(home, /const tier = groupTier\(group\)/);
   assert.match(home, /const tone = tierColors\[tier\]/);
+});
+
+test('Premium keeps one pink group and additional capacity creates green Team groups', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const db = new PGlite();
+  const migration = await read('../supabase/migrations/20261117100000_group_tiers_and_purchase_scope.sql');
+  await db.exec(`
+    CREATE ROLE anon; CREATE ROLE authenticated;
+    CREATE SCHEMA auth;
+    CREATE TABLE test_session(uid uuid);
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT uid FROM public.test_session LIMIT 1 $$;
+    CREATE FUNCTION public.is_app_user_read_only() RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+    CREATE TABLE user_subscriptions(user_id uuid PRIMARY KEY,plan_type text,status text,current_period_end timestamptz,team_trial_ends_at timestamptz,weekend_mode_until timestamptz);
+    CREATE TABLE groups(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_auth_id uuid,archived_at timestamptz,group_type text NOT NULL DEFAULT 'team',weekend_mode_until timestamptz,premium_branding boolean NOT NULL DEFAULT false,created_at timestamptz DEFAULT now(),hoyo_19_enabled boolean DEFAULT true,max_players integer DEFAULT 20,simultaneous_season_enabled boolean DEFAULT false);
+    CREATE TABLE pro_shop_purchases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),group_id uuid,purchased_by uuid,product_type text,amount_paid numeric,payment_method text,status text);
+    CREATE TABLE group_gamification(group_id uuid,product_id text,purchased boolean,enabled boolean,updated_by uuid,updated_at timestamptz DEFAULT now(),PRIMARY KEY(group_id,product_id));
+    CREATE FUNCTION public.activate_group_gamification(uuid,text[]) RETURNS void LANGUAGE sql AS $$ SELECT $$;
+  `);
+  await db.exec(migration);
+  const owner = '00000000-0000-0000-0000-000000000091';
+  await db.query('INSERT INTO test_session VALUES($1)', [owner]);
+  await db.query(`INSERT INTO user_subscriptions(user_id,plan_type,status,current_period_end) VALUES($1,'premium','active',now()+interval '1 year')`, [owner]);
+  const first = await db.query(`INSERT INTO groups(user_auth_id) VALUES($1) RETURNING id,premium_branding`, [owner]);
+  assert.equal(first.rows[0].premium_branding, true);
+  await db.query('SELECT public.set_additional_group_for_testing(true)');
+  const second = await db.query(`INSERT INTO groups(user_auth_id) VALUES($1) RETURNING premium_branding`, [owner]);
+  assert.equal(second.rows[0].premium_branding, false);
+  assert.equal((await db.query(`SELECT count(*)::int AS n FROM pro_shop_purchases WHERE product_type='grupo-adicional'`)).rows[0].n, 1);
+  await db.close();
 });

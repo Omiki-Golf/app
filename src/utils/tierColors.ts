@@ -34,12 +34,12 @@ export const tierColors: Record<TierColor, {
     outlineButton: 'border-lime-400 text-lime-700 hover:bg-lime-400/10 dark:text-lime-300',
   },
   premium: {
-    ink: 'text-fuchsia-700 dark:text-fuchsia-400',
-    border: 'border-fuchsia-500',
-    button: 'bg-fuchsia-500 hover:bg-fuchsia-600 text-slate-950',
-    soft: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300',
-    card: 'border-fuchsia-500/70 bg-fuchsia-500/10',
-    outlineButton: 'border-fuchsia-500 text-fuchsia-700 hover:bg-fuchsia-500/10 dark:text-fuchsia-300',
+    ink: 'text-pink-700 dark:text-pink-400',
+    border: 'border-pink-500',
+    button: 'bg-pink-500 hover:bg-pink-600 text-slate-950',
+    soft: 'bg-pink-500/10 text-pink-700 dark:text-pink-300',
+    card: 'border-pink-500/70 bg-pink-500/10',
+    outlineButton: 'border-pink-500 text-pink-700 hover:bg-pink-500/10 dark:text-pink-300',
   },
   weekend: {
     ink: 'text-orange-700 dark:text-orange-400',

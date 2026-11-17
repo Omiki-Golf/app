@@ -1354,6 +1354,7 @@ function App() {
             weekendUntil={subscription?.weekend_mode_until}
             weekendActivatedAt={subscription?.updated_at}
             hasTeamPlan={hasTeamPlan}
+            hasPremiumPlan={basePlanType === 'premium'}
             onBack={() => setCurrentView('main')}
             onTeamCreated={() => {
               refreshSubscription();
@@ -1474,6 +1475,7 @@ function App() {
               extraGroups: ownedExtraGroups,
               weekendUntil: subscription?.weekend_mode_until,
               hasTeamPlan,
+              hasPremiumPlan: basePlanType === 'premium',
             })}
             onCreateTeam={() => setCurrentView('team-creation')}
             groupShortcuts={homeGroups.map(({ group, access }) => ({
