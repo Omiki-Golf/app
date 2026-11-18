@@ -19,6 +19,8 @@ interface ProShopProps {
   userId: string;
   onBack: () => void;
   onPurchaseComplete?: () => void;
+  /** Abre Planes con Team marcado (oferta de pasar de la prueba a Team completo). */
+  onUpgradeTeam?: () => void;
   messagesButton?: React.ReactNode;
 }
 
@@ -64,7 +66,7 @@ const addons: Addon[] = [
 const titlesPrice = (paidCount: number) => (paidCount === 0 ? 0 : 1.99 + (paidCount - 1));
 type OwnedGroup = { id: string; name: string; weekend: boolean; premium: boolean };
 
-export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, groupName: initialGroupName, userId, onBack, messagesButton }) => {
+export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, groupName: initialGroupName, userId, onBack, messagesButton, onUpgradeTeam }) => {
   // Títulos y ampliaciones se contratan para el grupo elegido (Weekend incluido).
   // Grupo Adicional es de la cuenta. Lo ya pagado aparece marcado y no se puede retirar.
   const [ownedGroups, setOwnedGroups] = useState<OwnedGroup[]>([]);
@@ -147,9 +149,13 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
   const hasRequest = newTitleItems.length > 0 || newAddonItems.length > 0;
   const additionalFull = additionalOwned >= MAX_ADDITIONAL_GROUPS;
   const canBuyAdditionalGroup = hasPaidTeamPlan && planGroups.length > 0 && !additionalFull;
+  // Prueba Team: solo títulos. Las ampliaciones de un grupo Team piden Team completo; los Weekend no cambian.
+  const selectedIsWeekend = Boolean(ownedGroups.find(group => group.id === groupId)?.weekend);
+  const groupAddonsLocked = !hasPaidTeamPlan && !selectedIsWeekend;
+  const showTeamUpgrade = isTeamTrial && !hasPaidTeamPlan;
   const additionalNote = additionalFull
     ? 'Ya tienes tus 3 grupos: el incluido y 2 adicionales'
-    : !hasPaidTeamPlan ? (isTeamTrial ? 'Hazte Team para crear un grupo extra' : 'Requiere un plan Team o Premium')
+    : !hasPaidTeamPlan ? (isTeamTrial ? 'Disponible con Team completo' : 'Requiere un plan Team o Premium')
     : planGroups.length === 0 ? 'Crea primero el grupo incluido en tu plan'
     : `Tienes ${additionalOwned} de ${MAX_ADDITIONAL_GROUPS} · contrata otro grupo`;
 
@@ -257,15 +263,22 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                     purchased={!isAdditional && ownedAddons.has(item.id)}
                     price={`${money(item.price)} / año`}
                     vatLabel={t('plans.vatShort')}
-                    note={isAdditional ? additionalNote : item.note}
+                    note={isAdditional ? additionalNote : groupAddonsLocked && !ownedAddons.has(item.id) ? (isTeamTrial ? 'Disponible con Team completo' : 'Requiere un plan Team o Premium') : item.note}
                     onToggle={() => {
                       if (isAdditional) { setNewAdditional(current => !current); setSaved(false); }
                       else toggle(newAddons, setNewAddons, item.id);
                     }}
-                    disabled={isAdditional && !canBuyAdditionalGroup}
+                    disabled={isAdditional ? !canBuyAdditionalGroup : groupAddonsLocked}
                   />;
                 })}
               </div>
+              {showTeamUpgrade && (
+                <div role="status" className="rounded-2xl border border-accent bg-accent-soft p-4 text-center">
+                  <p className="text-sm font-semibold text-ink">Estás en la prueba Team</p>
+                  <p className="mt-1 text-xs text-ink-2">Pasa a Team completo para contratar Grupos Adicionales, ampliar la plantilla y la Temporada Simultánea. Los títulos ya puedes contratarlos.</p>
+                  {onUpgradeTeam && <button type="button" onClick={onUpgradeTeam} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover">Pasar a Team completo</button>}
+                </div>
+              )}
             </section>
 
             <section aria-label="Resumen" className="rounded-2xl border border-line bg-card p-4 shadow-card space-y-3">

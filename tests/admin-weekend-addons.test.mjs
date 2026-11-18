@@ -180,6 +180,8 @@ test('group rounds keep personal handicap separate and Pro-Shop separates accoun
   assert.match(shop, /rpc\('activate_group_gamification', \{ p_group: groupId/);
   assert.doesNotMatch(shop, /activate_account_gamification/);
   assert.match(shop, /rpc\('add_additional_group_for_testing'\)/);
+  assert.match(shop, /Pasar a Team completo/);
+  assert.match(shop, /onClick=\{onUpgradeTeam\}/);
   assert.doesNotMatch(shop, /Weekend solo permite un grupo temporal/);
   assert.doesNotMatch(shop, /alsoApplyTo/);
   assert.match(home, /const tier = groupTier\(group\)/);

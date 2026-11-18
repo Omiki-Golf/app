@@ -1406,6 +1406,7 @@ function App() {
             userId={user.id}
             onBack={() => setCurrentView('profile')}
             onPurchaseComplete={() => setCurrentView('profile')}
+            onUpgradeTeam={() => { setReturnToProfile(false); setPlansContext('team'); setCurrentView('plans'); }}
             messagesButton={inlineMessagesButton}
           />
         </div>

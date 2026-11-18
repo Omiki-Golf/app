@@ -223,3 +223,49 @@ test('Pro-Shop sells titles and add-ons per group, Weekend included, and never r
   assert.equal((await db.query('SELECT max_players FROM groups WHERE id=$1', [weekend])).rows[0].max_players, 32);
   await db.close();
 });
+
+test('Team trial buys titles only: add-ons and extra groups need full Team, Weekend groups keep them', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const db = new PGlite();
+  const files = ['20261117100000_group_tiers_and_purchase_scope', '20261118100000_weekend_end_of_day_and_auto_archive', '20261119100000_two_weekends_and_team_conversion', '20261121100000_team_trial_addons'];
+  const [tiers, expiry, rules, trial] = await Promise.all(files.map(name => read(`../supabase/migrations/${name}.sql`)));
+  await db.exec(`
+    CREATE ROLE anon; CREATE ROLE authenticated;
+    CREATE SCHEMA auth;
+    CREATE TABLE test_session(uid uuid);
+    CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT uid FROM public.test_session LIMIT 1 $$;
+    CREATE FUNCTION public.is_app_user_read_only() RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
+    CREATE TABLE user_subscriptions(user_id uuid PRIMARY KEY,plan_type text,status text,current_period_end timestamptz,team_trial_ends_at timestamptz,weekend_mode_until timestamptz,updated_at timestamptz DEFAULT now());
+    CREATE TABLE groups(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),name text,group_code text,user_auth_id uuid,archived_at timestamptz,group_type text NOT NULL DEFAULT 'team',weekend_mode_until timestamptz,premium_branding boolean NOT NULL DEFAULT false,created_at timestamptz DEFAULT now(),hoyo_19_enabled boolean DEFAULT true,max_players integer DEFAULT 20,simultaneous_season_enabled boolean DEFAULT false);
+    CREATE TABLE pro_shop_purchases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),group_id uuid,purchased_by uuid,product_type text,amount_paid numeric,payment_method text,status text);
+    CREATE TABLE group_gamification(group_id uuid,product_id text,purchased boolean,enabled boolean,updated_by uuid,updated_at timestamptz DEFAULT now(),PRIMARY KEY(group_id,product_id));
+    CREATE TABLE group_invitations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),group_id uuid,status text);
+    CREATE FUNCTION public.activate_group_gamification(uuid,text[]) RETURNS void LANGUAGE sql AS $$ SELECT $$;
+  `);
+  await db.exec(tiers);
+  await db.exec(expiry.replace(/CREATE EXTENSION IF NOT EXISTS pg_cron[^;]*;/, '').replace(/SELECT cron\.schedule\([^;]*;/, ''));
+  await db.exec(rules);
+  await db.exec(trial);
+
+  const owner = '00000000-0000-0000-0000-0000000000f1';
+  await db.query('INSERT INTO test_session VALUES($1)', [owner]);
+  await db.query(`INSERT INTO user_subscriptions(user_id,plan_type,status,current_period_end,team_trial_ends_at) VALUES($1,'player','active',now()+interval '1 year',now()+interval '20 days')`, [owner]);
+  const group = async (type = 'team', days = null) => (await db.query(
+    'INSERT INTO groups(name,group_code,user_auth_id,group_type,weekend_days) VALUES($1,$1,$2,$3,$4) RETURNING id', [`G-${type}`, owner, type, days])).rows[0].id;
+
+  // En la prueba Team: títulos sí; ampliaciones y Grupo Adicional, no.
+  const team = await group();
+  await db.query(`SELECT public.activate_group_gamification($1, ARRAY['spanish-hand'])`, [team]);
+  await assert.rejects(db.query(`SELECT public.activate_group_addons_for_testing($1, ARRAY['ampliacion-plantilla'])`, [team]), /Pasa a Team completo para ampliar/);
+  await assert.rejects(db.query('SELECT public.add_additional_group_for_testing()'), /Pasa a Team completo para contratar Grupos Adicionales/);
+  // Su grupo Weekend sí admite ampliaciones.
+  await db.query('SELECT public.activate_weekend_for_testing(7)');
+  const weekend = await group('weekend', 7);
+  await db.query(`SELECT public.activate_group_addons_for_testing($1, ARRAY['ampliacion-plantilla'])`, [weekend]);
+
+  // Con Team completo ya puede hacerlo todo.
+  await db.query(`UPDATE user_subscriptions SET plan_type='team' WHERE user_id=$1`, [owner]);
+  await db.query(`SELECT public.activate_group_addons_for_testing($1, ARRAY['ampliacion-plantilla','temporada-simultanea'])`, [team]);
+  assert.equal(await db.query('SELECT public.add_additional_group_for_testing() AS n').then(r => r.rows[0].n), 1);
+  await db.close();
+});
