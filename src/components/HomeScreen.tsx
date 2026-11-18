@@ -8,11 +8,10 @@ import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
 import { weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
+import { homeGroupSections } from '../utils/homeGroups';
 import { groupTier, tierColors } from '../utils/tierColors';
 import { RenewalNoticeCard, type RenewalNoticeAction } from './RenewalNoticeCard';
 
-type GroupAccess = 'owner' | 'admin' | 'member';
-const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
 
 interface HomeScreenProps {
   planType: PlanType;
@@ -21,7 +20,7 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean; weekend_mode_until?: string | null; weekend_days?: number | null }>;
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean; weekend_mode_until?: string | null; weekend_days?: number | null; since?: string | null }>;
   /** Abre Planes con Team marcado (aviso de fin del Weekend de 3 meses para quien no es Team). */
   onContractTeam?: () => void;
   onOpenGroup?: (groupId: string) => void;
@@ -128,6 +127,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const isTeam = (planType === 'team' || planType === 'premium');
   // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
   const weekend = weekendKindDays(createGroupKind);
+  const sections = homeGroupSections(groupShortcuts);
   // Sin dato explícito se mantiene la regla anterior: Team/Premium sin grupo propio.
   const canCreateGroup = createGroupKind !== undefined
     ? createGroupKind !== null
@@ -234,34 +234,71 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </WriteButton>
 
 
-          {/* Orden por rol: Creador, Administrador y Miembro (estable dentro de cada rol). */}
-          {[...groupShortcuts].sort((a, b) => ROLE_ORDER[a.access] - ROLE_ORDER[b.access]).map(group => {
-            const managesGroup = group.access === 'owner' || group.access === 'admin';
-            const tier = groupTier(group);
-            const tone = tierColors[tier];
-            return <React.Fragment key={group.id}><WriteButton
-              onClick={() => onOpenGroup?.(group.id)}
-              className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup ? `${tone.button} ${tone.border} shadow-card` : `bg-card ${tone.outlineButton}`}`}
-            >
-              <Users className="w-6 h-6" aria-hidden="true" />
-              <span className="min-w-0 truncate">{group.name}</span>
-              {group.access === 'owner' && <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>}
-              {group.access === 'admin' && <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
-            </WriteButton>
-            {group.access === 'owner' && tier === 'weekend' && (
-              <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
-            )}
-            </React.Fragment>;
-          })}
+          {/* Grupos en tres bloques: los creados (y el botón para crear otro), los que administras
+              y, en dos columnas (o a todo el ancho si solo hay uno), aquellos de los que eres miembro. Cada bloque, del más antiguo al más reciente. */}
+          {(sections.owned.length > 0 || canCreateGroup) && (
+            <div className="space-y-3 pt-2">
+              {sections.owned.map(group => {
+                const tier = groupTier(group);
+                const tone = tierColors[tier];
+                return <React.Fragment key={group.id}>
+                  <WriteButton
+                    onClick={() => onOpenGroup?.(group.id)}
+                    className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${tone.button} ${tone.border} shadow-card`}
+                  >
+                    <Users className="w-6 h-6" aria-hidden="true" />
+                    <span className="min-w-0 truncate">{group.name}</span>
+                    <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>
+                  </WriteButton>
+                  {tier === 'weekend' && (
+                    <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
+                  )}
+                </React.Fragment>;
+              })}
+              {canCreateGroup && (
+                <WriteButton
+                  onClick={onCreateTeam}
+                  className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : createGroupKind === 'premium' ? 'premium' : 'team'].button}`}
+                >
+                  <Plus className="w-6 h-6" aria-hidden="true" />
+                  <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(createGroupKind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</span>
+                </WriteButton>
+              )}
+            </div>
+          )}
 
-          {canCreateGroup && (
-            <WriteButton
-              onClick={onCreateTeam}
-              className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : createGroupKind === 'premium' ? 'premium' : 'team'].button}`}
-            >
-              <Plus className="w-6 h-6" aria-hidden="true" />
-              <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(createGroupKind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</span>
-            </WriteButton>
+          {sections.admin.length > 0 && (
+            <div className="space-y-3 pt-2">
+              {sections.admin.map(group => {
+                const tone = tierColors[groupTier(group)];
+                return <WriteButton
+                  key={group.id}
+                  onClick={() => onOpenGroup?.(group.id)}
+                  className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${tone.button} ${tone.border} shadow-card`}
+                >
+                  <Users className="w-6 h-6" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{group.name}</span>
+                  <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />
+                </WriteButton>;
+              })}
+            </div>
+          )}
+
+          {sections.member.length > 0 && (
+            <div className={`grid gap-2 pt-2 ${sections.member.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {sections.member.map(group => {
+                const tone = tierColors[groupTier(group)];
+                return <WriteButton
+                  key={group.id}
+                  onClick={() => onOpenGroup?.(group.id)}
+                  title={group.name}
+                  className={`flex min-w-0 items-center justify-center gap-2 border-2 bg-card px-3 py-2.5 rounded-xl transition-all font-semibold text-sm active:scale-[0.98] ${tone.outlineButton}`}
+                >
+                  <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 truncate">{group.name}</span>
+                </WriteButton>;
+              })}
+            </div>
           )}
         </div>
 

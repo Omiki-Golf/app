@@ -81,7 +81,8 @@ function App() {
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
   const [ownedExtraGroups, setOwnedExtraGroups] = useState(0);
-  const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member' }>>([]);
+  // since: fecha para ordenar en Inicio (creación, nombramiento como administrador o aceptación).
+  const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member'; since?: string | null }>>([]);
   // Pro-Shop: el grupo abierto si soy su creador; si no, mi primer grupo creado.
   const proShopGroup = (currentGroup && homeGroups.some(item => item.access === 'owner' && item.group.id === currentGroup.id))
     ? currentGroup
@@ -619,13 +620,14 @@ function App() {
       await supabase.rpc('archive_expired_weekend_groups');
       const [owned, memberships] = await Promise.all([
         supabase.from('groups').select('*').eq('user_auth_id', user.id).is('archived_at', null),
-        supabase.from('group_members').select('group_id, role').eq('user_id', user.id),
+        supabase.from('group_members').select('group_id, role, joined_at, admin_since').eq('user_id', user.id),
       ]);
       if (owned.error) throw owned.error;
       if (memberships.error) throw memberships.error;
       const ownedGroups = (owned.data || []) as Group[];
       const ownedIds = new Set(ownedGroups.map(group => group.id));
       const roles = new Map((memberships.data || []).filter(item => !ownedIds.has(item.group_id)).map(item => [item.group_id, item.role === 'admin' ? 'admin' as const : 'member' as const]));
+      const since = new Map((memberships.data || []).map(item => [item.group_id, item.role === 'admin' ? (item.admin_since ?? item.joined_at) : item.joined_at]));
       let joinedGroups: Group[] = [];
       if (roles.size) {
         const joined = await supabase.from('groups').select('*').in('id', [...roles.keys()]).is('archived_at', null);
@@ -641,8 +643,8 @@ function App() {
       setOwnedExtraGroups(extraGroups);
       setOwnedTeam(ownedGroups[0] ?? null);
       setHomeGroups([
-        ...ownedGroups.map(group => ({ group, access: 'owner' as const })),
-        ...joinedGroups.map(group => ({ group, access: roles.get(group.id) ?? 'member' as const })),
+        ...ownedGroups.map(group => ({ group, access: 'owner' as const, since: group.created_at })),
+        ...joinedGroups.map(group => ({ group, access: roles.get(group.id) ?? 'member' as const, since: since.get(group.id) ?? null })),
       ]);
     };
     void loadHomeGroups().catch(() => { if (active) { setOwnedTeam(null); setHomeGroups([]); } });
@@ -1506,10 +1508,11 @@ function App() {
               hasPremiumPlan: basePlanType === 'premium',
             })}
             onCreateTeam={() => setCurrentView('team-creation')}
-            groupShortcuts={homeGroups.map(({ group, access }) => ({
+            groupShortcuts={homeGroups.map(({ group, access, since }) => ({
               id: group.id,
               name: group.name || group.group_code,
               access,
+              since,
               group_type: group.group_type,
               premium_branding: group.premium_branding,
               weekend_mode_until: group.weekend_mode_until,
