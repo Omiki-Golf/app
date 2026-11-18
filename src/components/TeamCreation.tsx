@@ -7,8 +7,8 @@ import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
 import { useTranslation } from 'react-i18next';
-import { weekendDuration } from '../utils/weekendMode';
-import { nextGroupKind, type NewGroupKind } from '../utils/groupCapacity';
+import { weekendDuration, weekendExpiryText } from '../utils/weekendMode';
+import { isActiveWeekendGroup, nextGroupKind, type NewGroupKind } from '../utils/groupCapacity';
 
 interface TeamCreationProps {
   userId: string;
@@ -65,7 +65,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   const [addPlayersNow, setAddPlayersNow] = useState(true);
   const [hoyo19, setHoyo19] = useState(true);
   // Los planes Team y Premium incluyen un grupo: si ya existe, no se ofrece crear otro.
-  const [existingGroup, setExistingGroup] = useState<{ id: string; name: string } | null>(null);
+  const [existingGroup, setExistingGroup] = useState<{ id: string; name: string; group_type?: string | null; weekend_mode_until?: string | null } | null>(null);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [searchNick, setSearchNick] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
@@ -118,7 +118,11 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
       if (!active) return;
       const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekendUntil, hasTeamPlan, hasPremiumPlan });
       setKind(next);
-      setExistingGroup(next ? null : groups?.[0] ?? null);
+      // Con un Weekend vigente, lo que impide crear es su grupo Weekend, no el del plan.
+      const weekendGroup = (groups || []).find(group => isActiveWeekendGroup(group));
+      const planGroup = (groups || []).find(group => group.group_type !== 'weekend');
+      const weekendActive = Boolean(weekendUntil && Date.parse(weekendUntil) > Date.now());
+      setExistingGroup(next ? null : (weekendActive && weekendGroup) || planGroup || groups?.[0] || null);
       setCheckingExisting(false);
     })();
     return () => { active = false; };
@@ -241,9 +245,11 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
             <div className="w-16 h-16 bg-accent-soft rounded-full flex items-center justify-center mx-auto mb-4">
               <Users className="text-accent-ink" size={32} />
             </div>
-            <h2 className="text-xl font-bold text-ink mb-2">Ya tienes tu grupo</h2>
+            <h2 className="text-xl font-bold text-ink mb-2">{existingGroup.group_type === 'weekend' ? 'Ya tienes tu grupo Weekend' : 'Ya tienes tu grupo'}</h2>
             <p className="text-ink-3 mb-1">{existingGroup.name}</p>
-            <p className="text-sm text-ink-4 mb-6">Tu plan incluye un grupo. Desde Mis grupos puedes gestionar sus jugadores y administradores.</p>
+            <p className="text-sm text-ink-4 mb-6">{existingGroup.group_type === 'weekend'
+              ? `Cada Weekend incluye un grupo. Este vence ${weekendExpiryText(existingGroup.weekend_mode_until) ?? 'pronto'} y se archivará.`
+              : 'Tu plan incluye un grupo. Desde Mis grupos puedes gestionar sus jugadores y administradores.'}</p>
             <button
               onClick={() => onTeamCreated(existingGroup.id)}
               className="w-full bg-accent hover:bg-accent-hover text-on-accent font-semibold py-3 rounded-xl transition-colors"

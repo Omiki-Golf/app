@@ -114,7 +114,7 @@ function App() {
   }, []);
   const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
   const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
-  const [plansContext, setPlansContext] = useState<'default' | 'express-limit' | 'express-modes'>('default');
+  const [plansContext, setPlansContext] = useState<'default' | 'express-limit' | 'express-modes' | 'team'>('default');
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
     () => new URLSearchParams(window.location.search).get('email-confirmed') === '1'
@@ -606,6 +606,8 @@ function App() {
     }
     let active = true;
     const loadHomeGroups = async () => {
+      // Los grupos Weekend vencidos se archivan antes de mostrarlos (el cron lo hace cada 5 min).
+      await supabase.rpc('archive_expired_weekend_groups');
       const [owned, memberships] = await Promise.all([
         supabase.from('groups').select('*').eq('user_auth_id', user.id).is('archived_at', null),
         supabase.from('group_members').select('group_id, role').eq('user_id', user.id),
@@ -1144,10 +1146,11 @@ function App() {
               if (plansContext === 'express-limit' || plansContext === 'express-modes') {
                 setPlansContext('default');
                 setCurrentView('setup');
-              } else backFromProfileSection('main');
+              } else { setPlansContext('default'); backFromProfileSection('main'); }
             }}
             expressLimit={plansContext === 'express-limit'}
             expressModes={plansContext === 'express-modes'}
+            initialPlan={plansContext === 'team' ? 'team' : undefined}
             // Durante la prueba, el plan efectivo es Team, pero el plan pagado sigue siendo Player.
             // Mostrar este último permite suscribirse a Team antes de que termine la prueba.
             currentPlan={user ? ((subscription?.plan_type === 'player' || subscription?.plan_type === 'team' || subscription?.plan_type === 'premium') ? subscription.plan_type : activePlanType) : undefined}
@@ -1484,7 +1487,12 @@ function App() {
               access,
               group_type: group.group_type,
               premium_branding: group.premium_branding,
+              weekend_mode_until: group.weekend_mode_until,
+              created_at: group.created_at,
             }))}
+            onContractTeam={basePlanType === 'team' || basePlanType === 'premium' ? undefined : () => {
+              setReturnToProfile(false); setPlansContext('team'); setCurrentView('plans');
+            }}
             onOpenGroup={(groupId) => {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
               if (selectedGroup) void handleGroupJoined(selectedGroup);

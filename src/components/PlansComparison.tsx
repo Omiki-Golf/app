@@ -21,6 +21,8 @@ interface PlansComparisonProps {
   teamTrialUsed?: boolean;
   onStartTeamTrial?: () => Promise<void>;
   onStartWeekend?: (days: 7 | 90) => Promise<void>;
+  /** Plan marcado al abrir (por ejemplo Team desde el aviso de fin de Weekend). */
+  initialPlan?: DisplayPlan;
   expressLimit?: boolean;
   /** Express que intenta usar una modalidad bloqueada: solo Express (actual) y Player, sin inicio de sesión. */
   expressModes?: boolean;
@@ -36,7 +38,7 @@ const styles = {
 // Weekend es un pago puntual: nunca se considera "incluido" en otro plan.
 const planRank: Record<DisplayPlan, number> = { express: 0, player: 1, team: 2, premium: 3, weekend: 99 };
 
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false }) => {
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false, initialPlan }) => {
   const { t, i18n } = useTranslation();
   const currency = useDisplayCurrency();
   const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
@@ -46,7 +48,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
   const longDate = new Intl.DateTimeFormat(i18n.resolvedLanguage || 'es', { day: 'numeric', month: 'long', year: 'numeric' });
   const currentPlan = expressModes ? 'express' : planInUse;
   const onShowAuth = expressModes ? undefined : showAuth;
-  const [selected, setSelected] = useState<DisplayPlan>(expressLimit || expressModes ? 'player' : (currentPlan ?? 'express'));
+  const [selected, setSelected] = useState<DisplayPlan>(initialPlan ?? (expressLimit || expressModes ? 'player' : (currentPlan ?? 'express')));
   const [annual, setAnnual] = useState(currentBillingPeriod ? currentBillingPeriod === 'annual' : true);
   const [weekendDays, setWeekendDays] = useState<7 | 90>(7);
   const [comingSoon, setComingSoon] = useState(false);

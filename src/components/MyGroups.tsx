@@ -81,6 +81,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
         return;
       }
 
+      // Un grupo Weekend vencido aparece ya como archivado.
+      await supabase.rpc('archive_expired_weekend_groups');
       const [owned, memberships, profile] = await Promise.all([
         supabase.from('groups').select(GROUP_COLUMNS).eq('user_auth_id', user.id).order('created_at', { ascending: false }),
         supabase.from('group_members').select('role, group_id').eq('user_id', user.id),

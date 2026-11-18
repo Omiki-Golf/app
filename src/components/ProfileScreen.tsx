@@ -4,6 +4,7 @@ import { Settings, BarChart3, LandPlot, Crown, ChevronRight, CreditCard, Gem, In
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
 import { TeamTrialOfferCard, type TeamTrialOffer } from './TeamTrialOfferCard';
+import { weekendDaysLeft, weekendExpiryText } from '../utils/weekendMode';
 
 interface ProfileScreenProps {
   profile: UserProfile | null;
@@ -55,9 +56,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     && Date.parse(subscription.team_trial_ends_at) > Date.now()
     ? new Date(subscription.team_trial_ends_at) : null;
   const trialDaysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000)) : 0;
-  const weekendEnd = subscription?.weekend_mode_until && Date.parse(subscription.weekend_mode_until) > Date.now()
-    ? new Date(subscription.weekend_mode_until) : null;
-  const weekendDaysLeft = weekendEnd ? Math.max(1, Math.ceil((weekendEnd.getTime() - Date.now()) / 86_400_000)) : 0;
+  // El Weekend vence a las 23:59 h (hora de Madrid) de su último día y su grupo se archiva.
+  const weekendDays = weekendDaysLeft(subscription?.weekend_mode_until);
+  const weekendExpiry = weekendExpiryText(subscription?.weekend_mode_until);
   const nick = profile?.nick || t('profile.player');
   const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
   const fallbackHandicap18 = profile?.exact_handicap;
@@ -208,11 +209,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <p className="mt-1 text-xs opacity-80">Después volverás automáticamente a tu plan Player si no te suscribes a Team.</p>
           </div>
         )}
-        {weekendEnd && (
+        {weekendDays !== null && weekendExpiry && (
           <div className="mt-4 rounded-2xl border-2 border-orange-400 bg-orange-50 p-4 text-orange-950 shadow-soft dark:bg-orange-950/40 dark:text-orange-100" role="status">
             <div className="flex items-center gap-2 font-bold"><Crown size={18} fill="currentColor" /> Omiki Weekend activo</div>
-            <p className="mt-1 text-sm">Te quedan {weekendDaysLeft} días. Termina el {weekendEnd.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
-            <p className="mt-1 text-xs opacity-80">Durante este periodo tienes disponibles las funciones Team.</p>
+            <p className="mt-1 text-sm">{weekendDays > 1 && `Te quedan ${weekendDays} días. `}Tu grupo Weekend vence {weekendExpiry} y se archivará.</p>
+            <p className="mt-1 text-xs opacity-80">Hasta entonces tienes disponibles las funciones Team.</p>
           </div>
         )}
 

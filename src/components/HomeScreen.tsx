@@ -6,7 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { weekendDuration } from '../utils/weekendMode';
+import { weekendDuration, weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
 import { groupTier, tierColors } from '../utils/tierColors';
 
 type GroupAccess = 'owner' | 'admin' | 'member';
@@ -19,7 +19,9 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean }>;
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean; weekend_mode_until?: string | null; created_at?: string | null }>;
+  /** Abre Planes con Team marcado; si no se pasa, el aviso de fin de Weekend no ofrece contratar. */
+  onContractTeam?: () => void;
   onOpenGroup?: (groupId: string) => void;
   onShowProfile: () => void;
   onShowAuth: () => void;
@@ -60,6 +62,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   weekendUntil,
   weekendActivatedAt,
   createGroupKind,
+  onContractTeam,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
@@ -175,8 +178,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             const managesGroup = group.access === 'owner' || group.access === 'admin';
             const tier = groupTier(group);
             const tone = tierColors[tier];
-            return <WriteButton
-              key={group.id}
+            // Weekend de 3 meses: en su última semana el creador ve cuándo vence y puede pasar a Team.
+            const lastWeek = group.access === 'owner' && tier === 'weekend' && weekendLastWeek(group.weekend_mode_until, group.created_at);
+            return <React.Fragment key={group.id}><WriteButton
               onClick={() => onOpenGroup?.(group.id)}
               className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup ? `${tone.button} ${tone.border} shadow-card` : `bg-card ${tone.outlineButton}`}`}
             >
@@ -184,7 +188,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <span className="min-w-0 truncate">{group.name}</span>
               {group.access === 'owner' && <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>}
               {group.access === 'admin' && <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
-            </WriteButton>;
+            </WriteButton>
+            {lastWeek && (
+              <div role="status" className={`-mt-1 rounded-2xl border-2 ${tone.border} bg-card p-3 text-center`}>
+                <p className="text-sm font-semibold text-ink">Te queda menos de una semana de Weekend</p>
+                <p className="mt-1 text-xs text-ink-3">{group.name} vence {weekendExpiryText(group.weekend_mode_until)} y se archivará.{onContractTeam ? ' Con Omiki Team mantienes un grupo todo el año.' : ''}</p>
+                {onContractTeam && <button type="button" onClick={onContractTeam} className={`mt-2 w-full rounded-xl px-4 py-2 text-sm font-semibold ${tierColors.team.button}`}>Contratar Team</button>}
+              </div>
+            )}
+            </React.Fragment>;
           })}
 
           {canCreateGroup && (
