@@ -4,6 +4,7 @@ import { Settings, BarChart3, LandPlot, Crown, ChevronRight, CreditCard, Gem, In
 import { UserProfile, PlanType } from '../types';
 import { useTranslation } from 'react-i18next';
 import { TeamTrialOfferCard, type TeamTrialOffer } from './TeamTrialOfferCard';
+import { RenewalNoticeCard, type RenewalNoticeAction } from './RenewalNoticeCard';
 import { weekendDaysLeft, weekendExpiryText } from '../utils/weekendMode';
 
 interface ProfileScreenProps {
@@ -13,6 +14,8 @@ interface ProfileScreenProps {
     plan_type: string;
     team_trial_ends_at: string | null;
     weekend_mode_until: string | null;
+    weekend7_until?: string | null;
+    weekend90_until?: string | null;
   } | null;
   onBack: () => void;
   onLogout: () => void;
@@ -27,6 +30,8 @@ interface ProfileScreenProps {
   messagesButton?: React.ReactNode;
   /** Oferta de fin de prueba Team (días 25 a 30 de la prueba). */
   teamOffer?: TeamTrialOffer | null;
+  /** Aviso de vencimiento de la suscripción. */
+  renewal?: RenewalNoticeAction | null;
   handicap9?: number;
   handicap18?: number;
 }
@@ -46,6 +51,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onShowSettings,
   messagesButton,
   teamOffer,
+  renewal,
   handicap9: propHandicap9,
   handicap18: propHandicap18,
 }) => {
@@ -57,8 +63,15 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     ? new Date(subscription.team_trial_ends_at) : null;
   const trialDaysLeft = trialEnd ? Math.max(1, Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000)) : 0;
   // El Weekend vence a las 23:59 h (hora de Madrid) de su último día y su grupo se archiva.
-  const weekendDays = weekendDaysLeft(subscription?.weekend_mode_until);
-  const weekendExpiry = weekendExpiryText(subscription?.weekend_mode_until);
+  // Puede haber a la vez un Weekend de 7 días y otro de 3 meses.
+  const weekends = ([
+    { label: 'Weekend (7 días)', until: subscription?.weekend7_until },
+    { label: 'Weekend Plus (3 meses)', until: subscription?.weekend90_until },
+  ]).flatMap(item => {
+    const days = weekendDaysLeft(item.until);
+    const expiry = weekendExpiryText(item.until);
+    return days !== null && expiry ? [{ label: item.label, days, expiry }] : [];
+  });
   const nick = profile?.nick || t('profile.player');
   const nickSize = nick.length > 20 ? 'text-xs' : nick.length > 15 ? 'text-base' : 'text-xl';
   const fallbackHandicap18 = profile?.exact_handicap;
@@ -201,6 +214,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         </div>
 
         {/* Oferta, prueba Team y Weekend, justo encima de Cerrar sesión. */}
+        {renewal && <RenewalNoticeCard renewal={renewal} className="mt-4" />}
         {teamOffer && <TeamTrialOfferCard offer={teamOffer} className="mt-4" />}
         {trialEnd && (
           <div className="mt-4 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-soft dark:bg-amber-950/40 dark:text-amber-100" role="status">
@@ -209,10 +223,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <p className="mt-1 text-xs opacity-80">Después volverás automáticamente a tu plan Player si no te suscribes a Team.</p>
           </div>
         )}
-        {weekendDays !== null && weekendExpiry && (
+        {weekends.length > 0 && (
           <div className="mt-4 rounded-2xl border-2 border-orange-400 bg-orange-50 p-4 text-orange-950 shadow-soft dark:bg-orange-950/40 dark:text-orange-100" role="status">
             <div className="flex items-center gap-2 font-bold"><Crown size={18} fill="currentColor" /> Omiki Weekend activo</div>
-            <p className="mt-1 text-sm">{weekendDays > 1 && `Te quedan ${weekendDays} días. `}Tu grupo Weekend vence {weekendExpiry} y se archivará.</p>
+            {weekends.map(item => <p key={item.label} className="mt-1 text-sm"><span className="font-semibold">{item.label}:</span> {item.days > 1 && `te quedan ${item.days} días. `}Su grupo vence {item.expiry} y se archivará.</p>)}
             <p className="mt-1 text-xs opacity-80">Hasta entonces tienes disponibles las funciones Team.</p>
           </div>
         )}

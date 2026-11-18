@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { formatAverage, sortRanking, toFairEntries, type RankingMode } from '../utils/fairRanking';
 import { competitionPosition } from '../utils/ranking';
 
+import { PlayerName } from './PlayerName';
 interface RankingEntry {
   player_name: string;
   player_id?: string | null;
@@ -145,7 +146,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                     {position}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-base sm:text-lg leading-tight text-ink break-words">{entry.name}</p>
+                    <p className="font-bold text-base sm:text-lg leading-tight text-ink break-words"><PlayerName name={entry.name} /></p>
                     <p className="mt-1 text-xs sm:text-sm text-ink-3">
                       <span className="whitespace-nowrap">{entry.rounds} partidas</span>
                       {entry.handicap !== null && entry.handicap !== undefined && (

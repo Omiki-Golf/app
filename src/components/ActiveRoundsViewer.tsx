@@ -17,6 +17,7 @@ import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, Archive, Hand } from 'luc
 import { getErrorMessage } from '../utils/errorMessage';
 import { GamificationBadge } from './GamificationBadge';
 
+import { PlayerName } from './PlayerName';
 const gameModeLabels: Record<string, string> = {
   stableford: 'Stableford',
   match: 'Match Play',
@@ -516,7 +517,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                       </div>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-lg text-ink">{player.name}{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                          <p className="font-bold text-lg text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                           {player.noPasoRojasHoles.length > 0 && (
                             <div className="flex items-center gap-1">
                               {player.noPasoRojasHoles.map((holeNumber) => (
@@ -736,7 +737,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                               >
                                 <div className="flex-1">
                                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                    <p className={`font-semibold ${index === 0 ? 'text-yellow-950 dark:text-yellow-100' : 'text-ink'}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                                    <p className={`font-semibold ${index === 0 ? 'text-yellow-950 dark:text-yellow-100' : 'text-ink'}`}><PlayerName name={item.player.name} />{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                                     {(() => {
                                       // Mismas fichas con icono que en la Clasificación: Rojas, Spanish Hands y títulos del Pro-Shop.
                                       const pScores = [...roundStats.scores.filter(s => s.player_id === item.player.id)].sort((a, b) => a.hole_number - b.hole_number);
@@ -862,7 +863,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 }`}
                               >
                                 <div className="flex-1">
-                                  <p className="font-semibold text-ink">{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                                  <p className="font-semibold text-ink"><PlayerName name={item.player.name} />{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                                   <p className="text-xs text-ink-3">
                                     HCP {item.player.playing_handicap}
                                   </p>

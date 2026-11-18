@@ -1,13 +1,15 @@
 import { WriteButton } from '../context/ReadOnlyContext';
-import React from 'react';
+import React, { useState } from 'react';
 import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical, Crown } from 'lucide-react';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { weekendDuration, weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
+import { weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
+import { weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
 import { groupTier, tierColors } from '../utils/tierColors';
+import { RenewalNoticeCard, type RenewalNoticeAction } from './RenewalNoticeCard';
 
 type GroupAccess = 'owner' | 'admin' | 'member';
 const ROLE_ORDER: Record<GroupAccess, number> = { owner: 0, admin: 1, member: 2 };
@@ -19,8 +21,8 @@ interface HomeScreenProps {
   onQuickPlay: () => void;
   onJoinQuickPlay: () => void;
   onCreateTeam: () => void;
-  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean; weekend_mode_until?: string | null; created_at?: string | null }>;
-  /** Abre Planes con Team marcado; si no se pasa, el aviso de fin de Weekend no ofrece contratar. */
+  groupShortcuts?: Array<{ id: string; name: string; access: 'owner' | 'admin' | 'member'; group_type?: string; premium_branding?: boolean; weekend_mode_until?: string | null; weekend_days?: number | null }>;
+  /** Abre Planes con Team marcado (aviso de fin del Weekend de 3 meses para quien no es Team). */
   onContractTeam?: () => void;
   onOpenGroup?: (groupId: string) => void;
   onShowProfile: () => void;
@@ -33,11 +35,67 @@ interface HomeScreenProps {
   messagesButton?: React.ReactNode;
   handicap9?: number;
   handicap18?: number;
-  /** Omiki Weekend activo: fin y momento de activación (para saber si es de 7 días o 3 meses). */
-  weekendUntil?: string | null;
-  weekendActivatedAt?: string | null;
-  /** Grupo que el usuario puede crear ahora (Weekend aparte o el del plan/grupo adicional); null si ninguno. */
-  createGroupKind?: 'weekend' | 'team' | 'premium' | null;
+  /** Grupo que el usuario puede crear ahora (un Weekend aparte o el del plan/grupo adicional); null si ninguno. */
+  createGroupKind?: NewGroupKind | null;
+  /** Cómo puede pasar a Team un grupo Weekend de 3 meses (ver weekendConversion). */
+  weekendConversion?: 'free' | 'additional' | 'full' | 'not-team';
+  /** Pasa un grupo Weekend de 3 meses a Team. */
+  onConvertWeekend?: (groupId: string) => Promise<void>;
+  /** Aviso de vencimiento de la suscripción (15 días antes en anuales, 3 en mensuales). */
+  renewal?: RenewalNoticeAction | null;
+}
+
+/**
+ * Aviso bajo la pastilla de un grupo Weekend del creador.
+ * - 7 días: siempre indica cuándo vence.
+ * - 3 meses: en su última semana, además ofrece pasar el grupo a Team si hay hueco.
+ */
+function WeekendGroupNotice({ group, conversion, onContractTeam, onConvert }: {
+  group: { id: string; name: string; weekend_mode_until?: string | null; weekend_days?: number | null };
+  conversion: 'free' | 'additional' | 'full' | 'not-team';
+  onContractTeam?: () => void;
+  onConvert?: (groupId: string) => Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const expiry = weekendExpiryText(group.weekend_mode_until);
+  const lastWeek = weekendLastWeek(group.weekend_mode_until, group.weekend_days);
+  if (!expiry || (group.weekend_days === 90 && !lastWeek)) return null;
+  const convert = async () => {
+    if (!onConvert || busy) return;
+    setBusy(true); setError('');
+    try { await onConvert(group.id); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'No se ha podido pasar el grupo a Team.'); }
+    finally { setBusy(false); setConfirming(false); }
+  };
+  const button = `mt-2 w-full rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 ${tierColors.team.button}`;
+  return <div role="status" className={`-mt-1 rounded-2xl border-2 ${tierColors.weekend.border} bg-card p-3 text-center`}>
+    {lastWeek && <p className="text-sm font-semibold text-ink">Te queda menos de una semana de Weekend</p>}
+    <p className={`${lastWeek ? 'mt-1 text-xs' : 'text-sm'} text-ink-3`}>{group.name} vence {expiry} y se archivará.</p>
+    {lastWeek && conversion === 'free' && onConvert && <>
+      <p className="mt-1 text-xs text-ink-3">Pásalo a Team y mantén sus jugadores y su historial todo el año.</p>
+      <button type="button" disabled={busy} onClick={() => void convert()} className={button}>{busy ? 'Pasando a Team…' : 'Pasar a Team (incluido en tu plan)'}</button>
+    </>}
+    {lastWeek && conversion === 'additional' && onConvert && (confirming
+      ? <>
+          <p className="mt-2 text-xs text-ink-2">Se contratará un Grupo Adicional (24,99 € IVA incluido, pago de prueba) para este grupo.</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-2">Cancelar</button>
+            <button type="button" disabled={busy} onClick={() => void convert()} className={`rounded-xl px-4 py-2 text-sm font-semibold disabled:opacity-50 ${tierColors.team.button}`}>{busy ? 'Pasando…' : 'Confirmar'}</button>
+          </div>
+        </>
+      : <>
+          <p className="mt-1 text-xs text-ink-3">Pásalo a Team ocupando un Grupo Adicional y mantén sus jugadores y su historial.</p>
+          <button type="button" onClick={() => setConfirming(true)} className={button}>Pasar a Team · Grupo Adicional</button>
+        </>)}
+    {lastWeek && conversion === 'full' && <p className="mt-1 text-xs text-ink-3">Ya tienes tus 3 grupos Team, así que este grupo no puede pasar a Team.</p>}
+    {lastWeek && conversion === 'not-team' && onContractTeam && <>
+      <p className="mt-1 text-xs text-ink-3">Con Omiki Team podrás pasar este grupo a Team y mantenerlo todo el año.</p>
+      <button type="button" onClick={onContractTeam} className={button}>Contratar Team</button>
+    </>}
+    {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+  </div>;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -59,16 +117,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   messagesButton,
   handicap9,
   handicap18,
-  weekendUntil,
-  weekendActivatedAt,
   createGroupKind,
   onContractTeam,
+  weekendConversion = 'not-team',
+  onConvertWeekend,
+  renewal,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isTeam = (planType === 'team' || planType === 'premium');
   // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
-  const weekend = createGroupKind === 'weekend' ? weekendDuration(weekendUntil, weekendActivatedAt) : null;
+  const weekend = weekendKindDays(createGroupKind);
   // Sin dato explícito se mantiene la regla anterior: Team/Premium sin grupo propio.
   const canCreateGroup = createGroupKind !== undefined
     ? createGroupKind !== null
@@ -154,6 +213,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <p className="text-ink-3">{t('home.tagline')}</p>
         </div>
 
+        {renewal && <RenewalNoticeCard renewal={renewal} className="mb-4" />}
+
         {/* Main buttons */}
         <div className="space-y-3 mb-6">
           <WriteButton
@@ -178,8 +239,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             const managesGroup = group.access === 'owner' || group.access === 'admin';
             const tier = groupTier(group);
             const tone = tierColors[tier];
-            // Weekend de 3 meses: en su última semana el creador ve cuándo vence y puede pasar a Team.
-            const lastWeek = group.access === 'owner' && tier === 'weekend' && weekendLastWeek(group.weekend_mode_until, group.created_at);
             return <React.Fragment key={group.id}><WriteButton
               onClick={() => onOpenGroup?.(group.id)}
               className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${managesGroup ? `${tone.button} ${tone.border} shadow-card` : `bg-card ${tone.outlineButton}`}`}
@@ -189,12 +248,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               {group.access === 'owner' && <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>}
               {group.access === 'admin' && <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
             </WriteButton>
-            {lastWeek && (
-              <div role="status" className={`-mt-1 rounded-2xl border-2 ${tone.border} bg-card p-3 text-center`}>
-                <p className="text-sm font-semibold text-ink">Te queda menos de una semana de Weekend</p>
-                <p className="mt-1 text-xs text-ink-3">{group.name} vence {weekendExpiryText(group.weekend_mode_until)} y se archivará.{onContractTeam ? ' Con Omiki Team mantienes un grupo todo el año.' : ''}</p>
-                {onContractTeam && <button type="button" onClick={onContractTeam} className={`mt-2 w-full rounded-xl px-4 py-2 text-sm font-semibold ${tierColors.team.button}`}>Contratar Team</button>}
-              </div>
+            {group.access === 'owner' && tier === 'weekend' && (
+              <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
             )}
             </React.Fragment>;
           })}

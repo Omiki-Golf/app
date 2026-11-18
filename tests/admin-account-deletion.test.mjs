@@ -8,6 +8,7 @@ const migration = [
   await readFile(new URL('../supabase/migrations/20261025100000_account_deletion.sql', import.meta.url), 'utf8'),
   await readFile(new URL('../supabase/migrations/20261110100000_immediate_account_deletion.sql', import.meta.url), 'utf8'),
   await readFile(new URL('../supabase/migrations/20261116200000_retired_players_are_not_reusable.sql', import.meta.url), 'utf8'),
+  await readFile(new URL('../supabase/migrations/20261120100000_deleted_players_keep_nick.sql', import.meta.url), 'utf8'),
 ].join('\n');
 
 // Esquema mínimo con las protecciones reales que afectan a la baja.
@@ -58,7 +59,7 @@ const triggers = `
   CREATE TRIGGER linked_handicap_ledger BEFORE INSERT OR DELETE OR UPDATE ON public.handicap_adjustments FOR EACH ROW EXECUTE FUNCTION public.guard_linked_handicap_ledger();
 `;
 
-test('account deletion removes the name immediately, hands groups over and releases the nick', async () => {
+test('account deletion keeps the nick marked as deleted, hands groups over and releases the nick', async () => {
   const db = new PGlite();
   const [fede, admin, member, rival, groupA, groupB] = Array.from({ length: 6 }, () => randomUUID());
   const ids = { fede, admin, member, rival };
@@ -112,20 +113,20 @@ test('account deletion removes the name immediately, hands groups over and relea
       [rival, 'TERRASSES se ha quedado sin creador'],
     ].sort());
 
-    // Resultados conservados sin nombre ni cuenta.
+    // Resultados conservados con el nick marcado como dado de baja y sin cuenta.
     const retiredPlayer = (await db.query('SELECT name, auth_user_id, retired_at FROM public.players')).rows[0];
-    assert.equal(retiredPlayer.name, 'Jugador eliminado');
+    assert.equal(retiredPlayer.name, '☠ Fede');
     assert.equal(retiredPlayer.auth_user_id, null);
     assert.ok(retiredPlayer.retired_at);
     await assert.rejects(
       db.query('INSERT INTO public.round_players(round_id,player_id,name) VALUES($1,$2,$3)', [groupA, fede, 'Jugador eliminado']),
       /ya no está disponible/,
     );
-    assert.deepEqual((await db.query('SELECT name, user_id FROM public.round_players')).rows, [{ name: 'Jugador eliminado', user_id: null }]);
+    assert.deepEqual((await db.query('SELECT name, user_id FROM public.round_players')).rows, [{ name: '☠ Fede', user_id: null }]);
     const ranking = (await db.query('SELECT final_ranking FROM public.archived_rounds')).rows[0].final_ranking;
-    assert.deepEqual(ranking.map((row) => row.player_name), ['Jugador eliminado', 'Pepe']);
-    assert.equal((await db.query('SELECT player_name FROM public.daily_rankings')).rows[0].player_name, 'Jugador eliminado');
-    assert.equal((await db.query('SELECT player_name FROM public.handicap_adjustments')).rows[0].player_name, 'Jugador eliminado');
+    assert.deepEqual(ranking.map((row) => row.player_name), ['☠ Fede', 'Pepe']);
+    assert.equal((await db.query('SELECT player_name FROM public.daily_rankings')).rows[0].player_name, '☠ Fede');
+    assert.equal((await db.query('SELECT player_name FROM public.handicap_adjustments')).rows[0].player_name, '☠ Fede');
     assert.equal((await db.query('SELECT created_by FROM public.golf_rounds')).rows[0].created_by, null);
     assert.equal((await db.query('SELECT purchased_by FROM public.pro_shop_purchases')).rows[0].purchased_by, null);
     for (const table of ['user_profiles', 'user_subscriptions', 'group_invitations']) {

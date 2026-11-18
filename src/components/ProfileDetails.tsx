@@ -22,6 +22,8 @@ interface ProfileDetailsProps {
   /** Tras darse de baja: cerrar la sesión y volver al inicio. */
   onAccountDeleted?: () => void;
   onOpenGroups?: () => void;
+  /** Abre directamente el diálogo de baja (desde el aviso de vencimiento). */
+  openAccountDeletion?: boolean;
   messagesButton?: React.ReactNode;
 }
 
@@ -33,6 +35,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
   onSaved,
   onAccountDeleted,
   onOpenGroups,
+  openAccountDeletion = false,
   messagesButton,
 }) => {
   const { t } = useTranslation();
@@ -441,7 +444,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
               <p className="mt-2 text-xs text-ink-3">{t('profile.preferencesHelp')}</p>
             </section>
 
-            {profile && onAccountDeleted && <DeleteAccountSection onDeleted={onAccountDeleted} onOpenGroups={onOpenGroups} />}
+            {profile && onAccountDeleted && <DeleteAccountSection onDeleted={onAccountDeleted} onOpenGroups={onOpenGroups} autoOpen={openAccountDeletion} />}
         </section>
       </main>
     </div>

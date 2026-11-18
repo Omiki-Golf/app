@@ -7,6 +7,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { competitionPosition } from '../utils/ranking';
 import { GamificationBadge } from './GamificationBadge';
 
+import { PlayerName } from './PlayerName';
 interface LeaderboardProps {
   players: RoundPlayer[];
   rounds: Array<{
@@ -278,7 +279,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
 
                         <div className="flex-1 min-w-0">
                           <p className={`font-bold text-lg truncate ${style.text}`}>
-                            {entry.name}{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
+                            <PlayerName name={entry.name} />{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
                           </p>
                           <div className="flex gap-4 text-sm text-ink-3">
                             <span>HCP: {entry.handicapText}</span>
@@ -450,7 +451,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                   <div className="flex items-center gap-3">
                                     <span className="w-7 flex justify-center shrink-0">{style.icon}</span>
                                     <div>
-                                      <p className={`font-semibold ${style.text}`}>{item.player.name}{item.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                                      <p className={`font-semibold ${style.text}`}><PlayerName name={item.player.name} />{item.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                                       <p className="text-xs text-ink-3">
                                         HCP {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
                                       </p>

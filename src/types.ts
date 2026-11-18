@@ -51,6 +51,8 @@ export interface Group {
   max_players?: number;
   premium_branding?: boolean;
   weekend_mode_until?: string | null;
+  /** Duración del Weekend que creó el grupo (7 o 90 días); null en grupos Team/Premium. */
+  weekend_days?: number | null;
   group_type?: string;
   simultaneous_season_enabled?: boolean;
   archived_at?: string | null;

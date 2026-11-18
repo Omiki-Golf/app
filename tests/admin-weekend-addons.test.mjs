@@ -107,15 +107,15 @@ test('Weekend and Grupo adicional each allow one more owned group alongside the 
   const weekendGroup = { group_type: 'weekend', weekend_mode_until: '2026-11-18T10:00:00Z' };
   const until = '2026-11-18T10:00:00Z';
   // Team con su grupo: Weekend sigue disponible como extra.
-  assert.equal(nextGroupKind({ ownedGroups: [team], extraGroups: 0, weekendUntil: until, hasTeamPlan: true, now }), 'weekend');
+  assert.equal(nextGroupKind({ ownedGroups: [team], extraGroups: 0, weekend7Until: until, hasTeamPlan: true, now }), 'weekend7');
   // Con el grupo Weekend ya creado no hay otro Weekend; el del plan sigue ocupado.
-  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 0, weekendUntil: until, hasTeamPlan: true, now }), null);
+  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 0, weekend7Until: until, hasTeamPlan: true, now }), null);
   // Grupo adicional: un segundo grupo de plan, sin contar el Weekend.
-  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 1, weekendUntil: until, hasTeamPlan: true, now }), 'team');
+  assert.equal(nextGroupKind({ ownedGroups: [team, weekendGroup], extraGroups: 1, weekend7Until: until, hasTeamPlan: true, now }), 'team');
   assert.equal(nextGroupKind({ ownedGroups: [team, team], extraGroups: 1, hasTeamPlan: true, now }), null);
   // Solo Weekend (sin plan Team): un único grupo, el Weekend.
-  assert.equal(nextGroupKind({ ownedGroups: [], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), 'weekend');
-  assert.equal(nextGroupKind({ ownedGroups: [weekendGroup], extraGroups: 0, weekendUntil: until, hasTeamPlan: false, now }), null);
+  assert.equal(nextGroupKind({ ownedGroups: [], extraGroups: 0, weekend7Until: until, hasTeamPlan: false, now }), 'weekend7');
+  assert.equal(nextGroupKind({ ownedGroups: [weekendGroup], extraGroups: 0, weekend7Until: until, hasTeamPlan: false, now }), null);
 
   // Premium solo tiene un grupo rosa; cualquier capacidad adicional crea Team verde.
   const premium = { group_type: 'team', weekend_mode_until: null, premium_branding: true };
@@ -177,9 +177,10 @@ test('group rounds keep personal handicap separate and Pro-Shop separates accoun
   assert.doesNotMatch(i18n, /Cada grupo guarda el tuyo por separado/);
   assert.doesNotMatch(shop, /¿Para qué grupo\?/);
   assert.match(shop, /Configurar grupo/);
-  assert.match(shop, /activate_account_gamification/);
-  assert.match(shop, /set_additional_group_for_testing/);
-  assert.match(shop, /Weekend solo permite un grupo temporal/);
+  assert.match(shop, /rpc\('activate_group_gamification', \{ p_group: groupId/);
+  assert.doesNotMatch(shop, /activate_account_gamification/);
+  assert.match(shop, /rpc\('add_additional_group_for_testing'\)/);
+  assert.doesNotMatch(shop, /Weekend solo permite un grupo temporal/);
   assert.doesNotMatch(shop, /alsoApplyTo/);
   assert.match(home, /const tier = groupTier\(group\)/);
   assert.match(home, /const tone = tierColors\[tier\]/);

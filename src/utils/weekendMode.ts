@@ -36,7 +36,10 @@ export function weekendExpiryText(until?: string | null, now = Date.now()): stri
 }
 
 /** Último tramo de un Weekend de 3 meses: queda una semana o menos. */
-export const weekendLastWeek = (until?: string | null, startedAt?: string | null, now = Date.now()) => {
+export const weekendLastWeek = (until?: string | null, weekendDays?: number | null, now = Date.now()) => {
   const days = weekendDaysLeft(until, now);
-  return days !== null && days <= 7 && weekendDuration(until, startedAt, now) === 90;
+  return days !== null && days <= 7 && weekendDays === 90;
 };
+
+/** Días naturales (hora de Madrid) que faltan hasta una fecha futura: 0 = hoy. Sirve para cualquier vencimiento. */
+export const calendarDaysLeft = weekendDaysLeft;

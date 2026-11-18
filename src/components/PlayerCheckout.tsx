@@ -79,8 +79,8 @@ export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, 
               <div className="min-w-0"><p className="break-words font-bold text-ink">{state.profile.nick}</p><p className="text-sm text-ink-3">HCP {state.profile.exact_handicap ?? 0}</p></div>
             </div>
             <p className="mt-4 font-bold text-accent-ink">{plan.name} {state.completed ? '· Activo' : '· Pendiente de activación'}</p>
-            <p className="mt-1 text-sm text-ink-2">{annual ? 'Anual' : 'Mensual'} · {amount}{annual ? '/año' : '/mes'}{offer && ' el primer año'}</p>
-            {offer && <p className="mt-1 text-xs text-ink-3">Oferta fin de prueba · después {formatDisplayPrice(planPrice(plan, true), currency, i18n.resolvedLanguage)}/año</p>}
+            <p className="mt-1 text-sm text-ink-2">{annual ? 'Anual' : 'Mensual'} · {amount}{annual ? '/año' : '/mes'}{offer && ' el primer año'} · {t('plans.vatIncluded')}</p>
+            {offer && <p className="mt-1 text-xs text-ink-3">Oferta fin de prueba · después {formatDisplayPrice(planPrice(plan, true), currency, i18n.resolvedLanguage)}/año · {t('plans.vatShort')}</p>}
           </div>
           {!state.completed && <div className="mb-5 space-y-2"><CurrencySelector />{currency === 'GBP' && <p className="text-center text-[10px] leading-relaxed text-ink-3">{t('currency.adaptive')}</p>}</div>}
           <p className="mb-5 text-center text-sm text-ink-3">{state.completed ? 'Stripe ha confirmado el pago de prueba. No se ha realizado ningún cobro real.' : state.isUpgrade ? (offer ? `Tu año de ${plan.name} empieza hoy. Stripe descontará lo que te quede sin usar de Player, así que pagarás ${amount} o menos.` : 'Stripe calculará la diferencia proporcional y conservará la fecha de renovación de tu plan actual.') : `Tu correo está confirmado. Continúa a Stripe para activar ${plan.name} con una tarjeta de prueba.`}</p>

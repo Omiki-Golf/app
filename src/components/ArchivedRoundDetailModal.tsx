@@ -5,6 +5,7 @@ import { golfService } from '../services/golfService';
 import { GamificationBadge } from './GamificationBadge';
 import type { ArchivedDailyRanking, ArchivedPlayerStat, ArchivedRound, ArchivedRoundRanking } from '../types';
 
+import { PlayerName } from './PlayerName';
 interface ArchivedRoundDetailModalProps {
   round: ArchivedRound;
   onClose: () => void;
@@ -216,7 +217,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               {player.position}°
                             </div>
                             <div>
-                              <p className="font-semibold text-ink">{player.player_name}{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
+                              <p className="font-semibold text-ink"><PlayerName name={player.player_name} />{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                               <p className="text-xs text-ink-3">HCP: {player.hcp_juego}</p>
                             </div>
                           </div>
@@ -302,7 +303,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                                     {index < 2 ? 'P1' : 'P2'}
                                   </span>
                                 )}
-                                {player.player_name}{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
+                                <PlayerName name={player.player_name} />{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
                               </div>
                             </th>
                           ))}
@@ -412,7 +413,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                               <td className="py-3 px-4 font-semibold text-ink">
                                 <div className="flex items-center gap-2">
                                   {isWinner && <Trophy size={18} className="text-amber-700" />}
-                                  {playerStat.player_name}{playerStat.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
+                                  <PlayerName name={playerStat.player_name} />{playerStat.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}
                                   {isWinner && <span className="text-xs text-amber-700 font-bold">(Ganador/a)</span>}
                                 </div>
                               </td>

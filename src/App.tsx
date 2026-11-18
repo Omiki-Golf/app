@@ -36,7 +36,8 @@ import { TeamCreation } from './components/TeamCreation';
 import { NotificationsBell } from './components/NotificationsBell';
 import { teamTrialOfferActive } from './utils/teamTrialOffer';
 import { effectivePlan } from './utils/effectivePlan';
-import { nextGroupKind } from './utils/groupCapacity';
+import { nextGroupKind, weekendConversion } from './utils/groupCapacity';
+import { renewalNotice } from './utils/renewalNotice';
 import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
 import { useSubscription } from './hooks/useSubscription';
@@ -164,6 +165,14 @@ function App() {
   // Plan Team/Premium propio (o prueba Team), sin contar el Weekend, que da un grupo aparte.
   const basePlanType = effectivePlan(subscription ? { ...subscription, weekend_mode_until: null } : null);
   const hasTeamPlan = basePlanType === 'team' || basePlanType === 'premium';
+  // Team/Premium pagado (sin la prueba): necesario para pasar un Weekend de 3 meses a Team.
+  const hasPaidTeamPlan = subscription?.status === 'active'
+    && (subscription.plan_type === 'team' || subscription.plan_type === 'premium')
+    && (!subscription.current_period_end || Date.parse(subscription.current_period_end) > Date.now());
+  // Se incrementa para volver a cargar los grupos de Inicio (por ejemplo, tras pasar un Weekend a Team).
+  const [homeGroupsVersion, setHomeGroupsVersion] = useState(0);
+  // «Darse de baja» desde el aviso de vencimiento abre directamente el diálogo de baja.
+  const [openAccountDeletion, setOpenAccountDeletion] = useState(false);
   const latestHandicap = useLatestPlayingHandicap(user?.id, profile, currentView);
 
   // Arranque: la app se muestra cuando ya se conocen la sesión, el perfil, el plan y sus imágenes
@@ -638,7 +647,7 @@ function App() {
     };
     void loadHomeGroups().catch(() => { if (active) { setOwnedTeam(null); setHomeGroups([]); } });
     return () => { active = false; };
-  }, [user?.id, currentView]);
+  }, [user?.id, currentView, homeGroupsVersion]);
 
   // Mis grupos aparece en el perfil de cualquier miembro de un grupo, también con plan Player.
   useEffect(() => {
@@ -1094,7 +1103,20 @@ function App() {
         setCurrentView('player-checkout');
       } }
     : null;
-  const notificationCount = pendingInvitations + (teamOffer ? 1 : 0);
+  // Aviso de vencimiento: 15 días antes en anuales y 3 en mensuales, salvo «Continúa con nosotros».
+  const renewalInfo = renewalNotice(subscription, user?.user_metadata?.renewal_notice_dismissed);
+  const renewal = renewalInfo ? {
+    notice: renewalInfo,
+    onContinue: async () => {
+      const { error } = await supabase.auth.updateUser({ data: { renewal_notice_dismissed: renewalInfo.endsAt } });
+      if (error) throw error;
+    },
+    onCancel: () => {
+      setOpenAccountDeletion(true);
+      openFromProfile('profile-details');
+    },
+  } : null;
+  const notificationCount = pendingInvitations + (teamOffer ? 1 : 0) + (renewal ? 1 : 0);
   const inlineMessagesButton = <GlobalMessagesButton count={notificationCount} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
     {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
@@ -1106,6 +1128,7 @@ function App() {
     {!usesInlineMessages && <GlobalMessagesButton count={notificationCount} onClick={openMessages} belowWarning={isIncognito} />}
     {messagesOpen && <NotificationsBell
       teamOffer={teamOffer}
+      renewal={renewal ? { ...renewal, onCancel: () => { setMessagesOpen(false); renewal.onCancel(); } } : null}
       key={`${user?.id || 'express'}-${activityScope.groupId || activityScope.roundId || 'general'}`}
       userId={user?.id ?? null}
       activityScope={activityScope}
@@ -1243,6 +1266,7 @@ function App() {
             planType={activePlanType}
             subscription={subscription}
             teamOffer={teamOffer}
+            renewal={renewal}
             handicap9={latestHandicap.handicap9}
             handicap18={latestHandicap.handicap18}
             onBack={() => {
@@ -1327,14 +1351,15 @@ function App() {
             profile={profile}
             userId={user.id}
             email={user.email}
-            onBack={() => setCurrentView('profile')}
+            onBack={() => { setOpenAccountDeletion(false); setCurrentView('profile'); }}
             onAccountDeleted={async () => {
               // La cuenta ya no existe: se cierra la sesión local y se vuelve al inicio.
               try { await logout(); } catch { /* la sesión ya no es válida */ }
               setCurrentGroup(null);
               setCurrentView('main');
             }}
-            onOpenGroups={() => openFromProfile('my-groups')}
+            onOpenGroups={() => { setOpenAccountDeletion(false); openFromProfile('my-groups'); }}
+            openAccountDeletion={openAccountDeletion}
             onSaved={async () => {
               await refreshSubscription();
               setProfileSaved(true);
@@ -1354,8 +1379,8 @@ function App() {
         <div className={isIncognito ? 'pt-10' : ''}>
           <TeamCreation
             userId={user.id}
-            weekendUntil={subscription?.weekend_mode_until}
-            weekendActivatedAt={subscription?.updated_at}
+            weekend7Until={subscription?.weekend7_until}
+            weekend90Until={subscription?.weekend90_until}
             hasTeamPlan={hasTeamPlan}
             hasPremiumPlan={basePlanType === 'premium'}
             onBack={() => setCurrentView('main')}
@@ -1465,8 +1490,6 @@ function App() {
             profile={profile}
             handicap9={latestHandicap.handicap9}
             handicap18={latestHandicap.handicap18}
-            weekendUntil={subscription?.weekend_mode_until}
-            weekendActivatedAt={subscription?.updated_at}
             onQuickPlay={() => setCurrentView('setup')}
             onJoinQuickPlay={() => {
               setPendingRoundId(null);
@@ -1476,7 +1499,8 @@ function App() {
             createGroupKind={nextGroupKind({
               ownedGroups: homeGroups.filter(item => item.access === 'owner').map(item => item.group),
               extraGroups: ownedExtraGroups,
-              weekendUntil: subscription?.weekend_mode_until,
+              weekend7Until: subscription?.weekend7_until,
+              weekend90Until: subscription?.weekend90_until,
               hasTeamPlan,
               hasPremiumPlan: basePlanType === 'premium',
             })}
@@ -1488,10 +1512,22 @@ function App() {
               group_type: group.group_type,
               premium_branding: group.premium_branding,
               weekend_mode_until: group.weekend_mode_until,
-              created_at: group.created_at,
+              weekend_days: group.weekend_days,
             }))}
-            onContractTeam={basePlanType === 'team' || basePlanType === 'premium' ? undefined : () => {
+            weekendConversion={weekendConversion({
+              ownedGroups: homeGroups.filter(item => item.access === 'owner').map(item => item.group),
+              extraGroups: ownedExtraGroups,
+              hasPaidTeamPlan,
+            })}
+            onContractTeam={() => {
               setReturnToProfile(false); setPlansContext('team'); setCurrentView('plans');
+            }}
+            renewal={renewal}
+            onConvertWeekend={async groupId => {
+              const { error } = await supabase.rpc('convert_weekend_group_to_team', { p_group: groupId });
+              if (error) throw new Error(error.message || 'No se ha podido pasar el grupo a Team.');
+              await refreshSubscription();
+              setHomeGroupsVersion(version => version + 1);
             }}
             onOpenGroup={(groupId) => {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;

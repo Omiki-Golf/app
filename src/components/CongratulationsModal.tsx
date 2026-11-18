@@ -1,6 +1,7 @@
 import React from 'react';
 import { Trophy, Star } from 'lucide-react';
 
+import { PlayerName } from './PlayerName';
 interface CongratulationsModalProps {
   playerName: string;
   onClose: () => void;
@@ -25,7 +26,7 @@ export const CongratulationsModal: React.FC<CongratulationsModalProps> = ({
           </h2>
 
           <p className="text-xl text-ink mb-2">
-            <strong className="text-yellow-700">{playerName}</strong>
+            <strong className="text-yellow-700"><PlayerName name={playerName} /></strong>
           </p>
 
           <p className="text-2xl font-bold text-yellow-800 mb-4">

@@ -7,15 +7,16 @@ import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
 import { useTranslation } from 'react-i18next';
-import { weekendDuration, weekendExpiryText } from '../utils/weekendMode';
-import { isActiveWeekendGroup, nextGroupKind, type NewGroupKind } from '../utils/groupCapacity';
+import { weekendExpiryText } from '../utils/weekendMode';
+import { isActiveWeekendGroup, nextGroupKind, weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
 
 interface TeamCreationProps {
   userId: string;
   onBack: () => void;
   onTeamCreated: (groupId: string) => void;
-  weekendUntil?: string | null;
-  weekendActivatedAt?: string | null;
+  /** Fin de cada Weekend contratado (7 días y 3 meses); cada uno da su propio grupo. */
+  weekend7Until?: string | null;
+  weekend90Until?: string | null;
   /** Plan Team/Premium (o prueba Team) pagado, sin contar el Weekend. */
   hasTeamPlan?: boolean;
   hasPremiumPlan?: boolean;
@@ -54,11 +55,12 @@ const Tooltip: React.FC<TooltipProps> = ({ text }) => {
   );
 };
 
-export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekendUntil, weekendActivatedAt, hasTeamPlan = true, hasPremiumPlan = false }) => {
+export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTeamCreated, weekend7Until, weekend90Until, hasTeamPlan = true, hasPremiumPlan = false }) => {
   const { t } = useTranslation();
   // Tipo de grupo que se va a crear: Weekend (extra aparte) o el del plan/grupo adicional.
   const [kind, setKind] = useState<NewGroupKind | null>(null);
-  const weekend = kind === 'weekend' ? weekendDuration(weekendUntil, weekendActivatedAt) : null;
+  const weekend = weekendKindDays(kind);
+  const weekendUntil = weekend === 90 ? weekend90Until : weekend === 7 ? weekend7Until : null;
   const [step, setStep] = useState(1);
   const [groupName, setGroupName] = useState('');
   const [groupCode, setGroupCode] = useState('');
@@ -108,7 +110,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
   useEffect(() => {
     let active = true;
     void (async () => {
-      const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until, premium_branding').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
+      const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until, weekend_days, premium_branding').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
       const ids = (groups || []).map(group => group.id);
       let extraCapacity = 0;
       if (ids.length) {
@@ -116,17 +118,20 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
         extraCapacity = count || 0;
       }
       if (!active) return;
-      const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekendUntil, hasTeamPlan, hasPremiumPlan });
+      const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekend7Until, weekend90Until, hasTeamPlan, hasPremiumPlan });
       setKind(next);
       // Con un Weekend vigente, lo que impide crear es su grupo Weekend, no el del plan.
-      const weekendGroup = (groups || []).find(group => isActiveWeekendGroup(group));
+      const activeWeekendDays = ([7, 90] as const).filter(days => {
+        const until = days === 90 ? weekend90Until : weekend7Until;
+        return Boolean(until && Date.parse(until) > Date.now());
+      });
+      const weekendGroup = (groups || []).find(group => activeWeekendDays.some(days => isActiveWeekendGroup(group, days)));
       const planGroup = (groups || []).find(group => group.group_type !== 'weekend');
-      const weekendActive = Boolean(weekendUntil && Date.parse(weekendUntil) > Date.now());
-      setExistingGroup(next ? null : (weekendActive && weekendGroup) || planGroup || groups?.[0] || null);
+      setExistingGroup(next ? null : weekendGroup || planGroup || groups?.[0] || null);
       setCheckingExisting(false);
     })();
     return () => { active = false; };
-  }, [userId, weekendUntil, hasTeamPlan, hasPremiumPlan]);
+  }, [userId, weekend7Until, weekend90Until, hasTeamPlan, hasPremiumPlan]);
 
   const handleCreate = async () => {
     if (!groupName.trim()) { setError('El nombre del grupo es obligatorio'); return; }
@@ -146,8 +151,9 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
           user_auth_id: userId,
           hoyo_19_enabled: hoyo19,
           max_players: 20,
-          group_type: kind === 'weekend' ? 'weekend' : 'team',
-          weekend_mode_until: kind === 'weekend' ? weekendUntil : null,
+          group_type: weekend ? 'weekend' : 'team',
+          weekend_mode_until: weekend ? weekendUntil : null,
+          weekend_days: weekend,
         })
         .select()
         .single();

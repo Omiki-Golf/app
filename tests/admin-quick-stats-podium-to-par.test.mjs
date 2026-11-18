@@ -12,7 +12,7 @@ test('podium "vs Par Personal" belongs to the ranked player, not to the unsorted
 
 test('compact podium cards show HCP next to the name and points / vs par in two columns', () => {
   const podium = stats.slice(stats.indexOf('const renderPodiumGrid'), stats.indexOf('const renderStatisticsDetails'));
-  assert.match(podium, /\{entry\.player\.name\}<\/p>\s*<span[^>]*>HCP \{entry\.player\.playing_handicap\}<\/span>/);
+  assert.match(podium, /<PlayerName name=\{entry\.player\.name\} \/><\/p>\s*<span[^>]*>HCP \{entry\.player\.playing_handicap\}<\/span>/);
   assert.match(podium, /gameMode === 'stableford' \? 'grid-cols-2' : 'grid-cols-1'/);
   assert.doesNotMatch(podium, /text-5xl|p-6|border-4/);
 });

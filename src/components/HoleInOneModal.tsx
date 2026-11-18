@@ -2,6 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import React from 'react';
 import { Trophy } from 'lucide-react';
 
+import { PlayerName } from './PlayerName';
 interface HoleInOneModalProps {
   playerName: string;
   onConfirm: () => void;
@@ -24,7 +25,7 @@ export const HoleInOneModal: React.FC<HoleInOneModalProps> = ({
         </div>
 
         <p className="text-ink-2 mb-6 text-lg">
-          ¿<strong>{playerName}</strong> realmente hizo hoyo en uno (1 golpe)?
+          ¿<strong><PlayerName name={playerName} /></strong> realmente hizo hoyo en uno (1 golpe)?
         </p>
 
         <div className="flex gap-3">

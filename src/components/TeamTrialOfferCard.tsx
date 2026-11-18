@@ -20,9 +20,9 @@ export function TeamTrialOfferCard({ offer, className = '' }: { offer: TeamTrial
       <div className="flex items-start gap-3">
         <div className="shrink-0 rounded-xl bg-amber-400/25 p-2 text-amber-700 dark:text-amber-300"><Gift size={20} /></div>
         <div className="min-w-0">
-          <h2 className="font-bold">Quédate en Team por {euros(TEAM_TRIAL_OFFER_PRICE)} €</h2>
+          <h2 className="font-bold">Quédate en Team por {euros(TEAM_TRIAL_OFFER_PRICE)} € <span className="text-xs font-semibold">IVA incl.</span></h2>
           <p className="mt-1 text-sm">
-            Contrata Team anual antes del {until} y el primer año te cuesta {euros(TEAM_TRIAL_OFFER_PRICE)} € en vez de 39,99 €.
+            Contrata Team anual antes del {until} y el primer año te cuesta {euros(TEAM_TRIAL_OFFER_PRICE)} € en vez de 39,99 € (IVA incluido).
             Se descuenta lo que te quede de Player.
           </p>
         </div>

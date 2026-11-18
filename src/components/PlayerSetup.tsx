@@ -13,6 +13,7 @@ import { EditPlayerNameModal } from './EditPlayerNameModal';
 import { profileHandicapForHoles, personalHandicapChange } from '../utils/personalHandicap';
 import { adminPinUtils } from '../utils/adminPin';
 
+import { PlayerName } from './PlayerName';
 interface PlayerSetupProps {
   roundId: string;
   players: RoundPlayer[];
@@ -610,7 +611,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             disabled={player.handicap_pending || Boolean(unavailable)}
                             className="flex-1 px-4 py-3 text-left disabled:opacity-60"
                           >
-                            <p className="font-semibold text-ink">{player.name}</p>
+                            <p className="font-semibold text-ink"><PlayerName name={player.name} /></p>
                             <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
                             {unavailable && <p className="text-xs font-medium text-amber-700">{unavailable}</p>}
                             <p className="text-sm text-ink-3">
@@ -864,7 +865,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-ink">{player.name}</p>
+                        <p className="font-semibold text-ink"><PlayerName name={player.name} /></p>
                             <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
                         {teamIdx >= 0 && (
                           <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${teamIdx === 0 ? 'bg-blue-200 text-blue-800' : 'bg-orange-200 text-orange-800'}`}>

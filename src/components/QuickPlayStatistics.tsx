@@ -16,6 +16,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { tiedAwardLeaders } from '../utils/awardTies';
 import { competitionPosition } from '../utils/ranking';
 
+import { PlayerName } from './PlayerName';
 interface QuickPlayStatisticsProps {
   onBack: () => void;
   roundId?: string;
@@ -661,7 +662,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-lg font-black shadow ${style.badge}`}>
                   {position}
                 </span>
-                <p className={`min-w-0 truncate text-lg font-black ${style.name}`}>{entry.player.name}</p>
+                <p className={`min-w-0 truncate text-lg font-black ${style.name}`}><PlayerName name={entry.player.name} /></p>
                 <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>HCP {entry.player.playing_handicap}</span>
               </div>
               <div className={`grid gap-2 text-center mt-auto ${gameMode === 'stableford' ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -703,7 +704,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <Trophy size={12} /> {winner.label}
             </span>
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
-              <p className="break-words text-sm sm:text-base font-black leading-tight text-yellow-900 line-clamp-2">{winner.name}</p>
+              <p className="break-words text-sm sm:text-base font-black leading-tight text-yellow-900 line-clamp-2"><PlayerName name={winner.name} /></p>
             </div>
             <p className="text-xs font-bold text-yellow-800">HCP {winner.handicap}</p>
           </div>
@@ -718,7 +719,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
               <TrendingDown size={12} /> {loser.label}
             </span>
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
-              <p className="break-words text-sm sm:text-base font-black leading-tight text-white line-clamp-2">{loser.name}</p>
+              <p className="break-words text-sm sm:text-base font-black leading-tight text-white line-clamp-2"><PlayerName name={loser.name} /></p>
             </div>
             <p className="text-xs font-bold text-slate-300">HCP {loser.handicap}</p>
           </div>
@@ -763,7 +764,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(h.playerId))}`}>
                             {highlightPosition(index)}
                           </span>
-                          {h.playerName}
+                          <PlayerName name={h.playerName} />
                         </div>
                       </td>
                       <td className="statistics-table-accent text-center font-bold p-3 text-lg">{h.totalPoints}</td>
@@ -822,7 +823,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                             <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(row.rank, isParejasMode ? (row.key === 'team0' ? 0 : 1) : null)}`}>
                               {row.rank + 1}
                             </span>
-                            {row.name}
+                            <PlayerName name={row.name} />
                           </span>
                         </td>
                         {holes.map((hole) => {
@@ -904,7 +905,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                             <span className={`w-6 h-6 flex-shrink-0 flex items-center justify-center rounded-full text-xs font-bold ${positionBadgeClass(index, teamOfPlayer(entry.player.id))}`}>
                               {rankingPosition(index)}
                             </span>
-                            {entry.player.name}
+                            <PlayerName name={entry.player.name} />
                           </div>
                         </td>
                         {holes.map((hole) => {
@@ -1376,7 +1377,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                     <span className="text-xs font-black uppercase tracking-wider text-slate-300">
                       Puesto {position}
                     </span>
-                    <h2 className="text-2xl font-black text-white mt-1">{entry.player.name}</h2>
+                    <h2 className="text-2xl font-black text-white mt-1"><PlayerName name={entry.player.name} /></h2>
                     <p className="text-4xl font-black text-emerald-400 mt-2">{entry.totalPoints} <span className="text-sm">pts</span></p>
                   </div>
                 ))}

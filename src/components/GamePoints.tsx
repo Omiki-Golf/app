@@ -13,6 +13,7 @@ import { GroupMemberList } from './GroupMemberList';
 import { competitionPosition } from '../utils/ranking';
 import { GamificationBadge } from './GamificationBadge';
 
+import { PlayerName } from './PlayerName';
 interface DailyStanding {
   playerId: string;
   playerName: string;
@@ -394,7 +395,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                 {/* Nombre arriba; HCP e insignias debajo, para que la fila no se parta en móvil. */}
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate font-medium text-ink">
-                                    {standing.playerName}
+                                    <PlayerName name={standing.playerName} />
                                     {standing.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
                                   </p>
                                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -464,7 +465,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                       >
                         {/* Nombre arriba; debajo, HCP actual y nuevo en dos columnas. */}
                         <p className="font-semibold text-ink break-words mb-2">
-                          {adjustment.playerName}
+                          <PlayerName name={adjustment.playerName} />
                         </p>
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
@@ -542,7 +543,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                   key={playerName}
                                   className="text-center p-3 font-semibold text-ink-2 min-w-[140px]"
                                 >
-                                  {playerName}
+                                  <PlayerName name={playerName} />
                                 </th>
                               ))}
                           </tr>
@@ -668,7 +669,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                               <div className="flex items-center justify-between gap-1 mb-2">
                                 <div className="flex items-center gap-1 flex-1 min-w-0">
                                   <div className="font-medium text-title truncate">
-                                    {player.name}{player.is_guest && <span className="ml-1 text-xs text-ink-3">(Invitado)</span>}
+                                    <PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs text-ink-3">(Invitado)</span>}
                                   </div>
                                   <button
                                     onClick={() => handleEditNameClick(player)}

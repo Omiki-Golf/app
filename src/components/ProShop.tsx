@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next';
 import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
 import { formatDisplayPrice } from '../utils/currency';
 import { useSubscription } from '../hooks/useSubscription';
+import { MAX_ADDITIONAL_GROUPS } from '../utils/groupCapacity';
 
 interface ProShopProps {
   groupId: string | null;
@@ -54,9 +55,9 @@ const titles: ShopItem[] = [
 ];
 
 const addons: Addon[] = [
-  { id: 'grupo-adicional', name: 'Grupo Adicional', icon: Users, price: 24.99, note: '+1 grupo activo', info: '¿Tienes varios grupos? Amigos del club, compañeros del trabajo, la familia. Cada uno con su propio ranking y jugadores independientes.' },
+  { id: 'grupo-adicional', name: 'Grupo Adicional', icon: Users, price: 24.99, note: 'Hasta 2 grupos más', info: '¿Tienes varios grupos? Amigos del club, compañeros del trabajo, la familia. Cada uno con su propio ranking y jugadores independientes.' },
   { id: 'ampliacion-plantilla', name: 'Ampliación de Plantilla', icon: UserPlus, price: 19.99, note: '+12 jugadores sobre el base', info: 'Pasa de 20 a 32 jugadores registrados, con participación máxima de 16 a 24 en cada jornada.' },
-  { id: 'temporada-simultanea', name: 'Temporada Simultánea', icon: CalendarDays, price: 14.99, note: '2 clasificaciones paralelas', info: 'Dos clasificaciones al mismo tiempo dentro del mismo grupo. Liga anual y Match Play a la vez, o una Copa de verano paralela.' },
+  { id: 'temporada-simultanea', name: 'Temporada Simultánea', icon: CalendarDays, price: 14.99, note: 'Próximamente: la configurarás cuando esté disponible', info: 'Dos clasificaciones al mismo tiempo dentro del mismo grupo. Liga anual y Match Play a la vez, o una Copa de verano paralela.' },
 ];
 
 // Precio escalonado de la web: 1,99 € el primer título de pago y 1 € más por cada uno adicional.
@@ -64,13 +65,12 @@ const titlesPrice = (paidCount: number) => (paidCount === 0 ? 0 : 1.99 + (paidCo
 type OwnedGroup = { id: string; name: string; weekend: boolean; premium: boolean };
 
 export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, groupName: initialGroupName, userId, onBack, messagesButton }) => {
-  // El selector solo afecta a las ampliaciones propias de un grupo. La gamificación y
-  // Grupo Adicional tienen alcance global sobre la cuenta.
+  // Títulos y ampliaciones se contratan para el grupo elegido (Weekend incluido).
+  // Grupo Adicional es de la cuenta. Lo ya pagado aparece marcado y no se puede retirar.
   const [ownedGroups, setOwnedGroups] = useState<OwnedGroup[]>([]);
   const [groupId, setGroupId] = useState<string | null>(initialGroupId);
   const groupName = ownedGroups.find(group => group.id === groupId)?.name ?? initialGroupName;
-  const selectedGroup = ownedGroups.find(group => group.id === groupId);
-  const eligibleGlobalGroups = ownedGroups.filter(group => !group.weekend);
+  const planGroups = ownedGroups.filter(group => !group.weekend);
   const { t, i18n } = useTranslation();
   const { subscription } = useSubscription(userId);
   const hasPaidTeamPlan = subscription?.status === 'active'
@@ -81,9 +81,15 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
     && Boolean(subscription.team_trial_ends_at && Date.parse(subscription.team_trial_ends_at) > Date.now());
   const currency = useDisplayCurrency();
   const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
-  const [selectedTitles, setSelectedTitles] = useState<Set<string>>(() => new Set(titles.filter(item => item.free).map(item => item.id)));
-  const [selectedAddons, setSelectedAddons] = useState<Set<string>>(new Set());
-  const [additionalGroup, setAdditionalGroup] = useState(false);
+  // Lo ya pagado para el grupo elegido y lo que se va a contratar ahora.
+  const [ownedTitles, setOwnedTitles] = useState<Set<string>>(new Set());
+  const [ownedAddons, setOwnedAddons] = useState<Set<string>>(new Set());
+  const [newTitles, setNewTitles] = useState<Set<string>>(new Set());
+  const [newAddons, setNewAddons] = useState<Set<string>>(new Set());
+  // Grupos Adicionales ya comprados por la cuenta (máximo 2) y si se compra otro ahora.
+  const [additionalOwned, setAdditionalOwned] = useState(0);
+  const [newAdditional, setNewAdditional] = useState(false);
+  const [reload, setReload] = useState(0);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -100,35 +106,32 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
     return () => { cancelled = true; };
   }, [userId]);
 
-  // Títulos globales: se conserva la unión de lo ya contratado y, al guardar, se
-  // normaliza la misma selección en todos los grupos Team/Premium (nunca Weekend).
+  // Grupos Adicionales de la cuenta: se anclan a sus grupos Team/Premium.
   useEffect(() => {
-    const ids = eligibleGlobalGroups.map(group => group.id);
-    if (ids.length === 0) return;
+    const ids = planGroups.map(group => group.id);
+    if (ids.length === 0) { setAdditionalOwned(0); return; }
     let cancelled = false;
-    void Promise.all([
-      supabase.from('group_gamification').select('product_id').in('group_id', ids).eq('purchased', true),
-      supabase.from('pro_shop_purchases').select('id').in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed').limit(1),
-    ]).then(([gamification, extra]) => {
-      if (cancelled) return;
-      if (!gamification.error) setSelectedTitles(new Set(['no-paso-rojas', ...(gamification.data || []).map(row => row.product_id)]));
-      if (!extra.error) setAdditionalGroup((extra.data || []).length > 0);
-    });
+    void supabase.from('pro_shop_purchases').select('id').in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed')
+      .then(({ data, error }) => { if (!cancelled && !error) setAdditionalOwned(Math.min(MAX_ADDITIONAL_GROUPS, (data || []).length)); });
     return () => { cancelled = true; };
-  }, [ownedGroups]);
+    // planGroups se recalcula en cada render; basta con los grupos cargados.
+  }, [ownedGroups, reload]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Plantilla y Temporada Simultánea sí pertenecen al grupo seleccionado.
+  // Títulos y ampliaciones ya pagados del grupo elegido.
   useEffect(() => {
     if (!groupId) return;
     let cancelled = false;
-    setSaved(false);
-    void supabase.from('pro_shop_purchases').select('product_type').eq('group_id', groupId).eq('status', 'completed').in('product_type', ['ampliacion-plantilla', 'temporada-simultanea'])
-      .then(({ data, error }) => {
+    setNewTitles(new Set()); setNewAddons(new Set());
+    void Promise.all([
+      supabase.from('group_gamification').select('product_id').eq('group_id', groupId).eq('purchased', true),
+      supabase.from('pro_shop_purchases').select('product_type').eq('group_id', groupId).eq('status', 'completed').in('product_type', ['ampliacion-plantilla', 'temporada-simultanea']),
+    ]).then(([gamification, purchases]) => {
       if (cancelled) return;
-      if (!error) setSelectedAddons(new Set((data || []).map(row => row.product_type)));
+      if (!gamification.error) setOwnedTitles(new Set((gamification.data || []).map(row => row.product_id).filter(id => id !== 'no-paso-rojas')));
+      if (!purchases.error) setOwnedAddons(new Set((purchases.data || []).map(row => row.product_type)));
     });
     return () => { cancelled = true; };
-  }, [groupId]);
+  }, [groupId, reload]);
 
   const toggle = (set: Set<string>, setter: (next: Set<string>) => void, id: string) => {
     const next = new Set(set);
@@ -137,30 +140,42 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
     setSaved(false);
   };
 
-  const paidTitles = titles.filter(item => !item.free && selectedTitles.has(item.id));
-  const chosenAddons = addons.filter(item => item.id === 'grupo-adicional' ? additionalGroup : selectedAddons.has(item.id));
-  const hasRequest = paidTitles.length > 0 || chosenAddons.length > 0;
-  const canUseGlobalTitles = eligibleGlobalGroups.length > 0;
-  const canBuyAdditionalGroup = hasPaidTeamPlan && Boolean(selectedGroup && !selectedGroup.weekend);
+  // Precio escalonado sobre todos los títulos del grupo: solo se paga la diferencia.
+  const newTitleItems = titles.filter(item => newTitles.has(item.id));
+  const newTitlesPrice = titlesPrice(ownedTitles.size + newTitleItems.length) - titlesPrice(ownedTitles.size);
+  const newAddonItems = addons.filter(item => item.id === 'grupo-adicional' ? newAdditional : newAddons.has(item.id));
+  const hasRequest = newTitleItems.length > 0 || newAddonItems.length > 0;
+  const additionalFull = additionalOwned >= MAX_ADDITIONAL_GROUPS;
+  const canBuyAdditionalGroup = hasPaidTeamPlan && planGroups.length > 0 && !additionalFull;
+  const additionalNote = additionalFull
+    ? 'Ya tienes tus 3 grupos: el incluido y 2 adicionales'
+    : !hasPaidTeamPlan ? (isTeamTrial ? 'Hazte Team para crear un grupo extra' : 'Requiere un plan Team o Premium')
+    : planGroups.length === 0 ? 'Crea primero el grupo incluido en tu plan'
+    : `Tienes ${additionalOwned} de ${MAX_ADDITIONAL_GROUPS} · contrata otro grupo`;
 
   const activateForTesting = async () => {
-    if (!groupId) return;
+    if (!groupId || !hasRequest) return;
     setSaving(true); setSaved(false); setSaveError('');
     try {
-      if (eligibleGlobalGroups.length > 0) {
-        const { error: gamificationError } = await supabase.rpc('activate_account_gamification', { p_product_ids: paidTitles.map(item => item.id) });
-        if (gamificationError) throw gamificationError;
-        eligibleGlobalGroups.forEach(group => notifyGamificationUpdated(group.id));
+      if (newTitleItems.length > 0) {
+        const { error } = await supabase.rpc('activate_group_gamification', { p_group: groupId, p_product_ids: [...ownedTitles, ...newTitles] });
+        if (error) throw error;
+        notifyGamificationUpdated(groupId);
       }
-      const { error: accountExtraError } = await supabase.rpc('set_additional_group_for_testing', { p_enabled: additionalGroup });
-      if (accountExtraError) throw accountExtraError;
-      const groupAddons = [...selectedAddons].filter(id => id !== 'grupo-adicional');
-      const { error: addonsError } = await supabase.rpc('activate_group_addons_for_testing', { p_group: groupId, p_product_ids: groupAddons });
-      if (addonsError) throw addonsError;
+      if (newAddons.size > 0) {
+        const { error } = await supabase.rpc('activate_group_addons_for_testing', { p_group: groupId, p_product_ids: [...ownedAddons, ...newAddons] });
+        if (error) throw error;
+      }
+      if (newAdditional) {
+        const { error } = await supabase.rpc('add_additional_group_for_testing');
+        if (error) throw error;
+      }
+      setNewAdditional(false);
+      setReload(value => value + 1);
       setSaved(true);
     } catch (error) {
-      console.error('Error activating group gamification:', error);
-      setSaveError('No se ha podido guardar la selección. Inténtalo de nuevo.');
+      console.error('Error activating Pro-Shop products:', error);
+      setSaveError(error instanceof Error && error.message ? error.message : 'No se ha podido contratar la selección. Inténtalo de nuevo.');
     } finally { setSaving(false); }
   };
 
@@ -187,7 +202,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
             {ownedGroups.length > 1 && (
               <section aria-labelledby="shop-group" className="space-y-2">
                 <h2 id="shop-group" className="text-lg font-bold text-ink">Configurar grupo</h2>
-                <p className="text-xs text-ink-3">La plantilla y las temporadas se configuran por grupo. La gamificación y Grupo Adicional se aplican automáticamente a tu cuenta.</p>
+                <p className="text-xs text-ink-3">La gamificación y las ampliaciones se contratan para cada grupo. Grupo Adicional es para tu cuenta.</p>
                 <div className="flex flex-wrap gap-2">
                   {ownedGroups.map(group => (
                     <button
@@ -210,46 +225,46 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                 <h2 id="pack-gamificacion" className="text-lg font-bold text-ink">Pack de Gamificación</h2>
                 <span className="text-xs text-ink-3">Precio escalonado</span>
               </div>
-              <p className="text-xs text-ink-3">Una sola selección para todos tus grupos Team y Premium. Los Weekend quedan fuera. 1,99 € el primero y 1 € más por cada título adicional.</p>
+              <p className="text-xs text-ink-3">Para {groupName || 'este grupo'}. 1,99 € el primer título y 1 € más por cada uno adicional, IVA incluido. Lo ya contratado queda marcado.</p>
               <div className="rounded-2xl border border-line bg-card shadow-card">
                 {titles.map((item, index) => (
                   <ShopRow
                     key={item.id}
                     item={item}
                     first={index === 0}
-                    checked={selectedTitles.has(item.id)}
+                    checked={item.free || ownedTitles.has(item.id) || newTitles.has(item.id)}
+                    purchased={ownedTitles.has(item.id)}
                     price={item.free ? 'Incluido' : `${money(1.99)}*`}
-                    onToggle={() => toggle(selectedTitles, setSelectedTitles, item.id)}
-                    disabled={!item.free && !canUseGlobalTitles}
+                    vatLabel={t('plans.vatShort')}
+                    onToggle={() => toggle(newTitles, setNewTitles, item.id)}
                   />
                 ))}
               </div>
-              <p className="text-xs text-ink-3">* Precio del primer título; el total baja por título al elegir varios.</p>
+              <p className="text-xs text-ink-3">* Precio del primer título; el total baja por título al elegir varios. Todos los precios llevan el IVA incluido.</p>
             </section>
 
             <section aria-labelledby="amplia-team" className="space-y-2">
               <h2 id="amplia-team" className="text-lg font-bold text-ink">Amplía tu Team</h2>
-              <p className="text-xs text-ink-3">Complementos para adaptar tu plan Team o Premium. Sin permanencia.</p>
+              <p className="text-xs text-ink-3">Plantilla y Temporada Simultánea son para {groupName || 'este grupo'}; Grupo Adicional, para tu cuenta.</p>
               <div className="rounded-2xl border border-line bg-card shadow-card">
-                {addons.map((item, index) => (
-                  <ShopRow
+                {addons.map((item, index) => {
+                  const isAdditional = item.id === 'grupo-adicional';
+                  return <ShopRow
                     key={item.id}
                     item={item}
                     first={index === 0}
-                    checked={item.id === 'grupo-adicional' ? additionalGroup : selectedAddons.has(item.id)}
+                    checked={isAdditional ? newAdditional : ownedAddons.has(item.id) || newAddons.has(item.id)}
+                    purchased={!isAdditional && ownedAddons.has(item.id)}
                     price={`${money(item.price)} / año`}
-                    note={item.id === 'grupo-adicional' && !canBuyAdditionalGroup
-                      ? (selectedGroup?.weekend ? 'Weekend solo permite un grupo temporal. Selecciona un Team o Premium.' : isTeamTrial ? 'Hazte Team para crear un grupo extra' : 'Requiere un plan Team o Premium')
-                      : item.note}
+                    vatLabel={t('plans.vatShort')}
+                    note={isAdditional ? additionalNote : item.note}
                     onToggle={() => {
-                      if (item.id === 'grupo-adicional') {
-                        setAdditionalGroup(current => !current);
-                        setSaved(false);
-                      } else toggle(selectedAddons, setSelectedAddons, item.id);
+                      if (isAdditional) { setNewAdditional(current => !current); setSaved(false); }
+                      else toggle(newAddons, setNewAddons, item.id);
                     }}
-                    disabled={item.id === 'grupo-adicional' && !canBuyAdditionalGroup}
-                  />
-                ))}
+                    disabled={isAdditional && !canBuyAdditionalGroup}
+                  />;
+                })}
               </div>
             </section>
 
@@ -259,27 +274,26 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                 <div className="min-w-0 flex-1 text-sm">
                   {hasRequest ? (
                     <>
-                      {paidTitles.length > 0 && <p className="text-ink"><span className="font-semibold">{paidTitles.length} {paidTitles.length === 1 ? 'título' : 'títulos'}</span> · {money(titlesPrice(paidTitles.length))}</p>}
-                      {chosenAddons.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {money(item.price)} / año</p>)}
+                      {newTitleItems.length > 0 && <p className="text-ink"><span className="font-semibold">{newTitleItems.length} {newTitleItems.length === 1 ? 'título' : 'títulos'}</span> · {money(newTitlesPrice)} {t('plans.vatIncluded')}</p>}
+                      {newAddonItems.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {money(item.price)} / año {t('plans.vatIncluded')}</p>)}
                     </>
                   ) : (
-                    <p className="text-ink-3">"No paso de Rojas" va incluido. Selecciona títulos o ampliaciones para solicitarlos.</p>
+                    <p className="text-ink-3">"No paso de Rojas" va incluido. Marca lo que quieras contratar para este grupo.</p>
                   )}
                 </div>
               </div>
-              {/* Siempre se puede guardar: también para retirar títulos desmarcados. */}
               <WriteButton
                 type="button"
-                disabled={saving}
+                disabled={saving || !hasRequest}
                 onClick={() => void activateForTesting()}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60"
               >
                 {saved ? <Check size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
-                {saving ? 'Guardando…' : saved ? 'Selección guardada' : 'Guardar selección (pruebas)'}
+                {saving ? 'Contratando…' : saved && !hasRequest ? 'Contratado' : 'Contratar selección (pruebas)'}
               </WriteButton>
-              {saved && <p role="status" className="text-center text-xs font-semibold text-accent-ink">Gamificación guardada para todos tus Team y Premium; ampliaciones propias guardadas en {groupName || 'el grupo elegido'}.</p>}
+              {saved && <p role="status" className="text-center text-xs font-semibold text-accent-ink">Contratado para {groupName || 'el grupo elegido'}. Ya aparece marcado y no se puede retirar.</p>}
               {saveError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{saveError}</p>}
-              <p className="text-xs text-ink-3">Los títulos y ampliaciones están desbloqueados para pruebas. La plantilla pasa a 32 jugadores, Grupo Adicional permite otro grupo activo y Temporada Simultánea habilita su configuración.</p>
+              <p className="text-xs text-ink-3">Los títulos y ampliaciones están desbloqueados para pruebas. La plantilla pasa a 32 jugadores, Grupo Adicional permite otro grupo (hasta 3 en total) y Temporada Simultánea queda guardada para cuando esté disponible.</p>
             </section>
           </div>
         )}
@@ -296,8 +310,12 @@ const ShopRow: React.FC<{
   note?: string;
   onToggle: () => void;
   disabled?: boolean;
-}> = ({ item, first, checked, price, note, onToggle, disabled = false }) => {
-  const locked = Boolean(item.free || disabled);
+  /** Ya pagado para este grupo: marcado y sin poder retirarse. */
+  purchased?: boolean;
+  /** Etiqueta de IVA bajo el precio («IVA incl.»). */
+  vatLabel?: string;
+}> = ({ item, first, checked, price, note, onToggle, disabled = false, purchased = false, vatLabel }) => {
+  const locked = Boolean(item.free || disabled || purchased);
   const inputId = `shop-${item.id}`;
   return (
     <div className={`flex items-center gap-3 px-4 py-3 ${first ? '' : 'border-t border-line'} ${disabled ? 'opacity-55' : ''}`}>
@@ -319,10 +337,10 @@ const ShopRow: React.FC<{
         </div>
         {note && <p className="text-xs text-ink-3">{note}</p>}
       </div>
-      {item.free ? (
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-1 text-xs font-semibold text-accent-ink"><Check size={13} aria-hidden="true" />{price}</span>
+      {item.free || purchased ? (
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-2 py-1 text-xs font-semibold text-accent-ink"><Check size={13} aria-hidden="true" />{item.free ? price : 'Contratado'}</span>
       ) : (
-        <span className="shrink-0 text-sm font-bold text-ink">{price}</span>
+        <span className="shrink-0 text-right text-sm font-bold text-ink">{price}<span className="block text-[10px] font-normal text-ink-3">{vatLabel}</span></span>
       )}
     </div>
   );

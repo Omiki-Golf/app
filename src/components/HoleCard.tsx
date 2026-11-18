@@ -8,6 +8,8 @@ import { CongratulationsModal } from './CongratulationsModal';
 import { gamificationProduct } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
 
+import { PlayerName } from './PlayerName';
+import { parseDeletedPlayer } from '../utils/deletedPlayer';
 interface HoleCardProps {
   hole: GolfHole;
   players: RoundPlayer[];
@@ -47,13 +49,16 @@ const playerInitials = (name: string) => name
 
 function CompactPlayer({ name, colorIndex }: { name: string; colorIndex: number }) {
   const safeIndex = Math.max(0, colorIndex) % markerColors.length;
+  // Un jugador que se dio de baja conserva sus iniciales, en gris.
+  const { deleted, nick } = parseDeletedPlayer(name);
+  const label = deleted ? `${nick} (se dio de baja)` : name;
   return (
     <span
-      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-black leading-none shadow-sm ${markerColors[safeIndex]}`}
-      title={name}
-      aria-label={name}
+      className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-[11px] font-black leading-none shadow-sm ${deleted ? 'border-line bg-card-2 text-ink-4' : markerColors[safeIndex]}`}
+      title={label}
+      aria-label={label}
     >
-      {playerInitials(name)}
+      {playerInitials(nick)}
     </span>
   );
 }
@@ -375,7 +380,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   <div className="flex min-w-0 items-center gap-2">
                     {isModeScoring && <ColorMarker colorIndex={isParejas ? team : playerIndex} />}
                     {isParejas && <span className="sr-only">{teamLabel}</span>}
-                    <p className="truncate font-semibold text-ink" title={player.name}>{middleEllipsis(player.name)}</p>
+                    <p className="truncate font-semibold text-ink" title={player.name}>{parseDeletedPlayer(player.name).deleted ? <PlayerName name={player.name} /> : middleEllipsis(player.name)}</p>
                   </div>
                   {/* Marcas del hoyo: solo iconos, en la fila del HCP para no tapar el nombre. */}
                   <div className="mt-0.5 flex flex-wrap items-center gap-1">

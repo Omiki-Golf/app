@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { AlertTriangle, Loader2, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, Loader2, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
 const CONFIRMATION = 'ELIMINAR CUENTA';
@@ -11,7 +11,9 @@ interface DeletionPreview {
 
 // "Darse de baja" al final de Mis datos de registro: explica qué se borra y qué se conserva,
 // qué pasará con los grupos que ha creado y pide escribir ELIMINAR CUENTA. La baja es inmediata.
-export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: () => void; onOpenGroups?: () => void }) {
+// Con autoOpen (desde el aviso de vencimiento) se muestra la sección y se abre el diálogo directamente.
+export function DeleteAccountSection({ onDeleted, onOpenGroups, autoOpen = false }: { onDeleted: () => void; onOpenGroups?: () => void; autoOpen?: boolean }) {
+  const sectionRef = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<DeletionPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -52,12 +54,19 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: (
     }
   };
 
+  useEffect(() => {
+    if (!autoOpen) return;
+    sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    void start();
+    // Solo al llegar desde el aviso de vencimiento.
+  }, [autoOpen]);
+
   const groupsWithoutAdmin = preview?.groups.filter(group => !group.admin && group.members > 0) ?? [];
 
   return (
-    <section className="mt-7 border-t border-line pt-6" aria-labelledby="delete-account-title">
+    <section ref={sectionRef} className="mt-7 border-t border-line pt-6" aria-labelledby="delete-account-title">
       <h2 id="delete-account-title" className="text-lg font-bold text-ink">Darse de baja</h2>
-      <p className="mt-1 text-sm text-ink-3">Elimina inmediatamente tu cuenta y tus datos personales. Los resultados necesarios para las clasificaciones quedan completamente anónimos.</p>
+      <p className="mt-1 text-sm text-ink-3">Elimina inmediatamente tu cuenta y tus datos personales. En el historial de tus grupos y partidas se conserva tu nick, marcado como dado de baja.</p>
       <button type="button" onClick={() => void start()} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50">
         <Trash2 size={16} aria-hidden="true" />
         Darme de baja
@@ -85,7 +94,7 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: (
                   <ul className="list-disc space-y-1 pl-5">
                     <li>Se borran tu cuenta, tu perfil, tus avisos y tus invitaciones.</li>
                     <li>Si tienes una suscripción, se cancela y no se volverá a cobrar.</li>
-                    <li>Tu nombre desaparece del historial; los resultados necesarios se muestran como «Jugador eliminado».</li>
+                    <li>Tu nick se mantiene en el historial de tus grupos y partidas, en gris y con una calavera, para que las clasificaciones sigan teniendo sentido.</li>
                     <li>Tu nick queda libre inmediatamente y podrá utilizarlo otra persona.</li>
                   </ul>
                 </div>
@@ -106,7 +115,7 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups }: { onDeleted: (
                     {groupsWithoutAdmin.length > 0 && (
                       <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
                         <p>Antes de darte de baja, nombra a alguien administrador en Mis grupos → Jugadores y administradores. Así pasará a ser el creador del grupo. Si no lo haces, el grupo se quedará sin creador y avisaremos a sus miembros.</p>
-                        {onOpenGroups && <button type="button" onClick={() => { setOpen(false); onOpenGroups(); }} className="mt-2 font-semibold underline">Ir a Mis grupos</button>}
+                        {onOpenGroups && <button type="button" onClick={() => { setOpen(false); onOpenGroups(); }} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover"><Users size={18} aria-hidden="true" />Ir a Mis grupos</button>}
                       </div>
                     )}
                   </div>

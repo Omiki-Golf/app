@@ -26,6 +26,7 @@ import { enabledExtraProducts } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
 import { GAMIFICATION_UPDATED_EVENT } from '../services/groupSettingsService';
 
+import { PlayerName } from './PlayerName';
 interface StatisticsProps {
   onBack: () => void;
   backDestination?: 'back' | 'home';
@@ -117,7 +118,7 @@ const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: s
       <div>
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">{label}</span>
         <p className={`font-bold text-sm sm:text-base leading-tight truncate mt-0.5 ${tone}`} title={entry.name}>
-          {entry.name}
+          <PlayerName name={entry.name} />
         </p>
       </div>
       <div className="mt-1">
@@ -1241,7 +1242,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                     {index + 1}
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <p className="font-bold text-base sm:text-lg text-ink truncate">{player.name}</p>
+                                    <p className="font-bold text-base sm:text-lg text-ink truncate"><PlayerName name={player.name} /></p>
                                     <div className="flex items-center gap-1.5 text-xs text-ink-3 mt-0.5">
                                       <span className="whitespace-nowrap">{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</span>
                                       <span>·</span>
@@ -1346,7 +1347,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                                   {index + 1}
                                 </span>
                                 <div className="min-w-0">
-                                  <p className="font-bold text-ink truncate">{player.name}</p>
+                                  <p className="font-bold text-ink truncate"><PlayerName name={player.name} /></p>
                                   <p className="text-xs text-ink-3">{player.totalRounds} {player.totalRounds === 1 ? 'partida' : 'partidas'}</p>
                                 </div>
                               </div>
@@ -1415,7 +1416,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/40 dark:to-emerald-900/30 rounded-lg p-5 border-2 border-accent-ring dark:border-emerald-700 shadow-soft">
                           <h4 className="text-lg font-bold text-title mb-2">Mejor Ronda</h4>
                           <p className="text-sm text-ink-2 mb-3">Record del campo</p>
-                          <p className="text-2xl font-bold text-accent-ink">{courseStats.mejorRonda.player_name}</p>
+                          <p className="text-2xl font-bold text-accent-ink"><PlayerName name={courseStats.mejorRonda.player_name} /></p>
                           <p className="text-3xl font-bold text-accent-ink mt-2">{courseStats.mejorRonda.best_score} pts</p>
                           <p className="text-xs text-ink-3 mt-1">
                             {new Date(courseStats.mejorRonda.played_at).toLocaleDateString('es-ES')}

@@ -109,11 +109,11 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
                   {isCurrent ? <span className={`text-[10px] font-bold uppercase ${current.ink}`}>{p('current')}</span> : isIncluded ? <span className="text-[10px] font-bold uppercase text-ink-4">{p('included')}</span> : active ? <Check size={18} className={current.ink} /> : <Circle size={16} className="text-ink-4" />}
                 </div>
                 {'oneOff' in item ? (
-                  <p className="mt-2 font-bold text-ink">{p('from', { price: money(item.oneOff[0].price) })}<span className="ml-1 text-xs font-normal text-ink-3">{p('oneOff')}</span></p>
+                  <p className="mt-2 font-bold text-ink">{p('from', { price: money(item.oneOff[0].price) })}<span className="ml-1 text-xs font-normal text-ink-3">{p('oneOff')} · {p('vatIncluded')}</span></p>
                 ) : (
-                  <p className="mt-2 font-bold text-ink">{item.monthly === 0 ? p('free') : money(planPrice(item, annual))}<span className="ml-1 text-xs font-normal text-ink-3">{item.monthly === 0 ? p('noSignup') : annual ? p('perYear') : p('perMonth')}</span></p>
+                  <p className="mt-2 font-bold text-ink">{item.monthly === 0 ? p('free') : money(planPrice(item, annual))}<span className="ml-1 text-xs font-normal text-ink-3">{item.monthly === 0 ? p('noSignup') : `${annual ? p('perYear') : p('perMonth')} · ${p('vatIncluded')}`}</span></p>
                 )}
-                {annual && item.regularAnnual !== null && <p className="text-[11px] text-ink-4 line-through">{p('regular', { price: money(item.regularAnnual) })}</p>}
+                {annual && item.regularAnnual !== null && <p className="text-[11px] text-ink-4"><span className="line-through">{p('regular', { price: money(item.regularAnnual) })}</span> · {p('vatShort')}</p>}
               </button>
             );
           })}
@@ -128,6 +128,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
                 return <button type="button" key={option.label} aria-pressed={weekendDays === days} onClick={() => setWeekendDays(days)} className={`rounded-xl border bg-card p-3 text-center ${weekendDays === days ? style.border : 'border-line'}`}>
                   <p className="text-[11px] text-ink-3">{p('payFor', { label: catalogText(plan.id, `oneOff.${index}`, option.label) })}</p>
                   <p className="text-lg font-bold text-ink">{money(option.price)}</p>
+                  <p className="text-[10px] text-ink-3">{p('vatShort')}</p>
                 </button>;
               })}
             </div>
