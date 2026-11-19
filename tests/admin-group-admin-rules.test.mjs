@@ -23,7 +23,9 @@ test('owner and delegated admin can archive and delete, but only owner manages t
 });
 
 test('archived groups sort last and hide their access code', () => {
-  assert.match(groups, /archiveOrder[\s\S]{0,160}created_at\.localeCompare/);
+  // Mismo orden que Inicio (ver homeGroupOrder); los archivados, al final.
+  assert.match(groups, /const sortGroups = \(items: MyGroup\[\]\) => homeGroupOrder\(items\)/);
+  assert.match(groups, /select\('role, group_id, joined_at, admin_since'\)/);
   assert.match(groups, /!group\.archived_at && <div className="flex items-center gap-3 mb-3">/);
 });
 

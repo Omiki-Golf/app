@@ -247,6 +247,16 @@ export const userService = {
     if (error) throw error;
     const invitations = ((data || []) as unknown as GroupInvitation[]).filter(invitation => !invitation.group?.archived_at);
     if (!invitations.length) return invitations;
+    // Los perfiles ajenos no se pueden leer: el nick de quien invita llega por una función
+    // que solo devuelve el de tus invitaciones pendientes. Si falla, el aviso sigue saliendo.
+    const { data: inviters, error: invitersError } = await supabase.rpc('pending_invitation_inviters');
+    if (!invitersError && Array.isArray(inviters)) {
+      const nicks = new Map((inviters as Array<{ invitation_id: string; inviter_nick: string | null }>).map(row => [row.invitation_id, row.inviter_nick]));
+      return invitations.map(inv => {
+        const nick = nicks.get(inv.id);
+        return nick ? { ...inv, inviter_profile: { user_id: inv.invited_by, nick } as UserProfile } : inv;
+      }) as GroupInvitation[];
+    }
     // invited_by references Auth, not user_profiles. Fetch optional display
     // details separately so a missing/inaccessible profile cannot hide an invite.
     const { data: profiles, error: profileError } = await supabase

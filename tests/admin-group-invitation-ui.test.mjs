@@ -55,3 +55,30 @@ test('archiving cancels pending invitations before the read-only guard takes eff
     assert.ok((await db.query('SELECT archived_at FROM groups WHERE id=$1', [group])).rows[0].archived_at);
   } finally { await db.close(); }
 });
+
+test('the invitation notice shows who invites you, read through a function limited to your pending invitations', async () => {
+  const { readFile: readText } = await import('node:fs/promises');
+  const { PGlite } = await import('@electric-sql/pglite');
+  const sql = await readText(new URL('../supabase/migrations/20261125100000_invitation_inviter_nick.sql', import.meta.url), 'utf8');
+  const service = await readText(new URL('../src/services/userService.ts', import.meta.url), 'utf8');
+  assert.match(service, /rpc\('pending_invitation_inviters'\)/);
+  const db = new PGlite();
+  const [me, kike, other] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+  try {
+    await db.exec(`
+      CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA auth;
+      CREATE TABLE session(uid uuid);
+      CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT uid FROM public.session LIMIT 1 $$;
+      CREATE TABLE user_profiles(user_id uuid, nick text, display_name text);
+      CREATE TABLE group_invitations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), invited_user_id uuid, invited_by uuid, status text);
+    `);
+    await db.exec(sql);
+    await db.query('INSERT INTO session VALUES($1)', [me]);
+    await db.query("INSERT INTO user_profiles VALUES($1,'Kikeas04',NULL)", [kike]);
+    await db.query("INSERT INTO group_invitations(invited_user_id,invited_by,status) VALUES($1,$2,'pending'),($1,$2,'accepted'),($3,$2,'pending')", [me, kike, other]);
+    const rows = (await db.query('SELECT inviter_nick FROM public.pending_invitation_inviters()')).rows;
+    assert.deepEqual(rows.map(row => row.inviter_nick), ['Kikeas04'], 'solo tus invitaciones pendientes');
+  } finally {
+    await db.close();
+  }
+});

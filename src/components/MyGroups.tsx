@@ -6,6 +6,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Users, Copy, Check, Trash2, Crown, ChevronDown, ChevronUp, Archive, Settings, LogOut } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { Group } from '../types';
+import { homeGroupOrder } from '../utils/homeGroups';
 import { userService } from '../services/userService';
 import { normalizeAvatarUrl } from '../utils/avatarOptions';
 import { ConfirmModal } from './ConfirmModal';
@@ -45,13 +46,13 @@ interface MyGroup extends GroupWithCode {
   // owner: lo creó esta cuenta; admin: le han nombrado administrador; member: miembro invitado.
   access: 'owner' | 'admin' | 'member';
   handicap18?: number | null;
+  /** Fecha para ordenar como en Inicio: creación, nombramiento como administrador o aceptación. */
+  since?: string | null;
 }
 
 const GROUP_COLUMNS = 'id, name, group_code, created_at, created_by, user_auth_id, hoyo_19_enabled, archived_at, group_type, premium_branding';
-const sortGroups = (items: MyGroup[]) => [...items].sort((a, b) => {
-  const archiveOrder = Number(Boolean(a.archived_at)) - Number(Boolean(b.archived_at));
-  return archiveOrder || b.created_at.localeCompare(a.created_at);
-});
+// Mismo orden que Inicio; los archivados, al final.
+const sortGroups = (items: MyGroup[]) => homeGroupOrder(items);
 
 export default function MyGroups({ onBack, backDestination = 'back', onGroupSelected, onGroupArchived, onGroupDeleted, onGroupLeft, messagesButton, onShowPlans }: MyGroupsProps) {
   const { t, i18n } = useTranslation();
@@ -85,7 +86,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       await supabase.rpc('archive_expired_weekend_groups');
       const [owned, memberships, profile] = await Promise.all([
         supabase.from('groups').select(GROUP_COLUMNS).eq('user_auth_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('group_members').select('role, group_id').eq('user_id', user.id),
+        supabase.from('group_members').select('role, group_id, joined_at, admin_since').eq('user_id', user.id),
         supabase.from('user_profiles').select('nick').eq('user_id', user.id).maybeSingle(),
       ]);
       if (owned.error) throw owned.error;
@@ -93,11 +94,12 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
       if (profile.error) throw profile.error;
       setUserNick(profile.data?.nick || '');
 
-      const ownedGroups: MyGroup[] = (owned.data || []).map(group => ({ ...group, access: 'owner' }));
+      const ownedGroups: MyGroup[] = (owned.data || []).map(group => ({ ...group, access: 'owner', since: group.created_at }));
       const ownedIds = new Set(ownedGroups.map(group => group.id));
       const roles = new Map((memberships.data || [])
         .filter(membership => !ownedIds.has(membership.group_id))
         .map(membership => [membership.group_id, membership.role === 'admin' ? 'admin' as const : 'member' as const]));
+      const since = new Map((memberships.data || []).map(membership => [membership.group_id, membership.role === 'admin' ? (membership.admin_since ?? membership.joined_at) : membership.joined_at]));
 
       let joinedGroups: MyGroup[] = [];
       if (roles.size > 0) {
@@ -107,7 +109,7 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
           .in('id', [...roles.keys()])
           .order('created_at', { ascending: false });
         if (joinedError) throw joinedError;
-        joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member' }));
+        joinedGroups = (data || []).map(group => ({ ...group, access: roles.get(group.id) ?? 'member', since: since.get(group.id) ?? null }));
       }
 
       const groupsWithHandicap = await Promise.all([...ownedGroups, ...joinedGroups].map(async group => {
