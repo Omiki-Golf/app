@@ -10,8 +10,8 @@ export function playerIntent(metadata: Record<string, unknown>): PlayerIntent | 
     (value.period === 'monthly' || value.period === 'annual') &&
     (value.offer === undefined || (value.offer === 'team_trial' && value.plan === 'team' && value.period === 'annual')) ? value as PlayerIntent : null;
 }
-export type RegistrationField = 'nick' | 'email' | 'password' | 'handicap' | 'age' | 'over14' | 'acceptedTerms';
-type RegistrationFields = { nick: string; email: string; password: string; handicap: string; age: string; over14: boolean; acceptedTerms: boolean };
+export type RegistrationField = 'nick' | 'email' | 'password' | 'handicap' | 'age' | 'over18' | 'acceptedTerms';
+type RegistrationFields = { nick: string; email: string; password: string; handicap: string; age: string; over18: boolean; acceptedTerms: boolean };
 
 /** Errores de cada campo del alta, en el mismo orden en que aparecen en el formulario. */
 export function registrationFieldErrors(fields: RegistrationFields): Partial<Record<RegistrationField, string>> {
@@ -21,8 +21,8 @@ export function registrationFieldErrors(fields: RegistrationFields): Partial<Rec
   if (fields.password.length < 6 || !/[A-Z]/.test(fields.password) || !/[a-z]/.test(fields.password) || !/[^a-zA-Z0-9]/.test(fields.password)) errors.password = 'Mínimo 6 caracteres, con mayúscula, minúscula y un carácter especial.';
   // Hándicap de juego en 18 hoyos: número entero entre 0 y 54, sin decimales.
   if (fields.handicap && (!/^\d{1,2}$/.test(fields.handicap.trim()) || Number(fields.handicap) > 54)) errors.handicap = 'Número entero de 0 a 54, sin decimales.';
-  if (fields.age && (!Number.isInteger(Number(fields.age)) || Number(fields.age) < 14)) errors.age = 'Número entero, mínimo 14.';
-  if (!fields.over14) errors.over14 = 'Debes confirmar que tienes al menos 14 años.';
+  if (fields.age && (!Number.isInteger(Number(fields.age)) || Number(fields.age) < 18)) errors.age = 'Número entero, mínimo 18.';
+  if (!fields.over18) errors.over18 = 'Debes confirmar que eres mayor de 18 años.';
   if (!fields.acceptedTerms) errors.acceptedTerms = 'Debes aceptar los términos y la política de privacidad.';
   return errors;
 }

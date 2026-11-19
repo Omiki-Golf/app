@@ -159,8 +159,8 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
       setError('Introduce un hándicap entero entre 0 y 54.');
       return;
     }
-    if (age.trim() && (!Number.isInteger(Number(age)) || Number(age) < 14)) {
-      setError('La edad debe ser un número entero de al menos 14 años.');
+    if (age.trim() && (!Number.isInteger(Number(age)) || Number(age) < 18)) {
+      setError('La edad debe ser un número entero de al menos 18 años.');
       return;
     }
     if (!(await checkNick())) {
@@ -390,7 +390,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                   <p className="flex items-center gap-2 text-sm text-ink-3">
                     {profile.accepted_terms ? <CheckCircle2 size={16} className="text-accent-ink" /> : <X size={16} className="text-red-500" />}
                     {profile.accepted_terms
-                      ? 'Términos y política de privacidad aceptados. Mayor de 14 años confirmado.'
+                      ? 'Términos y política de privacidad aceptados. Mayor de 18 años confirmado.'
                       : 'Términos y política de privacidad pendientes de aceptar.'}
                   </p>
                 </>

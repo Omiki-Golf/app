@@ -17,7 +17,7 @@ const FIELD_IDS: Record<RegistrationField, string> = {
   password: 'register-password',
   handicap: 'register-handicap',
   age: 'register-age',
-  over14: 'register-over14',
+  over18: 'register-over18',
   acceptedTerms: 'register-terms',
 };
 
@@ -61,7 +61,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
   const [age, setAge] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(DEFAULT_AVATAR_URL);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [over14, setOver14] = useState(false);
+  const [over18, setOver18] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
@@ -112,7 +112,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
 
   const handleSubmit = async () => {
     if (submitting.current) return;
-    const validation = registrationFieldErrors({ nick, email, password, handicap, age, over14, acceptedTerms });
+    const validation = registrationFieldErrors({ nick, email, password, handicap, age, over18, acceptedTerms });
     setError('');
     setFieldErrors(validation);
     const firstInvalid = (Object.keys(FIELD_IDS) as RegistrationField[]).find(field => validation[field]);
@@ -303,7 +303,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
           {/* Country + Postal + Age */}
           <div className="grid md:grid-cols-3 gap-4 mb-4">
             <div>
-              <label htmlFor="register-country" className="block text-sm font-medium text-ink-2 mb-1">Pais</label>
+              <label htmlFor="register-country" className="block text-sm font-medium text-ink-2 mb-1">País</label>
               <input id="register-country"
                 type="text"
                 value={country}
@@ -312,7 +312,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
               />
             </div>
             <div>
-              <label htmlFor="register-postalCode" className="block text-sm font-medium text-ink-2 mb-1">Cod. Postal</label>
+              <label htmlFor="register-postalCode" className="block text-sm font-medium text-ink-2 mb-1">Cód. postal</label>
               <input id="register-postalCode"
                 type="text"
                 value={postalCode}
@@ -337,16 +337,16 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
           {/* Checkboxes */}
           <div className="space-y-3 mb-6">
             <div>
-              <label className={`flex items-start gap-2 cursor-pointer rounded-lg ${fieldErrors.over14 ? 'ring-1 ring-red-500 bg-red-50/40 p-1.5 dark:bg-red-500/10' : ''}`}>
-                <input id="register-over14" type="checkbox" checked={over14} onChange={(e) => { setOver14(e.target.checked); clearFieldError('over14'); }} {...invalidProps('over14')} className="mt-0.5 w-5 h-5 accent-emerald-600" />
-                <span className="text-sm text-ink-3">Confirmo que tengo al menos 14 anos</span>
+              <label className={`flex items-start gap-2 cursor-pointer rounded-lg ${fieldErrors.over18 ? 'ring-1 ring-red-500 bg-red-50/40 p-1.5 dark:bg-red-500/10' : ''}`}>
+                <input id="register-over18" type="checkbox" checked={over18} onChange={(e) => { setOver18(e.target.checked); clearFieldError('over18'); }} {...invalidProps('over18')} className="mt-0.5 w-5 h-5 accent-emerald-600" />
+                <span className="text-sm text-ink-3">Confirmo que soy mayor de 18 años</span>
               </label>
-              <FieldError field="over14" message={fieldErrors.over14} />
+              <FieldError field="over18" message={fieldErrors.over18} />
             </div>
             <div>
             <label className={`flex items-start gap-2 cursor-pointer rounded-lg ${fieldErrors.acceptedTerms ? 'ring-1 ring-red-500 bg-red-50/40 p-1.5 dark:bg-red-500/10' : ''}`}>
               <input id="register-terms" type="checkbox" checked={acceptedTerms} onChange={(e) => { setAcceptedTerms(e.target.checked); clearFieldError('acceptedTerms'); }} {...invalidProps('acceptedTerms')} className="mt-0.5 w-5 h-5 accent-emerald-600" />
-              <span className="text-sm text-ink-3">Acepto los <a href="#" className="text-accent-ink underline">terminos</a> y la <a href="#" className="text-accent-ink underline">politica de privacidad</a></span>
+              <span className="text-sm text-ink-3">Acepto los <a href="#" className="text-accent-ink underline">términos</a> y la <a href="#" className="text-accent-ink underline">política de privacidad</a></span>
             </label>
             <FieldError field="acceptedTerms" message={fieldErrors.acceptedTerms} />
             </div>

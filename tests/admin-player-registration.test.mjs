@@ -7,11 +7,12 @@ import { activateSimulation, periodEnd, playerIntent, playerSignupMetadata, regi
 const uid = '00000000-0000-4000-8000-000000000001';
 const other = '00000000-0000-4000-8000-000000000002';
 const intent = { id: '11111111-1111-4111-8111-111111111111', period: 'annual' };
-const fields = { nick: 'Prueba', email: 'test@example.com', password: 'Test!123', handicap: '', age: '', over14: true, acceptedTerms: true };
+const fields = { nick: 'Prueba', email: 'test@example.com', password: 'Test!123', handicap: '', age: '', over18: true, acceptedTerms: true };
 test('Player registration validates credentials, age consistency and billing dates', () => {
   assert.equal(registrationError(fields), null);
-  for (const patch of [{email:''},{password:''},{password:'abcdef'},{age:'13'},{age:'20.5'},{handicap:'NaN'},{handicap:'12.4'},{handicap:'-3'},{handicap:'55'},{over14:false},{acceptedTerms:false}]) assert.ok(registrationError({...fields,...patch}));
+  for (const patch of [{email:''},{password:''},{password:'abcdef'},{age:'13'},{age:'17'},{age:'20.5'},{handicap:'NaN'},{handicap:'12.4'},{handicap:'-3'},{handicap:'55'},{over18:false},{acceptedTerms:false}]) assert.ok(registrationError({...fields,...patch}));
   for (const handicap of ['0', '18', '54']) assert.equal(registrationError({ ...fields, handicap }), null);
+  assert.equal(registrationError({ ...fields, age: '18' }), null); // Edad mínima: 18 años.
   assert.equal(periodEnd(new Date('2028-02-29T12:00:00Z'), 'annual'), '2029-02-28T12:00:00.000Z');
   assert.equal(periodEnd(new Date('2026-01-31T12:00:00Z'), 'monthly'), '2026-02-28T12:00:00.000Z');
   assert.equal(playerIntent({player_checkout:{...intent,period:'weekly'}}), null);
@@ -64,4 +65,14 @@ for (const plan of ['player', 'team', 'premium']) for (const period of ['monthly
     const restored = await activateSimulation(store,uid,{...intent,period:'monthly'},new Date('2026-09-25T12:00:00Z'));
     assert.equal(new Date(restored.current_period_end).toISOString(),'2026-10-22T12:00:00.000Z');
   } finally { await db.close(); }
+});
+
+test('registration and profile ask for 18 or older, with proper accents', async () => {
+  const form = await readFile(new URL('../src/components/RegistrationForm.tsx', import.meta.url), 'utf8');
+  const profile = await readFile(new URL('../src/components/ProfileDetails.tsx', import.meta.url), 'utf8');
+  assert.ok(form.includes('Confirmo que soy mayor de 18 años'));
+  for (const text of ['>términos</a>', '>política de privacidad</a>', '>País</label>', '>Cód. postal</label>']) assert.ok(form.includes(text), text);
+  assert.match(profile, /Number\(age\) < 18\)/);
+  assert.ok(profile.includes('Mayor de 18 años confirmado.'));
+  for (const source of [form, profile]) assert.doesNotMatch(source, /14 a[ñn]os|over14/);
 });
