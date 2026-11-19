@@ -34,3 +34,16 @@ test('Weekend wins over Premium when choosing a group card tone', async () => {
   const source = await read('../src/utils/tierColors.ts');
   assert.ok(source.indexOf("group.group_type === 'weekend'") < source.indexOf('group.premium_branding'));
 });
+
+test('app background uses a subtle golf ball texture: irregular dimples in light, light-only relief in dark', async () => {
+  const { readFile, stat } = await import('node:fs/promises');
+  const css = await readFile(new URL('../src/index.css', import.meta.url), 'utf8');
+  assert.match(css, /:root \{[\s\S]*?--app-texture: url\('\/images\/textures\/dimples-light\.svg'\);/);
+  assert.match(css, /\.dark \{[\s\S]*?--app-texture: url\('\/images\/textures\/dimples-dark\.svg'\);/);
+  assert.match(css, /\.bg-app \{\s*background-image: var\(--app-texture\);/);
+  for (const name of ['dimples-light.svg', 'dimples-dark.svg']) {
+    const file = new URL(`../public/images/textures/${name}`, import.meta.url);
+    assert.ok((await stat(file)).size < 80_000, `${name} pesa poco`);
+    assert.match(await readFile(file, 'utf8'), /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  }
+});

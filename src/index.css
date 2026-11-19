@@ -12,6 +12,8 @@
 
   /* Superficies */
   --app: #F0FDF4;          /* antes: gradientes green-50 / emerald-50 / slate-50 */
+  /* Textura de bola de golf (claro: hoyuelos irregulares). Para quitarla: --app-texture: none. */
+  --app-texture: url('/images/textures/dimples-light.svg');
   --card: #FFFFFF;         /* antes: bg-white */
   --card-2: #F9FAFB;       /* antes: bg-gray-50 */
 
@@ -54,6 +56,8 @@
   color-scheme: dark;
 
   --app: #071710;
+  /* Textura de bola de golf (oscuro: relieve solo con luz). */
+  --app-texture: url('/images/textures/dimples-dark.svg');
   --card: #0F241A;
   --card-2: #152D22;
 
@@ -95,6 +99,12 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder {
   color: var(--ink-4);
+}
+
+/* Fondo de las pantallas con textura sutil de bola de golf (ver --app-texture en :root y .dark). */
+.bg-app {
+  background-image: var(--app-texture);
+  background-repeat: repeat;
 }
 
 /* Transición suave al cambiar de tema, sin animar layout */
