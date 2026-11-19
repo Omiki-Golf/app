@@ -9,6 +9,7 @@ const migration = [
   await readFile(new URL('../supabase/migrations/20261110100000_immediate_account_deletion.sql', import.meta.url), 'utf8'),
   await readFile(new URL('../supabase/migrations/20261116200000_retired_players_are_not_reusable.sql', import.meta.url), 'utf8'),
   await readFile(new URL('../supabase/migrations/20261120100000_deleted_players_keep_nick.sql', import.meta.url), 'utf8'),
+  await readFile(new URL('../supabase/migrations/20261123100000_account_deletion_group_heirs.sql', import.meta.url), 'utf8'),
 ].join('\n');
 
 // Esquema mínimo con las protecciones reales que afectan a la baja.
@@ -28,7 +29,7 @@ const schema = `
   CREATE TABLE public.group_write_permits(tx bigint, entity uuid, operation text);
   CREATE TABLE public.app_administrators(user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE RESTRICT, alias text, status text DEFAULT 'active');
   CREATE TABLE public.user_profiles(id uuid DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, nick text NOT NULL, display_name text);
-  CREATE TABLE public.groups(id uuid PRIMARY KEY, name text, group_code text, user_auth_id uuid, archived_at timestamptz, created_at timestamptz DEFAULT now());
+  CREATE TABLE public.groups(id uuid PRIMARY KEY, name text, group_code text, user_auth_id uuid, archived_at timestamptz, created_at timestamptz DEFAULT now(), group_type text, weekend_days int, weekend_mode_until timestamptz);
   CREATE TABLE public.group_members(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, role text DEFAULT 'member', invited_by uuid REFERENCES auth.users(id), joined_at timestamptz DEFAULT now(), member_revision bigint DEFAULT nextval('public.group_member_versions'));
   CREATE TABLE public.players(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, name text, auth_user_id uuid REFERENCES auth.users(id), is_guest boolean DEFAULT false, member_revision bigint DEFAULT 1, updated_at timestamptz);
   CREATE TABLE public.golf_rounds(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, created_by uuid REFERENCES auth.users(id) ON DELETE CASCADE, admin_withdrawn_at timestamptz, admin_previous_status text, updated_at timestamptz);
@@ -37,8 +38,9 @@ const schema = `
   CREATE TABLE public.daily_rankings(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), player_name text, game_player_id uuid);
   CREATE TABLE public.handicap_adjustments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), player_id uuid, player_name text);
   CREATE TABLE public.group_invitations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, invited_user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE, invited_by uuid REFERENCES auth.users(id));
-  CREATE TABLE public.pro_shop_purchases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, purchased_by uuid NOT NULL REFERENCES auth.users(id), product_type text);
-  CREATE TABLE public.user_subscriptions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES auth.users(id));
+  CREATE TABLE public.pro_shop_purchases(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), group_id uuid, purchased_by uuid NOT NULL REFERENCES auth.users(id), product_type text, status text DEFAULT 'completed');
+  CREATE TABLE public.user_subscriptions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES auth.users(id), plan_type text, status text, current_period_end timestamptz);
+  CREATE TABLE public.round_scores(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), round_id uuid);
   CREATE TABLE public.app_messages(id uuid PRIMARY KEY, title text NOT NULL, body text NOT NULL, status text NOT NULL DEFAULT 'draft', author_id uuid NOT NULL, author_alias text NOT NULL, recipients jsonb NOT NULL, revision int NOT NULL DEFAULT 1, sent_at timestamptz, sender_kind text NOT NULL DEFAULT 'app', source_group_id uuid, sender_label text NOT NULL DEFAULT 'Administración', recipient_selection jsonb, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
   CREATE TABLE public.app_message_deliveries(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), message_id uuid NOT NULL REFERENCES public.app_messages(id), kind text NOT NULL, recipient_id uuid NOT NULL, recipient_label text NOT NULL, sent_at timestamptz DEFAULT now(), read_at timestamptz);
   -- Archivo protegido: solo se puede reescribir con app.nick_rename, como en producción.
@@ -59,19 +61,25 @@ const triggers = `
   CREATE TRIGGER linked_handicap_ledger BEFORE INSERT OR DELETE OR UPDATE ON public.handicap_adjustments FOR EACH ROW EXECUTE FUNCTION public.guard_linked_handicap_ledger();
 `;
 
-test('account deletion keeps the nick marked as deleted, hands groups over and releases the nick', async () => {
+test('account deletion keeps the nick marked as deleted, hands active groups to a member with Team or Premium, erases the rest, leaves archived groups untouched and releases the nick', async () => {
   const db = new PGlite();
-  const [fede, admin, member, rival, groupA, groupB] = Array.from({ length: 6 }, () => randomUUID());
-  const ids = { fede, admin, member, rival };
+  const [fede, admin, member, rival, lola, groupA, groupB, groupC, groupD, groupE, groupF] = Array.from({ length: 11 }, () => randomUUID());
+  const ids = { fede, admin, member, rival, lola };
   try {
     await db.exec(schema);
     for (const [, id] of Object.entries(ids)) await db.query('INSERT INTO auth.users VALUES ($1)', [id]);
     await db.exec(`
-      INSERT INTO public.user_profiles(user_id, nick) VALUES ('${fede}', 'Fede'), ('${admin}', 'Kike'), ('${member}', 'Pepe'), ('${rival}', 'Rafa');
-      INSERT INTO public.groups(id, name, user_auth_id, archived_at) VALUES ('${groupA}', 'SABADETE', '${fede}', NULL), ('${groupB}', 'TERRASSES', '${fede}', now());
+      INSERT INTO public.user_profiles(user_id, nick) VALUES ('${fede}', 'Fede'), ('${admin}', 'Kike'), ('${member}', 'Pepe'), ('${rival}', 'Rafa'), ('${lola}', 'Lola');
+      INSERT INTO public.groups(id, name, user_auth_id, archived_at) VALUES ('${groupA}', 'SABADETE', '${fede}', NULL), ('${groupB}', 'TERRASSES', '${fede}', now()), ('${groupC}', 'GOLFERS', '${fede}', now()),
+        ('${groupD}', 'PREMIUM NO', '${fede}', NULL), ('${groupE}', 'SOLOS', '${fede}', NULL);
+      INSERT INTO public.groups(id, name, user_auth_id, group_type, weekend_days, weekend_mode_until) VALUES ('${groupF}', 'WEEKEND', '${fede}', 'weekend', 90, now() + interval '30 days');
       INSERT INTO public.group_members(group_id, user_id, role, invited_by) VALUES
         ('${groupA}', '${fede}', 'admin', NULL), ('${groupA}', '${admin}', 'admin', '${fede}'), ('${groupA}', '${member}', 'member', '${fede}'),
-        ('${groupB}', '${fede}', 'admin', NULL), ('${groupB}', '${rival}', 'member', '${fede}');
+        ('${groupB}', '${fede}', 'admin', NULL), ('${groupB}', '${rival}', 'member', '${fede}'),
+        ('${groupC}', '${fede}', 'admin', NULL), ('${groupC}', '${member}', 'admin', '${fede}'),
+        ('${groupD}', '${fede}', 'admin', NULL), ('${groupD}', '${member}', 'admin', '${fede}'), ('${groupD}', '${lola}', 'member', '${fede}'),
+        ('${groupE}', '${fede}', 'admin', NULL), ('${groupE}', '${rival}', 'member', '${fede}'),
+        ('${groupF}', '${fede}', 'admin', NULL), ('${groupF}', '${admin}', 'member', '${fede}');
       INSERT INTO public.players(id, group_id, name, auth_user_id) VALUES ('${fede}', '${groupA}', 'Fede', '${fede}');
       INSERT INTO public.golf_rounds(id, group_id, created_by) VALUES ('${groupA}', '${groupA}', '${fede}');
       INSERT INTO public.round_players(round_id, player_id, user_id, name) VALUES ('${groupA}', '${fede}', '${fede}', 'Fede');
@@ -81,7 +89,8 @@ test('account deletion keeps the nick marked as deleted, hands groups over and r
       INSERT INTO public.handicap_adjustments(player_id, player_name) VALUES ('${fede}', 'Fede');
       INSERT INTO public.group_invitations(group_id, invited_user_id, invited_by) VALUES ('${groupA}', '${rival}', '${fede}');
       INSERT INTO public.pro_shop_purchases(group_id, purchased_by, product_type) VALUES ('${groupA}', '${fede}', 'extra_players');
-      INSERT INTO public.user_subscriptions(user_id) VALUES ('${fede}');
+      INSERT INTO public.user_subscriptions(user_id, plan_type, status) VALUES ('${fede}', 'premium', 'active'), ('${admin}', 'team', 'active'), ('${lola}', 'premium', 'active');
+      INSERT INTO public.user_subscriptions(user_id, plan_type, status, current_period_end) VALUES ('${member}', 'team', 'active', now() - interval '1 day');
     `);
     await db.exec(migration);
     await db.exec(triggers);
@@ -96,21 +105,46 @@ test('account deletion keeps the nick marked as deleted, hands groups over and r
     await assert.rejects(db.query('SELECT public.delete_account_data($1)', [fede]), /permission denied/);
     await db.exec('RESET ROLE');
 
+    // Vista previa (como Fede): misma regla que la baja.
+    await db.query("SELECT set_config('request.uid', $1, false)", [fede]);
+    const preview = (await db.query('SELECT public.account_deletion_preview() AS p')).rows[0].p;
+    const byName = Object.fromEntries(preview.groups.map((g) => [g.name, g]));
+    assert.equal(byName.SABADETE.admin.nick, 'Kike');
+    assert.equal(byName['PREMIUM NO'].admin.nick, 'Lola', 'Pepe es administrador pero su plan ha vencido');
+    assert.equal(byName.WEEKEND.admin.nick, 'Kike');
+    assert.equal(byName.SOLOS.admin, null);
+    assert.equal(byName.SOLOS.will_delete, true);
+    assert.equal(byName.GOLFERS.archived, true);
+    assert.equal(byName.GOLFERS.will_delete, false);
+
     await db.query("SELECT set_config('request.role', 'service_role', false)");
     const result = (await db.query('SELECT public.delete_account_data($1) AS r', [fede])).rows[0].r;
-    assert.deepEqual(result, { groups_transferred: 1, groups_without_owner: 1 });
+    assert.deepEqual(result, { groups_transferred: 3, groups_deleted: 1, groups_without_owner: 0, archived_groups_kept: 2 });
 
-    // El administrador pasa a creador; el grupo sin administrador queda sin creador.
-    const groups = (await db.query('SELECT id, user_auth_id FROM public.groups ORDER BY name')).rows;
+    // El administrador del grupo activo pasa a creador. Los archivados solo se consultan:
+    // se quedan sin creador aunque tengan administrador, y sin avisos a sus miembros.
+    const groups = (await db.query('SELECT id, user_auth_id, archived_at FROM public.groups ORDER BY name')).rows;
     assert.equal(groups.find((g) => g.id === groupA).user_auth_id, admin);
     assert.equal(groups.find((g) => g.id === groupB).user_auth_id, null);
+    assert.equal(groups.find((g) => g.id === groupC).user_auth_id, null);
+    // Administrador sin plan: hereda el miembro con Premium, que pasa a administrador.
+    assert.equal(groups.find((g) => g.id === groupD).user_auth_id, lola);
+    assert.equal((await db.query('SELECT role FROM public.group_members WHERE group_id = $1 AND user_id = $2', [groupD, lola])).rows[0].role, 'admin');
+    assert.equal(groups.find((g) => g.id === groupF).user_auth_id, admin, 'el Weekend sigue la misma regla');
+    // Nadie con plan: el grupo se borra del todo.
+    assert.equal(groups.find((g) => g.id === groupE), undefined);
+    assert.ok(groups.filter((g) => [groupB, groupC].includes(g.id)).every((g) => g.archived_at), 'siguen archivados');
+    assert.equal((await db.query("SELECT role FROM public.group_members WHERE group_id = $1 AND user_id = $2", [groupC, member])).rows[0].role, 'admin');
 
-    // Avisos: al nuevo creador, al resto del grupo y a los miembros del grupo sin creador.
+    // Avisos de los grupos activos: herederos, resto de miembros y miembros del grupo borrado.
     const inbox = (await db.query('SELECT d.recipient_id, m.title FROM public.app_message_deliveries d JOIN public.app_messages m ON m.id = d.message_id ORDER BY m.title')).rows;
     assert.deepEqual(inbox.map((row) => [row.recipient_id, row.title]).sort(), [
       [admin, 'Ahora eres el creador de SABADETE'],
       [member, 'Nuevo creador en SABADETE'],
-      [rival, 'TERRASSES se ha quedado sin creador'],
+      [lola, 'Ahora eres el creador de PREMIUM NO'],
+      [member, 'Nuevo creador en PREMIUM NO'],
+      [admin, 'Ahora eres el creador de WEEKEND'],
+      [rival, 'SOLOS se ha eliminado'],
     ].sort());
 
     // Resultados conservados con el nick marcado como dado de baja y sin cuenta.
@@ -159,4 +193,12 @@ test('application administrators cannot delete their account from the app', asyn
   } finally {
     await db.close();
   }
+});
+
+test('deletion dialog shows archived groups as read-only and warns which active groups will be erased', async () => {
+  const dialog = await readFile(new URL('../src/components/DeleteAccountSection.tsx', import.meta.url), 'utf8');
+  assert.match(dialog, /const groupsToDelete = preview\?\.groups\.filter\(group => !group\.archived && !group\.admin\)/);
+  assert.ok(dialog.includes('se eliminará con todas sus partidas y clasificaciones'));
+  assert.ok(dialog.includes('Ningún miembro tiene Team o Premium para quedárselo.'));
+  assert.match(dialog, /group\.archived\s*\?\s*'archivado: se conserva solo para consulta\.'/);
 });

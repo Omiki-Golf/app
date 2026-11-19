@@ -6,7 +6,8 @@ const CONFIRMATION = 'ELIMINAR CUENTA';
 
 interface DeletionPreview {
   is_app_admin: boolean;
-  groups: Array<{ id: string; name: string; archived: boolean; members: number; admin: { user_id: string; nick: string } | null }>;
+  /** admin: quién heredaría el grupo (administrador o miembro con Team o Premium); will_delete: nadie puede heredarlo. */
+  groups: Array<{ id: string; name: string; archived: boolean; members: number; admin: { user_id: string; nick: string } | null; will_delete?: boolean }>;
 }
 
 // "Darse de baja" al final de Mis datos de registro: explica qué se borra y qué se conserva,
@@ -61,7 +62,8 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups, autoOpen = false
     // Solo al llegar desde el aviso de vencimiento.
   }, [autoOpen]);
 
-  const groupsWithoutAdmin = preview?.groups.filter(group => !group.admin && group.members > 0) ?? [];
+  // Grupos activos que nadie puede heredar: se borrarán al terminar la baja. Los archivados solo se consultan.
+  const groupsToDelete = preview?.groups.filter(group => !group.archived && !group.admin) ?? [];
 
   return (
     <section ref={sectionRef} className="mt-7 border-t border-line pt-6" aria-labelledby="delete-account-title">
@@ -103,18 +105,19 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups, autoOpen = false
                   <div className="space-y-2 rounded-xl border border-line bg-card-2 p-3 text-sm">
                     <p className="font-semibold text-ink">Grupos que has creado</p>
                     {preview.groups.map(group => (
-                      <p key={group.id} className="text-ink-2">
-                        <span className="font-semibold text-ink">{group.name}</span>{' · '}
-                        {group.admin
+                      <p key={group.id} className={group.archived ? 'text-ink-3' : 'text-ink-2'}>
+                        <span className={`font-semibold ${group.archived ? 'text-ink-3' : 'text-ink'}`}>{group.name}</span>{' · '}
+                        {group.archived
+                          ? 'archivado: se conserva solo para consulta.'
+                          : group.admin
                           ? <>pasará a tener como creador a <span className="font-semibold">{group.admin.nick}</span>. Avisaremos a todos los miembros.</>
-                          : group.members > 0
-                            ? <span className="text-red-600">no tiene administrador: se quedará sin creador.</span>
-                            : 'no tiene más miembros.'}
+                          : <span className="font-semibold text-red-600">se eliminará con todas sus partidas y clasificaciones{group.members > 0 ? '. Avisaremos a sus miembros.' : '.'}</span>}
                       </p>
                     ))}
-                    {groupsWithoutAdmin.length > 0 && (
-                      <div className="rounded-lg bg-amber-50 p-3 text-amber-900">
-                        <p>Antes de darte de baja, nombra a alguien administrador en Mis grupos → Jugadores y administradores. Así pasará a ser el creador del grupo. Si no lo haces, el grupo se quedará sin creador y avisaremos a sus miembros.</p>
+                    {groupsToDelete.length > 0 && (
+                      <div role="alert" className="rounded-lg bg-amber-50 p-3 text-amber-900">
+                        <p><span className="font-semibold">{groupsToDelete.length === 1 ? `${groupsToDelete[0].name} se eliminará` : `${groupsToDelete.length} grupos se eliminarán`} si terminas la baja.</span> Ningún miembro tiene Team o Premium para quedárselo. Se borrarán sus partidas, clasificaciones e historial, también para los demás jugadores, y no se puede deshacer.</p>
+                        <p className="mt-2">Para conservarlo, invita o nombra administrador a un jugador con Team o Premium antes de darte de baja.</p>
                         {onOpenGroups && <button type="button" onClick={() => { setOpen(false); onOpenGroups(); }} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover"><Users size={18} aria-hidden="true" />Ir a Mis grupos</button>}
                       </div>
                     )}
