@@ -134,7 +134,9 @@ test('server keeps Weekend groups outside the plan capacity and the home offers 
   assert.match(migration, /NEW\.weekend_mode_until:=v_weekend_until/);
   assert.match(migration, /UPDATE OF user_auth_id,archived_at,group_type/);
   assert.match(app, /createGroupKind=\{nextGroupKind\(/);
-  assert.match(home, /\{canCreateGroup && \(/);
+  // El botón de crear va en «Tus grupos» o, si toca un Weekend, en «Tus Weekends».
+  assert.match(home, /\{canCreateGroup && !weekend && createButton\}/);
+  assert.match(home, /\{canCreateGroup && weekend && createButton\}/);
   assert.match(members, /\$\{rosterCount\} de \$\{maxPlayers\}/);
 });
 

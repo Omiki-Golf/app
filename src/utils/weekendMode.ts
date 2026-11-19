@@ -35,6 +35,15 @@ export function weekendExpiryText(until?: string | null, now = Date.now()): stri
   return `${day} a las 23:59 h`;
 }
 
+/** Versión corta para etiquetas: «hoy», «mañana» o «23/11»; null si ya ha vencido o no hay fecha. */
+export function weekendExpiryShort(until?: string | null, now = Date.now()): string | null {
+  const days = weekendDaysLeft(until, now);
+  if (days === null) return null;
+  if (days === 0) return 'hoy';
+  if (days === 1) return 'mañana';
+  return new Date(Date.parse(until!)).toLocaleDateString('es-ES', { timeZone: MADRID, day: '2-digit', month: '2-digit' });
+}
+
 /** Último tramo de un Weekend de 3 meses: queda una semana o menos. */
 export const weekendLastWeek = (until?: string | null, weekendDays?: number | null, now = Date.now()) => {
   const days = weekendDaysLeft(until, now);

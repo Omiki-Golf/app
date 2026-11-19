@@ -13,23 +13,40 @@ test('home loads owned, administered and member groups as direct shortcuts', asy
   assert.match(source, /handleGroupJoined\(selectedGroup\)/);
 });
 
-test('home groups come in three blocks: created, administered and member groups in two columns', async () => {
+test('home groups come in three labelled blocks, sized by priority: created, administered and member', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
   assert.match(source, /const sections = homeGroupSections\(groupShortcuts\)/);
-  assert.match(source, /sections\.owned\.map/);
+  // Los Weekend creados por ti van aparte, en «Tus Weekends».
+  assert.match(source, /const ownedGroups = sections\.owned\.filter\(group => groupTier\(group\) !== 'weekend'\)/);
+  assert.match(source, /const ownedWeekends = sections\.owned\.filter\(group => groupTier\(group\) === 'weekend'\)/);
   assert.match(source, /sections\.admin\.map/);
-  // Una sola pastilla de miembro va a todo el ancho; si hay más, en dos columnas.
-  assert.match(source, /sections\.member\.length === 1 \? 'grid-cols-1' : 'grid-cols-2'/);
-  assert.match(source, /\$\{tone\.button\} \$\{tone\.border\} shadow-card/);
-  assert.match(source, /bg-card px-3 py-2\.5 rounded-xl[^`]*\$\{tone\.outlineButton\}/);
+  assert.match(source, /sections\.member\.map/);
+  for (const key of ['roundsLabel', 'groupsOwned', 'groupsAdmin', 'groupsWeekend', 'groupsMember']) assert.ok(source.includes(`t('home.${key}')`), key);
+  // Creados: a todo el ancho y más altos; administrados y de miembro: dos columnas, cada vez más pequeños.
+  assert.match(source, /owner: 'h-\[52px\][^']*text-base'/);
+  assert.match(source, /admin: 'h-11[^']*text-sm'/);
+  assert.match(source, /member: 'h-9[^']*text-\[13px\]'/);
+  // Partidas, administrados y de miembro van en dos columnas.
+  assert.equal(source.match(/<div className="grid grid-cols-2 gap-2">/g)?.length, 3);
+  // Rellenos para creados y administrados; solo contorno para miembro.
+  assert.match(source, /level === 'member' \? `bg-card \$\{tone\.outlineButton\}` : `\$\{tone\.button\} \$\{tone\.border\} shadow-card`/);
+  // Un grupo solo, o el último de un número impar, ocupa las dos columnas.
+  assert.match(source, /const isWide = \(index: number, total: number\) => total % 2 === 1 && index === total - 1/);
+  assert.match(source, /wide \? 'col-span-2' : ''/);
+});
+
+test('home weekend groups show a short expiry tag and the full notice only in their last week', async () => {
+  const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  assert.match(source, /weekendExpiryShort\(group\.weekend_mode_until\)/);
+  assert.match(source, /t\('home\.expires', \{ date: expires \}\)/);
+  assert.match(source, /\{weekendLastWeek\(group\.weekend_mode_until, group\.weekend_days\) && \(\s*<WeekendGroupNotice/);
 });
 
 test('home group shortcuts show two crowns for creator, one for admin and none for member', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
-  assert.match(source, /title="Creador" aria-label="Creador"><Crown[^\n]*<Crown/);
-  assert.match(source, /<Crown size=\{21\} fill="currentColor" className="shrink-0" aria-label="Administrador" \/>/);
-  const memberBlock = source.slice(source.indexOf('sections.member.map'), source.indexOf('</WriteButton>', source.indexOf('sections.member.map')));
-  assert.doesNotMatch(memberBlock, /<Crown/);
+  assert.match(source, /level === 'owner' && <span[^\n]*title="Creador" aria-label="Creador"><Crown[^\n]*<Crown/);
+  assert.match(source, /level === 'admin' && <Crown[^\n]*aria-label="Administrador" \/>/);
+  assert.doesNotMatch(source, /level === 'member' && <Crown/);
 });
 
 test('each home group block is sorted from oldest to newest by its own date', async () => {
@@ -71,7 +88,27 @@ test('admin_since is set when a member becomes admin and cleared when the role i
 
 test('home content starts with extra space below the top icon row', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
-  assert.match(source, /relative mb-8 flex min-h-11 items-center justify-between gap-3/);
+  assert.match(source, /relative mb-\[26px\] flex min-h-11 items-center justify-between gap-3/);
+});
+
+test('home blocks are headed cards in order: rounds, groups, admin, weekends, member', async () => {
+  const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  assert.match(source, /function HomeSection\(\{ title, children \}/);
+  assert.match(source, /<section className="rounded-2xl border border-line bg-card p-3 shadow-soft">/);
+  const order = ['roundsLabel', 'groupsOwned', 'groupsAdmin', 'groupsWeekend', 'groupsMember']
+    .map(key => source.indexOf(`<HomeSection title={t('home.${key}')}>`));
+  assert.ok(order.every(index => index > 0), 'cada bloque tiene su ficha');
+  assert.deepEqual([...order].sort((a, b) => a - b), order);
+});
+
+test('home rounds block: label and create/join side by side at the creator-group height; logos scaled together', async () => {
+  const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  assert.ok(source.includes("{t('home.roundsLabel')}"));
+  assert.ok(source.includes("{t('home.createGameShort')}") && source.includes("{t('home.joinGameShort')}"));
+  assert.equal(source.match(/flex h-\[52px\] min-w-0 items-center justify-center/g)?.length, 2);
+  // Logo superior 288 → 224 px; la «O» inferior se reduce en la misma proporción (112 → 87 px).
+  assert.match(source, /alt="OMIKI Golf"[^\n]*w-56/);
+  assert.match(source, /Omiki_O_VerdeAmarillo[^\n]*w-\[87px\]/);
 });
 
 test('home top icons share one size and vertical alignment', async () => {
@@ -80,7 +117,7 @@ test('home top icons share one size and vertical alignment', async () => {
   const language = await readFile(new URL('../src/components/LanguageSwitcher.tsx', import.meta.url), 'utf8');
   const reset = await readFile(new URL('../src/components/ResetExpressRounds.tsx', import.meta.url), 'utf8');
   const messages = await readFile(new URL('../src/components/GlobalMessagesButton.tsx', import.meta.url), 'utf8');
-  assert.match(home, /relative mb-8 flex min-h-11 items-center/);
+  assert.match(home, /relative mb-\[26px\] flex min-h-11 items-center/);
   assert.match(home, /inline-flex h-11 w-11 shrink-0 items-center justify-center/);
   for (const source of [theme, language, reset, messages]) assert.match(source, /h-11 w-11/);
   assert.match(theme, /<Sun size=\{21\}/);

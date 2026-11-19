@@ -6,7 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
+import { weekendExpiryShort, weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
 import { weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
 import { homeGroupSections } from '../utils/homeGroups';
 import { groupTier, tierColors } from '../utils/tierColors';
@@ -97,6 +97,52 @@ function WeekendGroupNotice({ group, conversion, onContractTeam, onConvert }: {
   </div>;
 }
 
+type ShortcutGroup = NonNullable<HomeScreenProps['groupShortcuts']>[number];
+type ShortcutLevel = 'owner' | 'admin' | 'member';
+
+/** Tamaño según la prioridad: los creados destacan más que los administrados, y estos más que los de miembro. */
+const shortcutSize: Record<ShortcutLevel, string> = {
+  owner: 'h-[52px] gap-3 px-4 rounded-2xl text-base',
+  admin: 'h-11 gap-2 px-2.5 rounded-xl text-sm',
+  member: 'h-9 gap-1.5 px-2.5 rounded-[10px] text-[13px]',
+};
+
+/** Acceso directo a un grupo en Home. Creados y administrados van rellenos del color del nivel; los de miembro, solo con contorno. */
+function GroupShortcut({ group, level, wide, expiresLabel, onOpen }: {
+  group: ShortcutGroup;
+  level: ShortcutLevel;
+  wide?: boolean;
+  expiresLabel?: string | null;
+  onOpen?: (groupId: string) => void;
+}) {
+  const tier = groupTier(group);
+  const tone = tierColors[tier];
+  const style = level === 'member' ? `bg-card ${tone.outlineButton}` : `${tone.button} ${tone.border} shadow-card`;
+  const crown = level === 'owner' ? 16 : 14;
+  return <WriteButton
+    onClick={() => onOpen?.(group.id)}
+    title={group.name}
+    className={`flex w-full min-w-0 items-center border-2 font-semibold transition-all active:scale-[0.98] ${shortcutSize[level]} ${style} ${wide ? 'col-span-2' : ''}`}
+  >
+    <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
+    <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
+    {expiresLabel && <span className="shrink-0 rounded-lg bg-white/90 px-2 py-0.5 text-[11px] font-medium text-slate-900">{expiresLabel}</span>}
+    {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
+    {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
+  </WriteButton>;
+}
+
+/** En los bloques de dos columnas, un grupo solo o el último de un número impar ocupa todo el ancho. */
+const isWide = (index: number, total: number) => total % 2 === 1 && index === total - 1;
+
+/** Ficha de Inicio con su encabezado (Partidas, Tus grupos, Administras, Tus Weekends, Eres miembro). */
+function HomeSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-2xl border border-line bg-card p-3 shadow-soft">
+    <h2 className="mb-2 ml-0.5 text-xs font-semibold text-ink-2">{title}</h2>
+    {children}
+  </section>;
+}
+
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   planType,
   isAuthenticated,
@@ -128,10 +174,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
   const weekend = weekendKindDays(createGroupKind);
   const sections = homeGroupSections(groupShortcuts);
+  // Los Weekend que has creado van en su propia ficha, «Tus Weekends».
+  const ownedGroups = sections.owned.filter(group => groupTier(group) !== 'weekend');
+  const ownedWeekends = sections.owned.filter(group => groupTier(group) === 'weekend');
   // Sin dato explícito se mantiene la regla anterior: Team/Premium sin grupo propio.
   const canCreateGroup = createGroupKind !== undefined
     ? createGroupKind !== null
     : isTeam && groupShortcuts.every(group => group.access !== 'owner');
+  // Botón para crear grupo: va en «Tus Weekends» si lo que toca crear es un Weekend; si no, en «Tus grupos».
+  const createButton = (
+    <WriteButton
+      onClick={onCreateTeam}
+      className={`w-full flex h-11 items-center justify-center gap-2 border-2 border-dashed bg-card px-4 rounded-xl transition-all font-semibold text-sm active:scale-[0.98] ${tierColors[weekend ? 'weekend' : createGroupKind === 'premium' ? 'premium' : 'team'].outlineButton}`}
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(createGroupKind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</span>
+    </WriteButton>
+  );
   const fallbackHcp18 = profile?.exact_handicap !== undefined && profile?.exact_handicap !== null
     ? Math.round(profile.exact_handicap)
     : 0;
@@ -149,7 +208,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
       <div className="max-w-md w-full">
         {/* Top bar */}
-        <div className="relative mb-8 flex min-h-11 items-center justify-between gap-3">
+        <div className="relative mb-[26px] flex min-h-11 items-center justify-between gap-3">
           <div className="flex h-11 items-center gap-2 max-[360px]:h-10 max-[360px]:gap-1">
             <button
               type="button"
@@ -206,103 +265,90 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {/* Logo */}
-        <div className="text-center mb-6 sm:mb-8">
-          <h1 className="mb-3">
-            <img src="/images/Omiki_VerdeAmarillo_Trans_Optimizada.png" alt="OMIKI Golf" width={804} height={313} fetchPriority="high" decoding="async" className="mx-auto h-auto w-72 max-w-full object-contain" />
+        <div className="text-center mb-5 sm:mb-6">
+          <h1 className="mb-2">
+            <img src="/images/Omiki_VerdeAmarillo_Trans_Optimizada.png" alt="OMIKI Golf" width={804} height={313} fetchPriority="high" decoding="async" className="mx-auto h-auto w-56 max-w-full object-contain" />
           </h1>
           <p className="text-ink-3">{t('home.tagline')}</p>
         </div>
 
         {renewal && <RenewalNoticeCard renewal={renewal} className="mb-4" />}
 
-        {/* Main buttons */}
+        {/* Inicio en fichas con encabezado, por este orden: Partidas, Tus grupos, Administras, Tus Weekends
+            y Eres miembro. Los grupos de cada ficha van del más antiguo al más reciente. */}
         <div className="space-y-3 mb-6">
-          <WriteButton
-            onClick={onQuickPlay}
-            className="w-full flex items-center justify-center gap-3 bg-accent text-on-accent px-6 py-4 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-lg shadow-card active:scale-[0.98]"
-          >
-            <Zap className="w-6 h-6" />
-            {t('home.createGame')}
-          </WriteButton>
+          <HomeSection title={t('home.roundsLabel')}>
+            <div className="grid grid-cols-2 gap-2">
+              <WriteButton
+                onClick={onQuickPlay}
+                title={t('home.createGame')}
+                aria-label={t('home.createGame')}
+                className="flex h-[52px] min-w-0 items-center justify-center gap-2 bg-accent text-on-accent px-3 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-base shadow-card active:scale-[0.98]"
+              >
+                <Zap className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{t('home.createGameShort')}</span>
+              </WriteButton>
 
-          <WriteButton
-            onClick={onJoinQuickPlay}
-            className="w-full flex items-center justify-center gap-3 bg-card text-accent-ink border-2 border-accent px-6 py-4 rounded-2xl hover:bg-accent-soft transition-all font-semibold text-lg active:scale-[0.98]"
-          >
-            <LogIn className="w-6 h-6" />
-            {t('home.joinGame')}
-          </WriteButton>
-
-
-          {/* Grupos en tres bloques: los creados (y el botón para crear otro), los que administras
-              y, en dos columnas (o a todo el ancho si solo hay uno), aquellos de los que eres miembro. Cada bloque, del más antiguo al más reciente. */}
-          {(sections.owned.length > 0 || canCreateGroup) && (
-            <div className="space-y-3 pt-2">
-              {sections.owned.map(group => {
-                const tier = groupTier(group);
-                const tone = tierColors[tier];
-                return <React.Fragment key={group.id}>
-                  <WriteButton
-                    onClick={() => onOpenGroup?.(group.id)}
-                    className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${tone.button} ${tone.border} shadow-card`}
-                  >
-                    <Users className="w-6 h-6" aria-hidden="true" />
-                    <span className="min-w-0 truncate">{group.name}</span>
-                    <span className="relative h-7 w-9 shrink-0" title="Creador" aria-label="Creador"><Crown size={20} fill="currentColor" className="absolute left-0 top-1" /><Crown size={20} fill="currentColor" className="absolute right-0 top-0" /></span>
-                  </WriteButton>
-                  {tier === 'weekend' && (
-                    <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
-                  )}
-                </React.Fragment>;
-              })}
-              {canCreateGroup && (
-                <WriteButton
-                  onClick={onCreateTeam}
-                  className={`w-full flex items-center justify-center gap-3 px-6 py-4 rounded-2xl transition-all font-semibold text-lg shadow-card active:scale-[0.98] ${tierColors[weekend ? 'weekend' : createGroupKind === 'premium' ? 'premium' : 'team'].button}`}
-                >
-                  <Plus className="w-6 h-6" aria-hidden="true" />
-                  <span className="truncate">{weekend ? t(weekend === 90 ? 'home.createWeekend90' : 'home.createWeekend7') : t(createGroupKind === 'premium' ? 'home.createPremium' : 'home.createTeam')}</span>
-                </WriteButton>
-              )}
+              <WriteButton
+                onClick={onJoinQuickPlay}
+                title={t('home.joinGame')}
+                aria-label={t('home.joinGame')}
+                className="flex h-[52px] min-w-0 items-center justify-center gap-2 bg-card text-accent-ink border-2 border-accent px-3 rounded-2xl hover:bg-accent-soft transition-all font-semibold text-base active:scale-[0.98]"
+              >
+                <LogIn className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{t('home.joinGameShort')}</span>
+              </WriteButton>
             </div>
+          </HomeSection>
+
+          {(ownedGroups.length > 0 || (canCreateGroup && !weekend)) && (
+            <HomeSection title={t('home.groupsOwned')}>
+              <div className="space-y-2">
+                {ownedGroups.map(group => <GroupShortcut key={group.id} group={group} level="owner" onOpen={onOpenGroup} />)}
+                {canCreateGroup && !weekend && createButton}
+              </div>
+            </HomeSection>
           )}
 
           {sections.admin.length > 0 && (
-            <div className="space-y-3 pt-2">
-              {sections.admin.map(group => {
-                const tone = tierColors[groupTier(group)];
-                return <WriteButton
-                  key={group.id}
-                  onClick={() => onOpenGroup?.(group.id)}
-                  className={`w-full flex items-center justify-center gap-3 border-2 px-6 py-4 rounded-2xl transition-all font-semibold text-lg active:scale-[0.98] ${tone.button} ${tone.border} shadow-card`}
-                >
-                  <Users className="w-6 h-6" aria-hidden="true" />
-                  <span className="min-w-0 truncate">{group.name}</span>
-                  <Crown size={21} fill="currentColor" className="shrink-0" aria-label="Administrador" />
-                </WriteButton>;
-              })}
-            </div>
+            <HomeSection title={t('home.groupsAdmin')}>
+              <div className="grid grid-cols-2 gap-2">
+                {sections.admin.map((group, index) => (
+                  <GroupShortcut key={group.id} group={group} level="admin" wide={isWide(index, sections.admin.length)} onOpen={onOpenGroup} />
+                ))}
+              </div>
+            </HomeSection>
+          )}
+
+          {(ownedWeekends.length > 0 || (canCreateGroup && weekend)) && (
+            <HomeSection title={t('home.groupsWeekend')}>
+              <div className="space-y-2">
+                {ownedWeekends.map(group => {
+                  const expires = weekendExpiryShort(group.weekend_mode_until);
+                  return <React.Fragment key={group.id}>
+                    <GroupShortcut group={group} level="owner" onOpen={onOpenGroup} expiresLabel={expires && t('home.expires', { date: expires })} />
+                    {weekendLastWeek(group.weekend_mode_until, group.weekend_days) && (
+                      <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
+                    )}
+                  </React.Fragment>;
+                })}
+                {canCreateGroup && weekend && createButton}
+              </div>
+            </HomeSection>
           )}
 
           {sections.member.length > 0 && (
-            <div className={`grid gap-2 pt-2 ${sections.member.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-              {sections.member.map(group => {
-                const tone = tierColors[groupTier(group)];
-                return <WriteButton
-                  key={group.id}
-                  onClick={() => onOpenGroup?.(group.id)}
-                  title={group.name}
-                  className={`flex min-w-0 items-center justify-center gap-2 border-2 bg-card px-3 py-2.5 rounded-xl transition-all font-semibold text-sm active:scale-[0.98] ${tone.outlineButton}`}
-                >
-                  <Users className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 truncate">{group.name}</span>
-                </WriteButton>;
-              })}
-            </div>
+            <HomeSection title={t('home.groupsMember')}>
+              <div className="grid grid-cols-2 gap-2">
+                {sections.member.map((group, index) => (
+                  <GroupShortcut key={group.id} group={group} level="member" wide={isWide(index, sections.member.length)} onOpen={onOpenGroup} />
+                ))}
+              </div>
+            </HomeSection>
           )}
         </div>
 
-        <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-28 object-contain" />
+        <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-[87px] object-contain" />
 
         <div className="hidden mt-6 flex-wrap items-center justify-center gap-3" aria-hidden="true">
           <WriteButton
