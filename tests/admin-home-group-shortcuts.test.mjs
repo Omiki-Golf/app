@@ -26,8 +26,8 @@ test('home groups come in three labelled blocks, sized by priority: created, adm
   assert.match(source, /owner: 'h-\[52px\][^']*text-base'/);
   assert.match(source, /admin: 'h-11[^']*text-sm'/);
   assert.match(source, /member: 'h-9[^']*text-\[13px\]'/);
-  // Partidas, administrados y de miembro van en dos columnas.
-  assert.equal(source.match(/<div className="grid grid-cols-2 gap-2">/g)?.length, 3);
+  // Administrados y de miembro van en dos columnas (Partidas, según haya grupos o no).
+  assert.equal(source.match(/<div className="grid grid-cols-2 gap-2">/g)?.length, 2);
   // Rellenos para creados y administrados; solo contorno para miembro.
   assert.match(source, /level === 'member' \? `bg-card \$\{tone\.outlineButton\}` : `\$\{tone\.button\} \$\{tone\.border\} shadow-card`/);
   // Un grupo solo, o el último de un número impar, ocupa las dos columnas.
@@ -104,7 +104,7 @@ test('home blocks are headed cards in order: rounds, groups, admin, weekends, me
 test('home rounds block: label and create/join side by side at the creator-group height; logos scaled together', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
   assert.ok(source.includes("{t('home.roundsLabel')}"));
-  assert.ok(source.includes("{t('home.createGameShort')}") && source.includes("{t('home.joinGameShort')}"));
+  assert.ok(source.includes("t('home.createGameShort')") && source.includes("t('home.joinGameShort')"));
   assert.equal(source.match(/flex h-\[52px\] min-w-0 items-center justify-center/g)?.length, 2);
   // Logo superior 288 → 224 px; la «O» inferior se reduce en la misma proporción (112 → 87 px).
   assert.match(source, /alt="OMIKI Golf"[^\n]*w-56/);
@@ -135,4 +135,33 @@ test('adding a player does not flash a light handicap input in dark mode', async
   const source = await readFile(new URL('../src/components/PlayerSetup.tsx', import.meta.url), 'utf8');
   assert.match(source, /className="w-full bg-card px-4 py-3 text-ink/);
   assert.doesNotMatch(source, /disabled:bg-gray-100/);
+});
+
+test('without any group card, rounds use two wide rows with full labels and the O logo sits in the free space', async () => {
+  const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
+  assert.match(source, /const hasGroupCards = groupShortcuts\.length > 0 \|\| canCreateGroup/);
+  assert.match(source, /grid gap-2 \$\{hasGroupCards \? 'grid-cols-2' : 'grid-cols-1'\}/);
+  assert.ok(source.includes("{hasGroupCards ? t('home.createGameShort') : t('home.createGame')}"));
+  assert.ok(source.includes("{hasGroupCards ? t('home.joinGameShort') : t('home.joinGame')}"));
+  // La «O» ocupa el hueco que sobra (flex-1) dentro de una columna que llena la pantalla, sin añadir altura.
+  assert.match(source, /<div className="max-w-md w-full flex flex-col">/);
+  assert.match(source, /<div className="flex flex-1 items-center justify-center">\s*<img src="\/images\/Omiki_O_VerdeAmarillo/);
+});
+
+test('Mis grupos uses the home order: created, administered, own Weekends, member; oldest first; archived last', async () => {
+  const ts = (await import('typescript')).default;
+  const source = await readFile(new URL('../src/utils/homeGroups.ts', import.meta.url), 'utf8');
+  const module = { exports: {} };
+  Function('module', 'exports', ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(module, module.exports);
+  const { homeGroupOrder } = module.exports;
+  const ordered = homeGroupOrder([
+    { name: 'Miembro', access: 'member', since: '2026-11-01T10:00:00Z' },
+    { name: 'TEAM 3ero', access: 'owner', since: '2026-11-19T12:00:00Z' },
+    { name: 'Archivado', access: 'owner', since: '2026-10-01T10:00:00Z', archived_at: '2026-11-10T10:00:00Z' },
+    { name: 'Weekend', access: 'owner', group_type: 'weekend', since: '2026-11-02T10:00:00Z' },
+    { name: 'TEAM 1ERO', access: 'owner', since: '2026-11-19T10:00:00Z' },
+    { name: 'Admin', access: 'admin', since: '2026-11-05T10:00:00Z' },
+    { name: 'TEAM 2do', access: 'owner', since: '2026-11-19T11:00:00Z' },
+  ]);
+  assert.deepEqual(ordered.map(group => group.name), ['TEAM 1ERO', 'TEAM 2do', 'TEAM 3ero', 'Admin', 'Weekend', 'Miembro', 'Archivado']);
 });

@@ -12,6 +12,7 @@ import { CurrencySelector, useDisplayCurrency } from './CurrencySelector';
 import { formatDisplayPrice } from '../utils/currency';
 import { useSubscription } from '../hooks/useSubscription';
 import { MAX_ADDITIONAL_GROUPS } from '../utils/groupCapacity';
+import { additionalGroupDate, loadAdditionalGroupSlots, setAdditionalGroupRenewal, type AdditionalGroupSlot } from '../services/additionalGroups';
 
 interface ProShopProps {
   groupId: string | null;
@@ -90,6 +91,10 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
   const [newAddons, setNewAddons] = useState<Set<string>>(new Set());
   // Grupos Adicionales ya comprados por la cuenta (máximo 2) y si se compra otro ahora.
   const [additionalOwned, setAdditionalOwned] = useState(0);
+  // Grupos Adicionales vigentes: cada uno con su grupo, su vencimiento anual y si se renueva.
+  const [additionalSlots, setAdditionalSlots] = useState<AdditionalGroupSlot[]>([]);
+  const [renewalBusy, setRenewalBusy] = useState<string | null>(null);
+  const [renewalError, setRenewalError] = useState('');
   const [newAdditional, setNewAdditional] = useState(false);
   const [reload, setReload] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -111,10 +116,17 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
   // Grupos Adicionales de la cuenta: se anclan a sus grupos Team/Premium.
   useEffect(() => {
     const ids = planGroups.map(group => group.id);
-    if (ids.length === 0) { setAdditionalOwned(0); return; }
     let cancelled = false;
-    void supabase.from('pro_shop_purchases').select('id').in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed')
-      .then(({ data, error }) => { if (!cancelled && !error) setAdditionalOwned(Math.min(MAX_ADDITIONAL_GROUPS, (data || []).length)); });
+    void loadAdditionalGroupSlots(userId)
+      .then(slots => { if (!cancelled) { setAdditionalSlots(slots); setAdditionalOwned(Math.min(MAX_ADDITIONAL_GROUPS, slots.length)); } })
+      .catch(() => {
+        // Sin la tabla de Grupos Adicionales anuales: se cuentan las compras como antes.
+        if (cancelled) return;
+        setAdditionalSlots([]);
+        if (ids.length === 0) { setAdditionalOwned(0); return; }
+        void supabase.from('pro_shop_purchases').select('id').in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed')
+          .then(({ data, error }) => { if (!cancelled && !error) setAdditionalOwned(Math.min(MAX_ADDITIONAL_GROUPS, (data || []).length)); });
+      });
     return () => { cancelled = true; };
     // planGroups se recalcula en cada render; basta con los grupos cargados.
   }, [ownedGroups, reload]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -261,7 +273,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                     first={index === 0}
                     checked={isAdditional ? newAdditional : ownedAddons.has(item.id) || newAddons.has(item.id)}
                     purchased={!isAdditional && ownedAddons.has(item.id)}
-                    price={`${money(item.price)} / año`}
+                    price={`${money(item.price)}${item.id === 'ampliacion-plantilla' ? '' : ' / año'}`}
                     vatLabel={t('plans.vatShort')}
                     note={isAdditional ? additionalNote : groupAddonsLocked && !ownedAddons.has(item.id) ? (isTeamTrial ? 'Disponible con Team completo' : 'Requiere un plan Team o Premium') : item.note}
                     onToggle={() => {
@@ -272,10 +284,40 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                   />;
                 })}
               </div>
+              {additionalSlots.length > 0 && (
+                <div className="rounded-2xl border border-line bg-card p-3 shadow-card">
+                  <p className="text-sm font-semibold text-ink">Tus Grupos Adicionales</p>
+                  <p className="text-xs text-ink-3">Cada uno se renueva cada año en su fecha. Si no lo renuevas, su grupo se archiva ese día y queda solo para consulta.</p>
+                  <ul className="mt-2 space-y-2">
+                    {additionalSlots.map(slot => {
+                      const name = ownedGroups.find(group => group.id === slot.group_id)?.name;
+                      const date = additionalGroupDate(slot.expires_at);
+                      return <li key={slot.id} className="flex items-center justify-between gap-2 rounded-xl border border-line bg-card-2 px-3 py-2">
+                        <div className="min-w-0 text-sm">
+                          <p className="truncate font-semibold text-ink">{name ?? 'Hueco libre'}</p>
+                          <p className={`text-xs ${slot.renew ? 'text-ink-3' : 'text-red-600'}`}>{slot.renew ? `Se renueva el ${date}` : name ? `No se renovará: se archivará el ${date}` : `No se renovará: vence el ${date}`}</p>
+                        </div>
+                        <WriteButton
+                          type="button"
+                          disabled={renewalBusy === slot.id}
+                          onClick={async () => {
+                            setRenewalBusy(slot.id); setRenewalError('');
+                            try { await setAdditionalGroupRenewal(slot.id, !slot.renew); setReload(value => value + 1); }
+                            catch (cause) { setRenewalError(cause instanceof Error && cause.message ? cause.message : 'No se ha podido guardar.'); }
+                            finally { setRenewalBusy(null); }
+                          }}
+                          className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold ${slot.renew ? 'border border-red-300 text-red-600' : 'bg-accent text-on-accent'}`}
+                        >{slot.renew ? 'No renovar' : 'Renovar'}</WriteButton>
+                      </li>;
+                    })}
+                  </ul>
+                  {renewalError && <p role="alert" className="mt-2 text-xs text-red-600">{renewalError}</p>}
+                </div>
+              )}
               {showTeamUpgrade && (
                 <div role="status" className="rounded-2xl border border-accent bg-accent-soft p-4 text-center">
                   <p className="text-sm font-semibold text-ink">Estás en la prueba Team</p>
-                  <p className="mt-1 text-xs text-ink-2">Pasa a Team completo para contratar Grupos Adicionales, ampliar la plantilla y la Temporada Simultánea. Los títulos ya puedes contratarlos.</p>
+                  <p className="mt-1 text-xs text-ink-2">Pasa a Team completo para contratar Grupos Adicionales, Ampliar Plantilla y la Temporada Simultánea. Los títulos ya puedes contratarlos.</p>
                   {onUpgradeTeam && <button type="button" onClick={onUpgradeTeam} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover">Pasar a Team completo</button>}
                 </div>
               )}
@@ -288,7 +330,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
                   {hasRequest ? (
                     <>
                       {newTitleItems.length > 0 && <p className="text-ink"><span className="font-semibold">{newTitleItems.length} {newTitleItems.length === 1 ? 'título' : 'títulos'}</span> · {money(newTitlesPrice)} {t('plans.vatIncluded')}</p>}
-                      {newAddonItems.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {money(item.price)} / año {t('plans.vatIncluded')}</p>)}
+                      {newAddonItems.map(item => <p key={item.id} className="text-ink"><span className="font-semibold">{item.name}</span> · {money(item.price)}{item.id === 'ampliacion-plantilla' ? '' : ' / año'} {t('plans.vatIncluded')}</p>)}
                     </>
                   ) : (
                     <p className="text-ink-3">"No paso de Rojas" va incluido. Marca lo que quieras contratar para este grupo.</p>

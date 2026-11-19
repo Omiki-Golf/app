@@ -11,6 +11,7 @@ import { weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
 import { homeGroupSections } from '../utils/homeGroups';
 import { groupTier, tierColors } from '../utils/tierColors';
 import { RenewalNoticeCard, type RenewalNoticeAction } from './RenewalNoticeCard';
+import { AdditionalGroupRenewalCard, type AdditionalGroupRenewal } from './AdditionalGroupRenewalCard';
 
 
 interface HomeScreenProps {
@@ -42,6 +43,10 @@ interface HomeScreenProps {
   onConvertWeekend?: (groupId: string) => Promise<void>;
   /** Aviso de vencimiento de la suscripción (15 días antes en anuales, 3 en mensuales). */
   renewal?: RenewalNoticeAction | null;
+  /** Grupos Adicionales que vencen en 15 días o menos (cada uno con su fecha). */
+  additionalRenewals?: AdditionalGroupRenewal[];
+  /** «Renovar» o «No renovar» un Grupo Adicional. */
+  onSetAdditionalRenewal?: (slotId: string, renew: boolean) => Promise<void>;
 }
 
 /**
@@ -167,6 +172,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   weekendConversion = 'not-team',
   onConvertWeekend,
   renewal,
+  additionalRenewals = [],
+  onSetAdditionalRenewal,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
@@ -182,6 +189,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     ? createGroupKind !== null
     : isTeam && groupShortcuts.every(group => group.access !== 'owner');
   // Botón para crear grupo: va en «Tus Weekends» si lo que toca crear es un Weekend; si no, en «Tus grupos».
+  // Sin ninguna ficha de grupos (ni grupos ni botón de crear), Partidas usa dos botones anchos, uno en cada fila.
+  const hasGroupCards = groupShortcuts.length > 0 || canCreateGroup;
   const createButton = (
     <WriteButton
       onClick={onCreateTeam}
@@ -206,7 +215,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   return (
     <div className="min-h-screen bg-app flex justify-center px-4 py-4 sm:py-8 transition-colors">
-      <div className="max-w-md w-full">
+      <div className="max-w-md w-full flex flex-col">
         {/* Top bar */}
         <div className="relative mb-[26px] flex min-h-11 items-center justify-between gap-3">
           <div className="flex h-11 items-center gap-2 max-[360px]:h-10 max-[360px]:gap-1">
@@ -273,12 +282,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
         {renewal && <RenewalNoticeCard renewal={renewal} className="mb-4" />}
+        {onSetAdditionalRenewal && additionalRenewals.map(item => (
+          <AdditionalGroupRenewalCard key={`${item.id}:${item.expires_at}:${item.renew}`} item={item} onSetRenewal={onSetAdditionalRenewal} className="mb-4" />
+        ))}
 
         {/* Inicio en fichas con encabezado, por este orden: Partidas, Tus grupos, Administras, Tus Weekends
             y Eres miembro. Los grupos de cada ficha van del más antiguo al más reciente. */}
         <div className="space-y-3 mb-6">
           <HomeSection title={t('home.roundsLabel')}>
-            <div className="grid grid-cols-2 gap-2">
+            <div className={`grid gap-2 ${hasGroupCards ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <WriteButton
                 onClick={onQuickPlay}
                 title={t('home.createGame')}
@@ -286,7 +298,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 className="flex h-[52px] min-w-0 items-center justify-center gap-2 bg-accent text-on-accent px-3 rounded-2xl hover:bg-accent-hover transition-all font-semibold text-base shadow-card active:scale-[0.98]"
               >
                 <Zap className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{t('home.createGameShort')}</span>
+                <span className="truncate">{hasGroupCards ? t('home.createGameShort') : t('home.createGame')}</span>
               </WriteButton>
 
               <WriteButton
@@ -296,7 +308,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 className="flex h-[52px] min-w-0 items-center justify-center gap-2 bg-card text-accent-ink border-2 border-accent px-3 rounded-2xl hover:bg-accent-soft transition-all font-semibold text-base active:scale-[0.98]"
               >
                 <LogIn className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{t('home.joinGameShort')}</span>
+                <span className="truncate">{hasGroupCards ? t('home.joinGameShort') : t('home.joinGame')}</span>
               </WriteButton>
             </div>
           </HomeSection>
@@ -348,7 +360,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           )}
         </div>
 
-        <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-[87px] object-contain" />
+        {/* La «O» se centra en el hueco libre bajo las fichas: con poco contenido baja, y nunca añade scroll. */}
+        <div className="flex flex-1 items-center justify-center">
+          <img src="/images/Omiki_O_VerdeAmarillo_Trans_Optimizada.png" alt="" aria-hidden="true" width={280} height={342} loading="lazy" decoding="async" className="mx-auto h-auto w-[87px] object-contain" />
+        </div>
 
         <div className="hidden mt-6 flex-wrap items-center justify-center gap-3" aria-hidden="true">
           <WriteButton

@@ -43,6 +43,7 @@ import { ProShop } from './components/ProShop';
 import { useSubscription } from './hooks/useSubscription';
 import { useLatestPlayingHandicap } from './hooks/useLatestPlayingHandicap';
 import { userService } from './services/userService';
+import { additionalGroupNotices, loadAdditionalGroupSlots, setAdditionalGroupRenewal, type AdditionalGroupSlot } from './services/additionalGroups';
 import ShareModal from './components/ShareModal';
 import { EmailConfirmedScreen } from './components/EmailConfirmedScreen';
 import type { User } from '@supabase/supabase-js';
@@ -81,6 +82,8 @@ function App() {
   const [isGroupCreator, setIsGroupCreator] = useState(false);
   const [ownedTeam, setOwnedTeam] = useState<Group | null>(null);
   const [ownedExtraGroups, setOwnedExtraGroups] = useState(0);
+  // Grupos Adicionales vigentes (huecos anuales ligados a su grupo), para sus avisos de renovación.
+  const [additionalSlots, setAdditionalSlots] = useState<AdditionalGroupSlot[]>([]);
   // since: fecha para ordenar en Inicio (creación, nombramiento como administrador o aceptación).
   const [homeGroups, setHomeGroups] = useState<Array<{ group: Group; access: 'owner' | 'admin' | 'member'; since?: string | null }>>([]);
   // Pro-Shop: el grupo abierto si soy su creador; si no, mi primer grupo creado.
@@ -618,6 +621,8 @@ function App() {
     const loadHomeGroups = async () => {
       // Los grupos Weekend vencidos se archivan antes de mostrarlos (el cron lo hace cada 5 min).
       await supabase.rpc('archive_expired_weekend_groups');
+      // Renueva o cierra los Grupos Adicionales vencidos y archiva los grupos de un Team vencido.
+      await supabase.rpc('process_additional_groups');
       const [owned, memberships] = await Promise.all([
         supabase.from('groups').select('*').eq('user_auth_id', user.id).is('archived_at', null),
         supabase.from('group_members').select('group_id, role, joined_at, admin_since').eq('user_id', user.id),
@@ -634,13 +639,21 @@ function App() {
         if (joined.error) throw joined.error;
         joinedGroups = (joined.data || []) as Group[];
       }
+      // Huecos de Grupo Adicional vigentes. Si la tabla aún no existe, se cuentan las compras como antes.
+      let slots: AdditionalGroupSlot[] = [];
       let extraGroups = 0;
-      if (ownedIds.size) {
-        const extras = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', [...ownedIds]).eq('product_type', 'grupo-adicional').eq('status', 'completed');
-        extraGroups = extras.count || 0;
+      try {
+        slots = await loadAdditionalGroupSlots(user.id);
+        extraGroups = slots.length;
+      } catch {
+        if (ownedIds.size) {
+          const extras = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', [...ownedIds]).eq('product_type', 'grupo-adicional').eq('status', 'completed');
+          extraGroups = extras.count || 0;
+        }
       }
       if (!active) return;
       setOwnedExtraGroups(extraGroups);
+      setAdditionalSlots(slots);
       setOwnedTeam(ownedGroups[0] ?? null);
       setHomeGroups([
         ...ownedGroups.map(group => ({ group, access: 'owner' as const, since: group.created_at })),
@@ -1527,6 +1540,14 @@ function App() {
               setReturnToProfile(false); setPlansContext('team'); setCurrentView('plans');
             }}
             renewal={renewal}
+            additionalRenewals={additionalGroupNotices(additionalSlots).map(slot => ({
+              ...slot,
+              groupName: homeGroups.find(item => item.group.id === slot.group_id)?.group.name ?? null,
+            }))}
+            onSetAdditionalRenewal={async (slotId, renew) => {
+              await setAdditionalGroupRenewal(slotId, renew);
+              setHomeGroupsVersion(version => version + 1);
+            }}
             onConvertWeekend={async groupId => {
               const { error } = await supabase.rpc('convert_weekend_group_to_team', { p_group: groupId });
               if (error) throw new Error(error.message || 'No se ha podido pasar el grupo a Team.');

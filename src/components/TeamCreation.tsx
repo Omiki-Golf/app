@@ -3,6 +3,7 @@ import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
 import { Info, Search, UserPlus, Check, X, Users} from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { loadAdditionalGroupSlots } from '../services/additionalGroups';
 import { userService } from '../services/userService';
 import { UserProfile } from '../types';
 import { getErrorMessage } from '../utils/errorMessage';
@@ -112,10 +113,15 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
     void (async () => {
       const { data: groups } = await supabase.from('groups').select('id, name, group_type, weekend_mode_until, weekend_days, premium_branding').eq('user_auth_id', userId).is('archived_at', null).order('created_at', { ascending: true });
       const ids = (groups || []).map(group => group.id);
+      // Grupos Adicionales vigentes. Si la tabla aún no existe, se cuentan las compras como antes.
       let extraCapacity = 0;
-      if (ids.length) {
-        const { count } = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed');
-        extraCapacity = count || 0;
+      try {
+        extraCapacity = (await loadAdditionalGroupSlots(userId)).length;
+      } catch {
+        if (ids.length) {
+          const { count } = await supabase.from('pro_shop_purchases').select('id', { count: 'exact', head: true }).in('group_id', ids).eq('product_type', 'grupo-adicional').eq('status', 'completed');
+          extraCapacity = count || 0;
+        }
       }
       if (!active) return;
       const next = nextGroupKind({ ownedGroups: groups || [], extraGroups: extraCapacity, weekend7Until, weekend90Until, hasTeamPlan, hasPremiumPlan });
