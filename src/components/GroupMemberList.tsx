@@ -16,7 +16,7 @@ const handicap9 = (handicap18: number) => {
 
 const middleEllipsis = (value: string) => value.length <= 10 ? value : `${value.slice(0, 4)}…${value.slice(-5)}`;
 
-export function GroupMemberList({ groupId, ownerId, archived = false, collapsible = false, onChanged }: { groupId: string; ownerId?: string; archived?: boolean; collapsible?: boolean; onChanged?: () => void }) {
+export function GroupMemberList({ groupId, ownerId: ownerIdProp, archived = false, collapsible = false, onChanged }: { groupId: string; ownerId?: string; archived?: boolean; collapsible?: boolean; onChanged?: () => void }) {
   const { user } = useAuth();
   const userId = user?.id;
   const identity = `${userId ?? ''}:${groupId}`;
@@ -33,6 +33,8 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
   const [refresh, setRefresh] = useState(0);
   // Plantilla del grupo: 20 jugadores, o 32 con la ampliación del Pro-Shop.
   const [maxPlayers, setMaxPlayers] = useState<number | null>(null);
+  // Creador leído del propio grupo, para las pantallas que no lo pasan (por ejemplo, Clasificación y jugadores).
+  const [fetchedOwner, setFetchedOwner] = useState<{ groupId: string; ownerId: string | null } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [searchName, setSearchName] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
@@ -50,13 +52,14 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
           userService.getGroupMembers(groupId),
           userService.getGroupInvitationStatuses(groupId),
           golfService.getAllPlayers(groupId).catch(() => []),
-          supabase.from('groups').select('max_players').eq('id', groupId).maybeSingle(),
+          supabase.from('groups').select('max_players, user_auth_id, created_by').eq('id', groupId).maybeSingle(),
         ]);
         const guestPlayerIds = new Set(gamePlayers.filter(player => player.is_guest).map(player => player.id));
         const members = rawMembers.filter(member => member.user_id || !member.player_id || !guestPlayerIds.has(member.player_id));
         if (active) {
           setState({ identity, members });
           setMaxPlayers(capacity.data?.max_players ?? 20);
+          setFetchedOwner({ groupId, ownerId: capacity.data?.user_auth_id || capacity.data?.created_by || null });
           setInvitationStatuses(Object.fromEntries(invitations.map(invitation => [invitation.userId, invitation.status])));
           setInvitedProfiles(invitations.filter(invitation => invitation.profile).map(invitation => ({ profile: invitation.profile!, status: invitation.status })));
           setLoadError('');
@@ -90,6 +93,8 @@ export function GroupMemberList({ groupId, ownerId, archived = false, collapsibl
   }, [searchName, userId]);
 
   const members = state?.identity === identity ? state.members : null;
+  // Sin creador recibido se usa el del grupo: así el creador sale como «Creador» (dos coronas) y no como «Admin».
+  const ownerId = ownerIdProp ?? (fetchedOwner?.groupId === groupId ? fetchedOwner.ownerId ?? undefined : undefined);
   const isOwner = !!userId && userId === ownerId;
   const canManage = members?.some(member => member.can_manage) ?? false;
   const delegatedAdminExists = members?.some(member => member.user_id !== ownerId && member.role === 'admin') ?? false;

@@ -35,3 +35,17 @@ test('member cards show only nick, role and both handicaps without technical det
   assert.doesNotMatch(members, /UUID de cuenta/);
   assert.doesNotMatch(members, /profile\?\.display_name/);
 });
+
+test('member list finds the group creator itself when the screen does not pass it, so the creator never shows as Admin', () => {
+  // Clasificación y jugadores (GamePoints) no pasa ownerId: la lista lo lee del grupo.
+  assert.match(members, /select\('max_players, user_auth_id, created_by'\)/);
+  assert.match(members, /setFetchedOwner\(\{ groupId, ownerId: capacity\.data\?\.user_auth_id \|\| capacity\.data\?\.created_by \|\| null \}\)/);
+  assert.match(members, /const ownerId = ownerIdProp \?\? \(fetchedOwner\?\.groupId === groupId/);
+  assert.match(members, /member\.user_id === ownerId \? <span/);
+});
+
+test('rankings card says it shows every day the group completed rounds, not only today', async () => {
+  const setup = await readFile(new URL('../src/components/RoundSetup.tsx', import.meta.url), 'utf8');
+  assert.match(setup, /Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus handicaps\./);
+  assert.doesNotMatch(setup, /completadas en el dia/);
+});

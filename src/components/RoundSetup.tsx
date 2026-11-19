@@ -630,7 +630,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
           >
             <h2 className="text-2xl font-bold text-blue-900 mb-4">{t('roundSetup.points')}</h2>
             <p className="text-ink-2 mb-6">
-              Consulta las clasificaciones de partidas completadas en el dia, los jugadores registrados y sus handicaps.
+              Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus handicaps.
             </p>
             <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
               {t('roundSetup.viewPoints')}
