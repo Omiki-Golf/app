@@ -71,6 +71,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const { t } = useTranslation();
   const isExpress = planType === 'express';
   const isArchivedGroup = Boolean(currentGroup?.archived_at);
+  // Clasificación, cervezas y hándicap del grupo se calculan con Stableford; las rápidas admiten todas.
+  const groupStablefordOnly = Boolean(currentGroup);
   const handleGameModeClick = (mode: GameMode) => {
     if (isExpress && mode !== 'stableford') {
       if (onShowPlans) onShowPlans('express-modes');
@@ -147,11 +149,11 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
   // La modalidad se recupera cuando se conoce el plan: Express solo permite Stableford.
   useEffect(() => {
-    if (!draftReady || draftModeApplied.current || isExpress) return;
+    if (!draftReady || draftModeApplied.current || isExpress || groupStablefordOnly) return;
     draftModeApplied.current = true;
     const mode = readDraft(currentDraftKey).gameMode;
     if (mode && GAME_MODES.includes(mode)) setGameMode(mode);
-  }, [draftReady, isExpress, currentDraftKey]);
+  }, [draftReady, isExpress, groupStablefordOnly, currentDraftKey]);
 
   useEffect(() => {
     if (!draftReady || !selectedCourse) return;
@@ -296,7 +298,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         useSlope,
         numHoles === 9 ? (selectedCourseHoleCount === 18 ? holesRange : '1-9') : undefined,
         undefined,
-        gameMode,
+        groupStablefordOnly ? 'stableford' : gameMode,
         currentGroup?.id ?? null
       );
 
@@ -472,6 +474,15 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                   <label className="block text-sm font-semibold text-ink-2 mb-3">
                     {t('roundSetup.gameMode')}
                   </label>
+                  {groupStablefordOnly ? (
+                    <>
+                      <div className="py-3 px-4 rounded-lg font-bold text-sm text-center bg-accent text-on-accent shadow-card">
+                        Stableford
+                      </div>
+                      <p className="text-xs text-ink-3 mt-2">{t('roundSetup.groupStablefordOnly')}</p>
+                    </>
+                  ) : (
+                  <>
                   <div className="grid grid-cols-2 gap-3">
                     <button
                       onClick={() => handleGameModeClick('stableford')}
@@ -525,6 +536,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                   )}
                   {gameMode === 'parejas' && (
                     <p className="text-xs text-ink-3 mt-2">{t('roundSetup.pairsHelp')}</p>
+                  )}
+                  </>
                   )}
                 </div>
 

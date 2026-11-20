@@ -7,7 +7,8 @@ export const notifyGamificationUpdated = (groupId: string) => {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(GAMIFICATION_UPDATED_EVENT, { detail: { groupId } }));
 };
 
-export type HandicapVariationMode = 'mitad' | 'primero_ultimo';
+import { normalizeHandicapVariationMode, type HandicapVariationMode } from '../utils/handicapVariation';
+export type { HandicapVariationMode };
 
 export interface GroupSettings {
   min_rounds_for_awards: number;
@@ -28,7 +29,7 @@ const getLocalSettings = (groupId: string): GroupSettings | null => {
         min_rounds_for_awards: typeof parsed.min_rounds_for_awards === 'number' && parsed.min_rounds_for_awards >= 0
           ? Math.floor(parsed.min_rounds_for_awards)
           : DEFAULT_GROUP_SETTINGS.min_rounds_for_awards,
-        handicap_variation_mode: parsed.handicap_variation_mode === 'primero_ultimo' ? 'primero_ultimo' : 'mitad',
+        handicap_variation_mode: normalizeHandicapVariationMode(parsed.handicap_variation_mode),
       };
     }
   } catch {}
@@ -96,9 +97,8 @@ export const groupSettingsService = {
           min_rounds_for_awards: typeof (data as any).min_rounds_for_awards === 'number'
             ? Math.floor((data as any).min_rounds_for_awards)
             : (local?.min_rounds_for_awards ?? DEFAULT_GROUP_SETTINGS.min_rounds_for_awards),
-          handicap_variation_mode: (data as any).handicap_variation_mode === 'primero_ultimo'
-            ? 'primero_ultimo'
-            : (local?.handicap_variation_mode ?? DEFAULT_GROUP_SETTINGS.handicap_variation_mode),
+          // El valor del grupo manda: es el que comparten todos los dispositivos.
+          handicap_variation_mode: normalizeHandicapVariationMode((data as any).handicap_variation_mode),
         };
         try {
           window.localStorage?.setItem(`group_settings_${groupId}`, JSON.stringify(remoteSettings));
@@ -113,25 +113,20 @@ export const groupSettingsService = {
   async saveGroupSettings(groupId: string, settings: GroupSettings): Promise<void> {
     const sanitized: GroupSettings = {
       min_rounds_for_awards: Math.max(0, Math.floor(Number(settings.min_rounds_for_awards) || 0)),
-      handicap_variation_mode: settings.handicap_variation_mode === 'primero_ultimo' ? 'primero_ultimo' : 'mitad',
+      handicap_variation_mode: normalizeHandicapVariationMode(settings.handicap_variation_mode),
     };
 
     try {
       window.localStorage?.setItem(`group_settings_${groupId}`, JSON.stringify(sanitized));
     } catch {}
 
-    try {
-      await supabase
-        .from('groups')
-        .update({
-          min_rounds_for_awards: sanitized.min_rounds_for_awards,
-          handicap_variation_mode: sanitized.handicap_variation_mode,
-        })
-        .eq('id', groupId);
-    } catch (err) {
-      // Column may not exist remotely yet until migration is applied; local storage persists
-      console.warn('Remote group settings update deferred:', err);
-    }
+    // Se guarda en el grupo para que el cálculo de hándicap lo lea en cualquier dispositivo.
+    const { error } = await supabase.rpc('save_group_settings', {
+      p_group: groupId,
+      p_handicap_variation_mode: sanitized.handicap_variation_mode,
+      p_min_rounds_for_awards: sanitized.min_rounds_for_awards,
+    });
+    if (error) throw error;
 
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('group_settings_updated', { detail: { groupId, settings: sanitized } }));

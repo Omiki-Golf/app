@@ -65,7 +65,7 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
       setTimeout(() => setSaved(false), 3000);
     } catch (error) {
       console.error('Error guardando la configuración del grupo:', error);
-      setSaveError('No se ha podido guardar la gamificación. Inténtalo de nuevo.');
+      setSaveError('No se ha podido guardar la configuración. Inténtalo de nuevo.');
     } finally {
       setSaving(false);
     }

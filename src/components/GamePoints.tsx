@@ -11,6 +11,8 @@ import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { GroupMemberList } from './GroupMemberList';
 import { competitionPosition } from '../utils/ranking';
+import { baseHandicapAdjustment, type HandicapVariationMode } from '../utils/handicapVariation';
+import { storageUtils } from '../utils/storage';
 import { GamificationBadge } from './GamificationBadge';
 
 import { PlayerName } from './PlayerName';
@@ -41,6 +43,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
   const [players, setPlayers] = useState<Player[]>([]);
   const [dailyRankings, setDailyRankings] = useState<DailyRanking[]>([]);
   const [handicapHistory, setHandicapHistory] = useState<HandicapHistoryEntry[]>([]);
+  const [variationMode, setVariationMode] = useState<HandicapVariationMode>('mitad');
   const [loading, setLoading] = useState(true);
   const [showPlayers, setShowPlayers] = useState(false);
   const [showHandicapHistory, setShowHandicapHistory] = useState(false);
@@ -65,11 +68,13 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
   const loadData = async () => {
     try {
       setLoading(true);
-      const [playersData, rankingsData, historyData] = await Promise.all([
+      const [playersData, rankingsData, historyData, mode] = await Promise.all([
         golfService.getAllPlayers(),
         golfService.getDailyRankings(),
         golfService.getHandicapHistory(),
+        golfService.getHandicapVariationMode(groupId ?? storageUtils.getCurrentGroupId()),
       ]);
+      setVariationMode(mode);
       setPlayers(playersData.filter(player => !player.auth_user_id && !player.is_guest));
       setDailyRankings(rankingsData);
       setHandicapHistory(historyData);
@@ -249,26 +254,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
     currentHandicap: number,
     spanishHandsCount: number = 0
   ): { newHandicap: number; adjustment: number; baseAdjustment: number; spanishHandsAdjustment: number } => {
-    const isOdd = totalPlayers % 2 === 1;
-    let baseAdjustment = 0;
-
-    if (isOdd) {
-      const middleIndex = Math.floor(totalPlayers / 2);
-      if (index < middleIndex) {
-        baseAdjustment = -1;
-      } else if (index === middleIndex) {
-        baseAdjustment = 0;
-      } else {
-        baseAdjustment = 1;
-      }
-    } else {
-      const middleIndex = totalPlayers / 2;
-      if (index < middleIndex) {
-        baseAdjustment = -1;
-      } else {
-        baseAdjustment = 1;
-      }
-    }
+    const baseAdjustment = baseHandicapAdjustment(index, totalPlayers, variationMode);
 
     const spanishHandsAdjustment = spanishHandsCount;
     const totalAdjustment = baseAdjustment + spanishHandsAdjustment;
@@ -299,7 +285,10 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
         currentHandicap,
         spanishHandsCount
       );
-      const colorClass = getColorClass(index, sortedStandings.length);
+      // Azul baja, amarillo se queda igual, rojo sube (según la variación de HCP del grupo).
+      const colorClass = baseAdjustment < 0
+        ? 'bg-blue-100 border-blue-300'
+        : baseAdjustment > 0 ? 'bg-red-100 border-red-300' : 'bg-yellow-100 border-yellow-300';
 
       return {
         playerName: standing.playerName,

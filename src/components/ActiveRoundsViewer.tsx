@@ -133,6 +133,10 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       setLoading(true);
       setError('');
       const target = rounds.find(item => item.round.id === roundId);
+      if (target && !isVerifiedLocalRoundCreator(target.round.user_id)) {
+        setError('No tienes permisos para archivar esta partida. Solo el creador puede archivarla.');
+        return;
+      }
       if (target?.round.group_id) {
         // Una partida de 9 hoyos con otra ya archivada ese día: puede ser la 2ª vuelta o una partida distinta.
         if (!sessionChoice && target.round.num_holes === 9
@@ -819,7 +823,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           </WriteButton>
                         )}
 
-                        {currentGroup && (
+                        {currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                             disabled={loading}
@@ -916,7 +920,8 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Ver Resultados Completos
                           </button>
                         )}
-                        {currentGroup && (
+                        {/* Solo el creador puede archivar o borrar una partida del grupo (como en el servidor). */}
+                        {currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => setRoundToArchive(roundStats.round.id)}
                             disabled={loading}
@@ -926,7 +931,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                             Archivar partida
                           </WriteButton>
                         )}
-                        {currentGroup && (
+                        {currentGroup && isRoundCreator && (
                           <WriteButton
                             onClick={() => handleDeleteRoundClick(roundStats.round.id)}
                             disabled={loading}

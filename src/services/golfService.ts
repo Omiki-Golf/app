@@ -37,6 +37,7 @@ import { generateAccessCode } from '../utils/accessCode';
 import { ensureExpressIdentity } from './expressIdentity';
 import { findLatestPlayingHandicap, type CareerAccount } from '../utils/careerStats';
 import { competitionPosition } from '../utils/ranking';
+import { baseHandicapAdjustment, normalizeHandicapVariationMode, type HandicapVariationMode } from '../utils/handicapVariation';
 
 const getRoundOwnerId = async (): Promise<string> => {
   const { data: { session } } = await supabase.auth.getSession();
@@ -1708,6 +1709,21 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     return rankings;
   },
 
+  /** Ajuste «Variación de HCP» del grupo; si no se puede leer, el clásico «mitad baja, mitad sube». */
+  async getHandicapVariationMode(groupId: string | null | undefined): Promise<HandicapVariationMode> {
+    if (!groupId) return 'mitad';
+    const { data, error } = await supabase
+      .from('groups')
+      .select('handicap_variation_mode')
+      .eq('id', groupId)
+      .maybeSingle();
+    if (error) {
+      console.warn('No se ha podido leer la variación de HCP del grupo:', error);
+      return 'mitad';
+    }
+    return normalizeHandicapVariationMode((data as { handicap_variation_mode?: unknown } | null)?.handicap_variation_mode);
+  },
+
   async getHandicapHistory(groupId?: string): Promise<HandicapHistoryEntry[]> {
     const currentGroupId = groupId || storageUtils.getCurrentGroupId();
 
@@ -1723,7 +1739,10 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
 
     if (!dailyRankingsData || dailyRankingsData.length === 0) return [];
 
-    const archivedRounds = await this.getStatisticsRounds(currentGroupId);
+    const [archivedRounds, variationMode] = await Promise.all([
+      this.getStatisticsRounds(currentGroupId),
+      this.getHandicapVariationMode(currentGroupId),
+    ]);
 
     const handicapsByPlayerAndDate = new Map<string, Map<string, number>>();
     archivedRounds.forEach((round) => {
@@ -1759,8 +1778,6 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     dateRankings.forEach((rankings, date) => {
       const sortedRankings = rankings.sort((a, b) => a.position - b.position);
       const totalPlayers = sortedRankings.length;
-      const isOdd = totalPlayers % 2 === 1;
-      const middleIndex = isOdd ? Math.floor(totalPlayers / 2) : totalPlayers / 2;
 
       historyByDate[date] = {};
 
@@ -1771,23 +1788,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         const playingHandicap = ranking.hcp_juego;
 
         if (playingHandicap !== undefined && playingHandicap !== null) {
-          let adjustment = 0;
-
-          if (isOdd) {
-            if (index < middleIndex) {
-              adjustment = playingHandicap > 0 ? -1 : 0;
-            } else if (index === middleIndex) {
-              adjustment = 0;
-            } else {
-              adjustment = playingHandicap < 12 ? 1 : 0;
-            }
-          } else {
-            if (index < middleIndex) {
-              adjustment = playingHandicap > 0 ? -1 : 0;
-            } else {
-              adjustment = playingHandicap < 12 ? 1 : 0;
-            }
-          }
+          const base = baseHandicapAdjustment(index, totalPlayers, variationMode);
+          const adjustment = base < 0 ? (playingHandicap > 0 ? -1 : 0) : base > 0 ? (playingHandicap < 12 ? 1 : 0) : 0;
 
           const newHandicap = Math.max(0, playingHandicap + adjustment);
 
@@ -1842,30 +1844,12 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     });
 
     const totalPlayers = sortedPlayers.length;
-    const isOdd = totalPlayers % 2 === 1;
+    const variationMode = totalPlayers > 0 ? await this.getHandicapVariationMode(round.group_id) : 'mitad';
 
     for (let index = 0; index < sortedPlayers.length; index++) {
       const player = sortedPlayers[index];
       const currentHandicap = player.exactHandicap;
-      let baseAdjustment = 0;
-
-      if (isOdd) {
-        const middleIndex = Math.floor(totalPlayers / 2);
-        if (index < middleIndex) {
-          baseAdjustment = -1;
-        } else if (index === middleIndex) {
-          baseAdjustment = 0;
-        } else {
-          baseAdjustment = 1;
-        }
-      } else {
-        const middleIndex = totalPlayers / 2;
-        if (index < middleIndex) {
-          baseAdjustment = -1;
-        } else {
-          baseAdjustment = 1;
-        }
-      }
+      const baseAdjustment = baseHandicapAdjustment(index, totalPlayers, variationMode);
 
       const newHandicap = Math.min(
         12,
@@ -1911,30 +1895,13 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
     });
 
     const totalPlayers = sortedPlayers.length;
-    const isOdd = totalPlayers % 2 === 1;
+    // Solo se consulta si hay miembros que ajustar (un día solo con invitados no toca hándicaps).
+    const variationMode = totalPlayers > 0 ? await this.getHandicapVariationMode(groupId) : 'mitad';
 
     for (let index = 0; index < sortedPlayers.length; index++) {
       const player = sortedPlayers[index];
       const currentHandicap = player.playingHandicap;
-      let baseAdjustment = 0;
-
-      if (isOdd) {
-        const middleIndex = Math.floor(totalPlayers / 2);
-        if (index < middleIndex) {
-          baseAdjustment = -1;
-        } else if (index === middleIndex) {
-          baseAdjustment = 0;
-        } else {
-          baseAdjustment = 1;
-        }
-      } else {
-        const middleIndex = totalPlayers / 2;
-        if (index < middleIndex) {
-          baseAdjustment = -1;
-        } else {
-          baseAdjustment = 1;
-        }
-      }
+      const baseAdjustment = baseHandicapAdjustment(index, totalPlayers, variationMode);
 
       const spanishHandsCount = player.spanishHandsHoles?.length ?? 0;
       const totalAdjustment = baseAdjustment + spanishHandsCount;

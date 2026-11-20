@@ -603,7 +603,18 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       const players = byProduct.get(id) || new Map<string, number>();
       players.set(stat.player_name, (players.get(stat.player_name) || 0) + Number(count || 0)); byProduct.set(id, players);
     })));
-    const products = extraGamification;
+    // Spanish Hand guarda su recuento aparte (spanish_hands_count), no en gamification_counts.
+    if (spanishHandsEnabled) {
+      const players = new Map<string, number>();
+      archivedRounds.forEach(round => round.player_stats?.forEach(stat => {
+        players.set(stat.player_name, (players.get(stat.player_name) || 0) + Number(stat.spanish_hands_count || 0));
+      }));
+      byProduct.set('spanish-hand', players);
+    }
+    const products: Array<{ id: string; name: string }> = [
+      ...(spanishHandsEnabled ? [{ id: 'spanish-hand', name: 'Spanish Hands' }] : []),
+      ...extraGamification,
+    ];
     if (!products.length) return null;
     return <div className="mb-6"><h3 className="mb-4 text-lg font-bold text-ink">Premios especiales · Gamificación</h3><div className="grid grid-cols-1 gap-4 md:grid-cols-2">{products.map(product => {
       const leaders = [...(byProduct.get(product.id)?.entries() || [])].sort((a, b) => b[1] - a[1]); const max = leaders[0]?.[1] || 0;
