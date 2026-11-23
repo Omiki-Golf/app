@@ -791,7 +791,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             </div>
 
             <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación en este momento</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-1 gap-2 mb-6">
               {(() => {
                 // Puntos Stableford acumulados; empate → menor hándicap de juego, como en la clasificación.
                 const standings = sortByResultAndHandicap(
@@ -813,39 +813,51 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                   entry => entry.player.playing_handicap,
                 );
                 const podium = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
+                const leaderPoints = standings[0]?.points ?? 0;
+                const tiedAtTop = standings.filter(entry => entry.points === leaderPoints && entry.player.playing_handicap === standings[0].player.playing_handicap).length > 1;
                 return standings.map((entry, index) => {
                 const { player, points: totalPoints, toPar } = entry;
                 const position = competitionPosition(standings, index, (a, b) =>
                   a.points === b.points && a.player.playing_handicap === b.player.playing_handicap);
+                const gap = leaderPoints - totalPoints;
+                const subtitle = position === 1
+                  ? (tiedAtTop ? 'Empatado en cabeza' : 'Líder provisional')
+                  : gap === 0 ? 'Mismos puntos que el líder' : `A ${gap} ${gap === 1 ? 'pt' : 'pts'} del líder`;
+                const toParLabel = toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `−${Math.abs(toPar)}`;
+                const toParClass = toPar === null || toPar === 0
+                  ? 'bg-card-2 text-ink-2 border border-line'
+                  : toPar < 0
+                  ? 'bg-emerald-300 text-emerald-950'
+                  : 'bg-red-200 text-red-900';
 
                 return (
                   <div
                     key={player.id}
-                    className="border-2 rounded-lg p-3 text-left bg-accent-soft border-accent-ring min-w-0 space-y-1"
+                    className="flex items-center gap-3 rounded-2xl border border-accent-ring bg-accent-soft p-3 text-left min-w-0"
                   >
-                    {/* 1º Fede */}
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-black ${podium[position - 1] ?? 'bg-card text-ink-2 border border-line'}`}>
-                        {position}º
-                      </span>
-                      {gameMode === 'parejas' && players.length === 4 && (
-                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                          {players.indexOf(player) < 2 ? 'P1' : 'P2'}
-                        </span>
-                      )}
-                      <p className="min-w-0 truncate font-bold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                    {/* Medalla con la posición */}
+                    <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-black shadow-sm ${podium[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
+                      {position}º
+                    </span>
+                    {/* Nombre y situación respecto al líder */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {gameMode === 'parejas' && players.length === 4 && (
+                          <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                            {players.indexOf(player) < 2 ? 'P1' : 'P2'}
+                          </span>
+                        )}
+                        <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                      </div>
+                      <p className="truncate text-sm text-ink-3">{subtitle}</p>
                     </div>
-                    {/* 8 puntos */}
-                    <p className="text-sm text-ink-2">
-                      <span className="text-xl font-black text-accent-ink">{totalPoints}</span> {totalPoints === 1 ? 'punto' : 'puntos'}
-                    </p>
-                    {/* Actual: -2 (neto, hoyos jugados) */}
-                    <p className="text-sm text-ink-2" title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
-                      Actual:{' '}
-                      <span className={`font-bold ${toPar === null ? 'text-ink-3' : toPar < 0 ? 'text-accent-ink' : toPar > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink'}`}>
-                        {toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `${toPar}`}
+                    {/* Puntos y cómo va (neto, hoyos jugados) */}
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <p className="text-2xl font-black leading-none text-accent-ink tabular-nums">{totalPoints} pts</p>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
+                        Actual {toParLabel}
                       </span>
-                    </p>
+                    </div>
                   </div>
                 );
                 });
