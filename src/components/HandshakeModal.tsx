@@ -5,6 +5,9 @@ interface HandshakeModalProps {
   winnerName: string;
   marginText: string;
   gameMode: string;
+  /** Solo el creador puede finalizar la partida. */
+  canFinish?: boolean;
+  onFinish?: () => void;
   onContinue: () => void;
 }
 
@@ -13,6 +16,8 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
   winnerName,
   marginText,
   gameMode,
+  canFinish = false,
+  onFinish,
   onContinue,
 }) => {
   if (!isOpen) return null;
@@ -42,10 +47,19 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
         </div>
 
         <p className="text-sm text-ink-2 font-medium mb-4">
-          El resultado oficial ya se ha guardado y no cambiará. Puedes seguir anotando los golpes que faltan.
+          El resultado oficial ya se ha guardado y no cambiará. Si seguís jugando, solo se pueden anotar los hoyos que faltan: los anteriores quedan cerrados.
         </p>
 
         <div className="space-y-3">
+          {canFinish && onFinish && (
+            <button
+              type="button"
+              onClick={onFinish}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-card"
+            >
+              Finalizar partida
+            </button>
+          )}
           <button
             type="button"
             onClick={onContinue}
@@ -53,6 +67,9 @@ export const HandshakeModal: React.FC<HandshakeModalProps> = ({
           >
             Seguir jugando
           </button>
+          {!canFinish && (
+            <p className="text-xs text-ink-3">Solo el creador de la partida puede finalizarla.</p>
+          )}
         </div>
       </div>
     </div>

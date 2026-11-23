@@ -1702,6 +1702,7 @@ function App() {
           hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
           gameMode={roundState.round.game_mode}
           decidedResult={roundState.round.decided_result}
+          decidedHoles={roundState.round.decided_holes}
           onHoleChange={handleHoleChange}
           onScoreChange={handleScoreChange}
           onShowLeaderboard={() => setCurrentView('leaderboard')}

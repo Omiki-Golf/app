@@ -43,6 +43,8 @@ interface ScorecardProps {
   hoyo19Enabled?: boolean;
   gameMode?: GameMode;
   decidedResult?: DecidedResult | null;
+  /** Hoyos cerrados al quedar decidida la partida (no se pueden modificar). */
+  decidedHoles?: number[] | null;
   onHoleChange: (holeNumber: number) => void;
   onScoreChange: (playerId: string, holeNumber: number, score: ScoreChangeInput | null) => void;
   onShowLeaderboard: () => void;
@@ -72,6 +74,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   hoyo19Enabled,
   gameMode = 'stableford',
   decidedResult = null,
+  decidedHoles = null,
   onHoleChange,
   onScoreChange,
   onShowLeaderboard,
@@ -148,6 +151,18 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     ? players.filter(player => !isEnteredScore(roundsMap.get(player.id)?.scores[hole.hole_number]))
     : [];
   const blockNextHole = !isRoundFinished && !isReadOnly && playersMissingCurrentHole.length > 0;
+
+  // Partida decidida (shakehands): el resultado es definitivo. Los hoyos ya jugados al decidirse quedan
+  // cerrados (la base de datos lo impone); si aún no ha llegado la lista, son los primeros jugados.
+  const isDecided = isModeScoring && !!decidedResult;
+  const lockedHoles = new Set<number>(
+    !isDecided ? [] : decidedHoles ?? playableHoles
+      .slice(0, Math.max(0, playableHoles.length - (decidedResult?.holes_remaining ?? 0)))
+      .map(h => h.hole_number),
+  );
+  const isCurrentHoleLocked = !!hole && lockedHoles.has(hole.hole_number);
+  // El creador puede finalizar una partida decidida en cualquier hoyo, aunque falten hoyos por jugar.
+  const canFinishDecidedEarly = isDecided && canFinishRound && !isRoundFinished;
 
   useEffect(() => {
     if (!lastHoleScoresComplete || allScoresComplete) {
@@ -361,6 +376,13 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             </div>
           )}
 
+          {isCurrentHoleLocked && !isRoundFinished && hasEditAccess && (
+            <div role="status" className="mb-3 flex items-center gap-2 rounded-lg border border-accent-ring bg-accent-soft px-3 py-2 text-sm font-medium text-accent-ink">
+              <Lock size={16} className="shrink-0" aria-hidden="true" />
+              Partida decidida: este hoyo ya no se puede modificar.
+            </div>
+          )}
+
           {hole && (
             <div className="mb-6">
               <HoleCard
@@ -374,7 +396,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 allHoleScores={Object.fromEntries(
                   players.map((p) => [p.id, roundsMap.get(p.id)?.scores || {}])
                 )}
-                readonly={!hasEditAccess}
+                readonly={!hasEditAccess || isCurrentHoleLocked}
                 groupCode={groupCode}
                 hoyo19Enabled={isDivend}
                 spanishHandsEnabled={spanishHandsEnabled}
@@ -412,7 +434,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               Anterior
             </button>
 
-            {isLastHole && allScoresComplete && canFinishRound && !isRoundFinished ? (
+            {isLastHole && ((allScoresComplete && canFinishRound && !isRoundFinished) || canFinishDecidedEarly) ? (
               <WriteButton
                 onClick={handleFinishWithConfirm}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
@@ -441,6 +463,15 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </button>
             )}
           </div>
+
+          {!isLastHole && canFinishDecidedEarly && (
+            <WriteButton
+              onClick={handleFinishWithConfirm}
+              className="-mt-3 mb-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
+            >
+              Finalizar partida
+            </WriteButton>
+          )}
 
           {!isLastHole && blockNextHole && (
             <p role="status" className="-mt-3 mb-6 text-center text-sm text-ink-3">
@@ -939,7 +970,9 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
       {showFinishModal && (
         <ConfirmModal
-          message="¿Finalizar la partida? Esto marcará la ronda como completada."
+          message={isDecided && !allScoresComplete
+            ? '¿Finalizar la partida? Ya está decidida: se guarda el resultado oficial y los hoyos que faltan quedan sin jugar.'
+            : '¿Finalizar la partida? Esto marcará la ronda como completada.'}
           onConfirm={handleConfirmFinish}
           onCancel={() => setShowFinishModal(false)}
         />
@@ -999,6 +1032,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
           winnerName={handshakeData.winner}
           marginText={handshakeData.margin}
           gameMode={gameMode}
+          canFinish={canFinishRound && !isRoundFinished}
+          onFinish={() => {
+            setHandshakeAcknowledged(true);
+            setHandshakeData(null);
+            handleFinishWithConfirm();
+          }}
           onContinue={() => {
             setHandshakeAcknowledged(true);
             setHandshakeData(null);

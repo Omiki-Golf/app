@@ -535,6 +535,8 @@ export interface GolfRound {
   responsible_user_id?: string | null;
   decided_result?: DecidedResult | null;
   decided_at?: string | null;
+  /** Hoyos ya completos cuando la partida quedó decidida: no se pueden modificar. */
+  decided_holes?: number[] | null;
   group_id?: string;
   num_holes: 9 | 18;
   holes_range?: '1-9' | '10-18';

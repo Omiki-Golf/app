@@ -12,7 +12,8 @@ test('score editing needs the creator or the round code, never the public row', 
   assert.doesNotMatch(app, /isCreator \|\| storedCode === roundData\.round\.access_code/);
   assert.match(app, /const hasEditAccess = canEditRoundScores\(isCreator, roundData\.round\.status, accessCodeStorage\.hasAccessCode\(activeRoundId\)\)/);
   assert.match(app, /if \(!roundState\.round \|\| !roundState\.hasEditAccess \|\| readOnly\)/);
-  assert.match(scorecard, /readonly=\{!hasEditAccess\}/);
+  // Además del permiso, los hoyos cerrados de una partida decidida tampoco se editan.
+  assert.match(scorecard, /readonly=\{!hasEditAccess \|\| isCurrentHoleLocked\}/);
 });
 
 test('finish button is concise and member names use a middle ellipsis on mobile', () => {
