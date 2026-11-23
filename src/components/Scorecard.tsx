@@ -639,7 +639,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             else if (holeDiff < 0) secondWins++;
                           });
                           const diff = firstWins - secondWins;
-                          const label = diff === 0 ? 'AS' : `${firstWins}-${secondWins}`;
+                          // Notación de match play: quien va ganando «N UP» (con su color de jugador); empate «A/S».
+                          const label = diff === 0 ? 'A/S' : `${Math.abs(diff)} UP`;
                           const color = diff > 0
                             ? 'bg-blue-600 text-white border-blue-400'
                             : diff < 0
@@ -789,29 +790,31 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 return (
                   <div
                     key={player.id}
-                    className="border-2 rounded-lg p-3 text-center bg-accent-soft border-accent-ring"
+                    className="border-2 rounded-lg p-3 text-left bg-accent-soft border-accent-ring min-w-0 space-y-1"
                   >
-                    <span className={`inline-block mb-1 rounded-full px-2.5 py-0.5 text-sm font-black ${podium[position - 1] ?? 'bg-card text-ink-2 border border-line'}`}>
-                      {position}º
-                    </span>
-                    <div className="flex items-center justify-center gap-2">
+                    {/* 1º Fede */}
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-sm font-black ${podium[position - 1] ?? 'bg-card text-ink-2 border border-line'}`}>
+                        {position}º
+                      </span>
                       {gameMode === 'parejas' && players.length === 4 && (
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                           {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                         </span>
                       )}
-                      <p className="text-sm font-semibold text-ink truncate"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                      <p className="min-w-0 truncate font-bold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                     </div>
-                    <p className="text-2xl font-bold text-accent-ink">{totalPoints}</p>
-                    <p className="text-xs text-ink-3">{totalPoints === 1 ? 'punto' : 'puntos'}</p>
-                    {toPar !== null && (
-                      <p
-                        className={`mt-1 text-sm font-bold ${toPar < 0 ? 'text-accent-ink' : toPar > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink-2'}`}
-                        title="Cómo va respecto al par, con hándicap, en los hoyos jugados"
-                      >
-                        {toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `${toPar}`}
-                      </p>
-                    )}
+                    {/* 8 puntos */}
+                    <p className="text-sm text-ink-2">
+                      <span className="text-xl font-black text-accent-ink">{totalPoints}</span> {totalPoints === 1 ? 'punto' : 'puntos'}
+                    </p>
+                    {/* Actual: -2 (neto, hoyos jugados) */}
+                    <p className="text-sm text-ink-2" title="Cómo va respecto al par, con hándicap, en los hoyos jugados">
+                      Actual:{' '}
+                      <span className={`font-bold ${toPar === null ? 'text-ink-3' : toPar < 0 ? 'text-accent-ink' : toPar > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink'}`}>
+                        {toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `${toPar}`}
+                      </span>
+                    </p>
                   </div>
                 );
                 });

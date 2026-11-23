@@ -669,16 +669,27 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
               <span className="text-xs font-semibold text-accent-ink uppercase tracking-wide">Resultado actual</span>
             </div>
             <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end">
-              {gameMode === 'match' && players.map((p, index) => {
-                const total = allHoles.reduce((sum, h) => sum + (allHoleScores[p.id]?.[h.hole_number]?.mode_points ?? 0), 0);
-                return <React.Fragment key={p.id}>
-                  {index > 0 && <span className="font-black text-ink-3">-</span>}
-                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm border border-line">
-                    <CompactPlayer name={p.name} colorIndex={index} />
-                    <strong className="text-accent-ink">{total.toLocaleString('es-ES')}</strong>
-                  </span>
-                </React.Fragment>;
-              })}
+              {gameMode === 'match' && players.length === 2 && (() => {
+                // Hoyos de ventaja: ganado = 1, empatado = 0,5 a cada uno; la diferencia de totales es lo que va arriba.
+                const totals = players.map(p => allHoles.reduce((sum, h) => sum + (allHoleScores[p.id]?.[h.hole_number]?.mode_points ?? 0), 0));
+                const lead = Math.round(totals[0] - totals[1]);
+                const statusFor = (index: number) => {
+                  const own = index === 0 ? lead : -lead;
+                  if (own > 0) return { text: `${own} UP`, className: 'bg-red-600 text-white border-red-400', title: `${own} arriba` };
+                  if (own < 0) return { text: `${-own} DN`, className: 'bg-blue-600 text-white border-blue-400', title: `${-own} abajo` };
+                  return { text: 'A/S', className: 'bg-white text-slate-900 border-line-2', title: 'All Square (empate)' };
+                };
+                return players.map((p, index) => {
+                  const status = statusFor(index);
+                  const badge = <span title={status.title} className={`rounded-md border px-2 py-0.5 text-xs font-black shadow-sm ${status.className}`}>{status.text}</span>;
+                  return <React.Fragment key={p.id}>
+                    {index > 0 && <span className="font-black text-ink-3">-</span>}
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-card px-2 py-1 shadow-sm border border-line">
+                      {index === 0 ? <><CompactPlayer name={p.name} colorIndex={index} />{badge}</> : <>{badge}<CompactPlayer name={p.name} colorIndex={index} /></>}
+                    </span>
+                  </React.Fragment>;
+                });
+              })()}
               {gameMode === 'sindicato' && [...players].sort((a, b) => {
                 const totalA = allHoles.reduce((sum, h) => {
                   const ps = allHoleScores[a.id]?.[h.hole_number];
