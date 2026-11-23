@@ -35,10 +35,9 @@ test('home groups come in three labelled blocks, sized by priority: created, adm
   assert.match(source, /wide \? 'col-span-2' : ''/);
 });
 
-test('home weekend groups show a short expiry tag and the full notice only in their last week', async () => {
+test('home weekend groups show no expiry tag; the full notice appears only in their last week', async () => {
   const source = await readFile(new URL('../src/components/HomeScreen.tsx', import.meta.url), 'utf8');
-  assert.match(source, /weekendExpiryShort\(group\.weekend_mode_until\)/);
-  assert.match(source, /t\('home\.expires', \{ date: expires \}\)/);
+  assert.doesNotMatch(source, /expiresLabel|home\.expires/);
   assert.match(source, /\{weekendLastWeek\(group\.weekend_mode_until, group\.weekend_days\) && \(\s*<WeekendGroupNotice/);
 });
 

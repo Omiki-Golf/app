@@ -6,7 +6,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from './LanguageSwitcher';
-import { weekendExpiryShort, weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
+import { weekendExpiryText, weekendLastWeek } from '../utils/weekendMode';
 import { weekendKindDays, type NewGroupKind } from '../utils/groupCapacity';
 import { homeGroupSections } from '../utils/homeGroups';
 import { groupTier, tierColors } from '../utils/tierColors';
@@ -114,11 +114,10 @@ const shortcutSize: Record<ShortcutLevel, string> = {
 };
 
 /** Acceso directo a un grupo en Home. Creados y administrados van rellenos del color del nivel; los de miembro, solo con contorno. */
-function GroupShortcut({ group, level, wide, expiresLabel, onOpen }: {
+function GroupShortcut({ group, level, wide, onOpen }: {
   group: ShortcutGroup;
   level: ShortcutLevel;
   wide?: boolean;
-  expiresLabel?: string | null;
   onOpen?: (groupId: string) => void;
 }) {
   const tier = groupTier(group);
@@ -132,7 +131,6 @@ function GroupShortcut({ group, level, wide, expiresLabel, onOpen }: {
   >
     <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
     <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
-    {expiresLabel && <span className="shrink-0 rounded-lg bg-white/90 px-2 py-0.5 text-[11px] font-medium text-slate-900">{expiresLabel}</span>}
     {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
     {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
   </WriteButton>;
@@ -337,9 +335,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <HomeSection title={t('home.groupsWeekend')}>
               <div className="space-y-2">
                 {ownedWeekends.map(group => {
-                  const expires = weekendExpiryShort(group.weekend_mode_until);
                   return <React.Fragment key={group.id}>
-                    <GroupShortcut group={group} level="owner" onOpen={onOpenGroup} expiresLabel={expires && t('home.expires', { date: expires })} />
+                    <GroupShortcut group={group} level="owner" onOpen={onOpenGroup} />
                     {weekendLastWeek(group.weekend_mode_until, group.weekend_days) && (
                       <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
                     )}
