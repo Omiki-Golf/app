@@ -14,6 +14,7 @@ import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
 import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, Archive, Hand } from 'lucide-react';
+import { InfoHint, GAME_POINTS_HINT } from './InfoHint';
 import { getErrorMessage } from '../utils/errorMessage';
 import { GamificationBadge } from './GamificationBadge';
 
@@ -1170,10 +1171,14 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-ink-2 mb-1">
-                    Hándicap Exacto ({rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes || 9} hoyos)
-                  </label>
+                  <div className="flex flex-wrap items-center gap-1 mb-1">
+                    <label htmlFor="add-player-game-points" className="text-sm font-medium text-ink-2">
+                      Puntos de juego ({rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes || 9} hoyos)
+                    </label>
+                    <InfoHint label="Qué son los puntos de juego" text={GAME_POINTS_HINT} />
+                  </div>
                   <input
+                    id="add-player-game-points"
                     type="number"
                     step="0.1"
                     value={newPlayerHandicap}

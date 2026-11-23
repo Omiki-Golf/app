@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { golfService } from '../services/golfService';
 import { userService } from '../services/userService';
 import { Trash2, Plus, ChevronDown, Lock, Eye, EyeOff, CreditCard as Edit2 } from 'lucide-react';
+import { InfoHint, GAME_POINTS_HINT } from './InfoHint';
 import { HolesRangeModal } from './HolesRangeModal';
 import { AdminPinModal } from './AdminPinModal';
 import { EditPlayerNameModal } from './EditPlayerNameModal';
@@ -736,10 +737,14 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
             )}
 
             <div>
-              <label className="block text-sm font-semibold text-ink-2 mb-2">
-                Hándicap Exacto ({numHoles} hoyos)
-              </label>
+              <div className="flex flex-wrap items-center gap-1 mb-2">
+                <label htmlFor="player-setup-game-points" className="text-sm font-semibold text-ink-2">
+                  Puntos de juego ({numHoles} hoyos)
+                </label>
+                <InfoHint label="Qué son los puntos de juego" text={GAME_POINTS_HINT} />
+              </div>
               <input
+                id="player-setup-game-points"
                 type="number"
                 step="1"
                 min={0}
@@ -874,7 +879,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                         )}
                       </div>
                       <div className="text-sm text-ink-3 space-y-0.5">
-                        <p>Hándicap Exacto ({numHoles} hoyos): {numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}</p>
+                        <p>Puntos de juego ({numHoles} hoyos):{numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}</p>
                         <p className="font-medium text-accent-ink">
                           Hándicap de Juego: {player.playing_handicap}{useSlope ? ' (con Slope)' : ''}
                         </p>

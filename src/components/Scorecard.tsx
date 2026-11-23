@@ -1,4 +1,4 @@
-import { WriteButton } from '../context/ReadOnlyContext';
+import { WriteButton, useReadOnly } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useEffect, useRef } from 'react';
 import { GolfHole, RoundPlayer, RoundScore, GameMode, DecidedResult, ScoreChangeInput } from '../types';
@@ -8,7 +8,8 @@ import { CourseChangeModal } from './CourseChangeModal';
 import { CourseChangeConfirmModal } from './CourseChangeConfirmModal';
 import { ScoreSymbol } from './ScoreSymbol';
 import { golfService } from '../services/golfService';
-import { getStrokesReceived, calculateScoreToPar } from '../utils/calculations';
+import { getStrokesReceived } from '../utils/calculations';
+import { competitionPosition, sortByResultAndHandicap } from '../utils/ranking';
 import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
@@ -139,6 +140,14 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   );
 
   const isLastHole = currentHole === playableHoles.length;
+
+  // No se pasa al hoyo siguiente hasta que todos los jugadores tengan su resultado en este hoyo.
+  // Las cuentas de solo lectura y las partidas finalizadas solo consultan: pueden moverse libremente.
+  const isReadOnly = useReadOnly();
+  const playersMissingCurrentHole = hole
+    ? players.filter(player => !isEnteredScore(roundsMap.get(player.id)?.scores[hole.hole_number]))
+    : [];
+  const blockNextHole = !isRoundFinished && !isReadOnly && playersMissingCurrentHole.length > 0;
 
   useEffect(() => {
     if (!lastHoleScoresComplete || allScoresComplete) {
@@ -423,7 +432,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             ) : (
               <button
                 onClick={() => onHoleChange(Math.min(playableHoles.length, currentHole + 1))}
-                disabled={currentHole === playableHoles.length}
+                disabled={currentHole === playableHoles.length || blockNextHole}
+                title={blockNextHole ? 'Informa el resultado de todos los jugadores para pasar al siguiente hoyo' : undefined}
                 className="flex-1 bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-on-accent font-semibold py-3 rounded-lg flex items-center justify-center gap-2 transition-colors"
               >
                 Siguiente
@@ -431,6 +441,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </button>
             )}
           </div>
+
+          {!isLastHole && blockNextHole && (
+            <p role="status" className="-mt-3 mb-6 text-center text-sm text-ink-3">
+              Falta el resultado de {playersMissingCurrentHole.map(player => player.name).join(', ')} en este hoyo.
+            </p>
+          )}
 
           {isLastHole && allScoresComplete && !canFinishRound && !isRoundFinished && (
             <p className="-mt-3 mb-6 text-center text-sm text-ink-3">
@@ -742,35 +758,33 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </div>
             </div>
 
-            <h3 className="font-semibold text-ink-2 mb-3 mt-6">Resumen de Puntos Stableford</h3>
+            <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación en este momento</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              {players.map((player) => {
-                const round = roundsMap.get(player.id);
-                const totalPoints = playableHoles.reduce((sum, h) => {
-                  return sum + (round?.scores[h.hole_number]?.stableford_points ?? 0);
-                }, 0);
-                const hasAbandonedScores = false;
-
-                const totalGrossStrokes = playableHoles.reduce((sum, h) => {
-                  const score = round?.scores[h.hole_number];
-                  if (!score?.gross_strokes) return sum;
-                  return sum + (score?.gross_strokes || 0);
-                }, 0);
-
-                const coursePar = playableHoles.reduce((sum, h) => sum + h.par, 0);
-                const scoreToPar = totalGrossStrokes > 0
-                  ? calculateScoreToPar(totalGrossStrokes, coursePar, player.playing_handicap)
-                  : null;
+              {(() => {
+                // Puntos Stableford acumulados; empate → menor hándicap de juego, como en la clasificación.
+                const standings = sortByResultAndHandicap(
+                  players.map(player => {
+                    const round = roundsMap.get(player.id);
+                    const points = playableHoles.reduce((sum, h) => sum + (round?.scores[h.hole_number]?.stableford_points ?? 0), 0);
+                    return { player, points };
+                  }),
+                  entry => entry.points,
+                  entry => entry.player.playing_handicap,
+                );
+                const podium = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
+                return standings.map((entry, index) => {
+                const { player, points: totalPoints } = entry;
+                const position = competitionPosition(standings, index, (a, b) =>
+                  a.points === b.points && a.player.playing_handicap === b.player.playing_handicap);
 
                 return (
                   <div
                     key={player.id}
-                    className={`border-2 rounded-lg p-3 text-center ${
-                      hasAbandonedScores
-                        ? 'bg-card-2 border-line-2'
-                        : 'bg-accent-soft border-accent-ring'
-                    }`}
+                    className="border-2 rounded-lg p-3 text-center bg-accent-soft border-accent-ring"
                   >
+                    <span className={`inline-block mb-1 rounded-full px-2.5 py-0.5 text-sm font-black ${podium[position - 1] ?? 'bg-card text-ink-2 border border-line'}`}>
+                      {position}º
+                    </span>
                     <div className="flex items-center justify-center gap-2">
                       {gameMode === 'parejas' && players.length === 4 && (
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
@@ -779,32 +793,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                       )}
                       <p className="text-sm font-semibold text-ink truncate"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                     </div>
-                    {hasAbandonedScores ? (
-                      <>
-                        <p className="text-2xl font-bold text-ink-4">-</p>
-                        <p className="text-xs text-ink-3">Abandonado</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-2xl font-bold text-accent-ink">{totalPoints}</p>
-                        <p className="text-xs text-ink-3">Puntos Stableford</p>
-                        {scoreToPar && (
-                          <div className="mt-2 pt-2 border-t border-accent-ring">
-                            <p className={`text-xl font-bold ${
-                              scoreToPar.value === 0 ? 'text-ink-2' :
-                              scoreToPar.value < 0 ? 'text-accent-ink' :
-                              'text-red-600'
-                            }`}>
-                              {scoreToPar.display}
-                            </p>
-                            <p className="text-xs text-ink-3">vs Par Personal</p>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    <p className="text-2xl font-bold text-accent-ink">{totalPoints}</p>
+                    <p className="text-xs text-ink-3">{totalPoints === 1 ? 'punto' : 'puntos'}</p>
                   </div>
                 );
-              })}
+                });
+              })()}
             </div>
 
             {isDivend && (
