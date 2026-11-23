@@ -23,6 +23,8 @@ interface PlansComparisonProps {
   onStartWeekend?: (days: 7 | 90) => Promise<void>;
   /** Plan marcado al abrir (por ejemplo Team desde el aviso de fin de Weekend). */
   initialPlan?: DisplayPlan;
+  /** Mensual o anual al abrir (por ejemplo, desde un enlace de la web pública). */
+  initialAnnual?: boolean;
   expressLimit?: boolean;
   /** Express que intenta usar una modalidad bloqueada: solo Express (actual) y Player, sin inicio de sesión. */
   expressModes?: boolean;
@@ -38,7 +40,7 @@ const styles = {
 // Weekend es un pago puntual: nunca se considera "incluido" en otro plan.
 const planRank: Record<DisplayPlan, number> = { express: 0, player: 1, team: 2, premium: 3, weekend: 99 };
 
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false, initialPlan }) => {
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false, initialPlan, initialAnnual }) => {
   const { t, i18n } = useTranslation();
   const currency = useDisplayCurrency();
   const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
@@ -49,7 +51,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
   const currentPlan = expressModes ? 'express' : planInUse;
   const onShowAuth = expressModes ? undefined : showAuth;
   const [selected, setSelected] = useState<DisplayPlan>(initialPlan ?? (expressLimit || expressModes ? 'player' : (currentPlan ?? 'express')));
-  const [annual, setAnnual] = useState(currentBillingPeriod ? currentBillingPeriod === 'annual' : true);
+  const [annual, setAnnual] = useState(initialAnnual ?? (currentBillingPeriod ? currentBillingPeriod === 'annual' : true));
   const [weekendDays, setWeekendDays] = useState<7 | 90>(7);
   const [comingSoon, setComingSoon] = useState(false);
   // Weekend es un extra: solo se contrata sobre un plan de pago (Player o Team).

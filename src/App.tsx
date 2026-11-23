@@ -26,6 +26,7 @@ import Auth from './components/Auth';
 import MyGroups from './components/MyGroups';
 import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
+import { clearPlanLink, readPlanLink } from './utils/planLink';
 import { PlayerCheckout } from './components/PlayerCheckout';
 import { playerIntent, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
 import { RegistrationForm } from './components/RegistrationForm';
@@ -93,10 +94,13 @@ function App() {
   const [hasGroupMembership, setHasGroupMembership] = useState(false);
   const [hasLimitedAccess, setHasLimitedAccess] = useState(false);
   const [groupLoading, setGroupLoading] = useState(true);
-  const [currentView, setCurrentViewState] = useState<ViewType>('main');
-  const currentViewRef = useRef<ViewType>('main');
+  // Enlace desde la web pública (?plan=player&period=annual): se abre directamente en Planes.
+  const [planLink, setPlanLink] = useState(() => readPlanLink(window.location.search));
+  const initialViewFromLink: ViewType = planLink ? 'plans' : 'main';
+  const [currentView, setCurrentViewState] = useState<ViewType>(initialViewFromLink);
+  const currentViewRef = useRef<ViewType>(initialViewFromLink);
   const historyIndexRef = useRef(1);
-  const historyViewsRef = useRef(new Map<number, ViewType>([[0, 'main'], [1, 'main']]));
+  const historyViewsRef = useRef(new Map<number, ViewType>([[0, initialViewFromLink], [1, initialViewFromLink]]));
   const historyInitializedRef = useRef(false);
   const exitBackAtRef = useRef(0);
   const [showExitHint, setShowExitHint] = useState(false);
@@ -370,6 +374,9 @@ function App() {
     url.searchParams.delete('email-confirmed');
     window.history.replaceState(window.history.state, document.title, `${url.pathname}${url.search}${url.hash}`);
   }, [emailConfirmed]);
+  useEffect(() => { clearPlanLink(); }, []);
+  // El plan del enlace solo se marca la primera vez que se abre Planes.
+  useEffect(() => { if (currentView !== 'plans') setPlanLink(null); }, [currentView]);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has('stripe_checkout')) return;
@@ -1188,7 +1195,8 @@ function App() {
             }}
             expressLimit={plansContext === 'express-limit'}
             expressModes={plansContext === 'express-modes'}
-            initialPlan={plansContext === 'team' ? 'team' : undefined}
+            initialPlan={planLink?.plan ?? (plansContext === 'team' ? 'team' : undefined)}
+            initialAnnual={planLink?.annual}
             // Durante la prueba, el plan efectivo es Team, pero el plan pagado sigue siendo Player.
             // Mostrar este último permite suscribirse a Team antes de que termine la prueba.
             currentPlan={user ? ((subscription?.plan_type === 'player' || subscription?.plan_type === 'team' || subscription?.plan_type === 'premium') ? subscription.plan_type : activePlanType) : undefined}

@@ -45,7 +45,7 @@ test('Home offers Team from the last-week notice and loaders archive expired Wee
     read('../src/components/PlansComparison.tsx'),
   ]);
   assert.match(app, /setPlansContext\('team'\)/);
-  assert.match(app, /initialPlan=\{plansContext === 'team' \? 'team' : undefined\}/);
+  assert.match(app, /initialPlan=\{planLink\?\.plan \?\? \(plansContext === 'team' \? 'team' : undefined\)\}/);
   assert.match(plans, /useState<DisplayPlan>\(initialPlan \?\?/);
   assert.match(home, /weekendLastWeek\(group\.weekend_mode_until, group\.weekend_days\)/);
   assert.match(home, /Contratar Team/);
