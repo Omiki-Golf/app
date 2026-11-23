@@ -76,7 +76,7 @@ export function PlayerCheckout({ userId, checkoutReturn = null, onBack, onDone, 
           <div className="my-6 rounded-xl border border-line bg-card-2 p-5">
             <div className="flex items-center gap-3">
               <img src={state.profile.avatar_url || '/images/Omiki_O_VerdeAmarillo_Trans.png'} alt="Avatar del jugador" className="h-14 w-14 shrink-0 rounded-full object-contain" />
-              <div className="min-w-0"><p className="break-words font-bold text-ink">{state.profile.nick}</p><p className="text-sm text-ink-3">HCP {state.profile.exact_handicap ?? 0}</p></div>
+              <div className="min-w-0"><p className="break-words font-bold text-ink">{state.profile.nick}</p><p className="text-sm text-ink-3">PJ {state.profile.exact_handicap ?? 0}</p></div>
             </div>
             <p className="mt-4 font-bold text-accent-ink">{plan.name} {state.completed ? '· Activo' : '· Pendiente de activación'}</p>
             <p className="mt-1 text-sm text-ink-2">{annual ? 'Anual' : 'Mensual'} · {amount}{annual ? '/año' : '/mes'}{offer && ' el primer año'} · {t('plans.vatIncluded')}</p>

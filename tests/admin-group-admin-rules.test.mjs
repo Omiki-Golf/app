@@ -30,7 +30,7 @@ test('archived groups sort last and hide their access code', () => {
 });
 
 test('member cards show only nick, role and both handicaps without technical details', () => {
-  assert.match(members, /HCP <strong[\s\S]{0,80}member\.handicap_18[\s\S]{0,160}handicap9\(member\.handicap_18\)/);
+  assert.match(members, /PJ <strong[\s\S]{0,80}member\.handicap_18[\s\S]{0,160}handicap9\(member\.handicap_18\)/);
   // El HCP de 9 hoyos no muestra decimales: se redondea y se marca con *.
   assert.match(members, /Number\.isInteger\(half\) \? String\(half\) : `\$\{Math\.round\(half\)\}\*`/);
   assert.doesNotMatch(members, /<details/);
@@ -48,6 +48,6 @@ test('member list finds the group creator itself when the screen does not pass i
 
 test('rankings card says it shows every day the group completed rounds, not only today', async () => {
   const setup = await readFile(new URL('../src/components/RoundSetup.tsx', import.meta.url), 'utf8');
-  assert.match(setup, /Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus handicaps\./);
+  assert.match(setup, /Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus puntos de juego\./);
   assert.doesNotMatch(setup, /completadas en el dia/);
 });

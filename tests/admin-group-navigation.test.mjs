@@ -29,7 +29,7 @@ test('My groups loads both owned and joined groups', () => {
 
 test('profile keeps the nick on one line and explains both handicap values', () => {
   assert.match(profile, /whitespace-nowrap/);
-  assert.match(profile, /HCP 18:/);
+  assert.match(profile, /PJ 18:/);
   assert.match(profile, /Math\.round\(handicap18 \/ 2\)/);
   assert.match(profile, /omikiHandicapInfo/);
   assert.match(profileDetails, /profile\.preferences/);

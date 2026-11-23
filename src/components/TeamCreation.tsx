@@ -211,7 +211,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
     const handicap18 = guestHandicap18.trim() === '' ? Number.NaN : Number(guestHandicap18);
     if (name.length < 2) { setError('Escribe el nombre del jugador'); return; }
     if (!Number.isFinite(handicap18) || handicap18 < 0 || handicap18 > 54) {
-      setError('Indica un hándicap de 18 hoyos entre 0 y 54');
+      setError('Indica unos puntos de juego de 18 hoyos entre 0 y 54');
       return;
     }
     if (selectedPlayers.some(p => p.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
@@ -439,7 +439,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                     )}
                     <div className="flex-1 text-left">
                       <p className="font-medium text-ink text-sm">{p.nick}</p>
-                      <p className="text-xs text-ink-3">HCP 18: {(p.exact_handicap ?? 0).toFixed(1)} · Cuenta registrada</p>
+                      <p className="text-xs text-ink-3">PJ 18: {(p.exact_handicap ?? 0).toFixed(1)} · Cuenta registrada</p>
                     </div>
                     <UserPlus size={16} className="text-accent-ink" />
                   </button>
@@ -450,7 +450,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
             {searchNick.trim().length >= 2 && !searching && !searchResults.some(p => p.nick.toLocaleLowerCase() === searchNick.trim().toLocaleLowerCase()) && (
               <div className="border border-line rounded-xl p-4 mb-4 bg-card-2">
                 <p className="text-sm font-medium text-ink mb-1">Añadir “{searchNick.trim()}” sin cuenta</p>
-                <p className="text-xs text-ink-3 mb-3">Indica su hándicap de 18 hoyos. En partidas de 9 se dividirá entre dos y se redondeará.</p>
+                <p className="text-xs text-ink-3 mb-3">Indica sus puntos de juego de 18 hoyos. En partidas de 9 se dividirán entre dos y se redondearán.</p>
                 <div className="flex gap-2">
                   <input
                     type="number"
@@ -459,8 +459,8 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                     step="0.1"
                     value={guestHandicap18}
                     onChange={(e) => setGuestHandicap18(e.target.value)}
-                    placeholder="HCP 18 hoyos"
-                    aria-label="Hándicap de 18 hoyos"
+                    placeholder="PJ 18 hoyos"
+                    aria-label="Puntos de juego de 18 hoyos"
                     className="min-w-0 flex-1 px-3 py-2 border border-line-2 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent"
                   />
                   <WriteButton onClick={addGuest} className="px-4 py-2 bg-accent text-on-accent font-semibold rounded-lg">Añadir</WriteButton>
@@ -481,7 +481,7 @@ export const TeamCreation: React.FC<TeamCreationProps> = ({ userId, onBack, onTe
                       )}
                       <div className="flex-1">
                         <p className="text-sm font-medium text-ink">{p.name}</p>
-                        <p className="text-xs text-ink-3">HCP 18: {p.handicap18.toFixed(1)} · {p.registeredUserId ? 'Registrado (no editable)' : 'Sin cuenta'}</p>
+                        <p className="text-xs text-ink-3">PJ 18: {p.handicap18.toFixed(1)} · {p.registeredUserId ? 'Registrado (no editable)' : 'Sin cuenta'}</p>
                       </div>
                       <button onClick={() => removePlayer(p.key)} className="text-red-500 hover:text-red-700" aria-label={`Quitar a ${p.name}`}>
                         <X size={16} />

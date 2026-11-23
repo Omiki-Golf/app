@@ -374,12 +374,12 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
       if (selectedPlayerId === 'new') {
         if (!newPlayerName.trim() || !newPlayerHandicap.trim()) {
-          setError('Por favor ingresa nombre y handicap');
+          setError('Por favor ingresa nombre y puntos de juego');
           return;
         }
         const handicap = Number(newPlayerHandicap);
         if (!Number.isInteger(handicap) || handicap < 0 || handicap > (round.round.num_holes === 18 ? 54 : 27)) {
-          setError(`El hándicap debe estar entre 0 y ${round.round.num_holes === 18 ? 54 : 27}`);
+          setError(`Los puntos de juego deben estar entre 0 y ${round.round.num_holes === 18 ? 54 : 27}`);
           return;
         }
         const baseHandicap = round.round.num_holes === 18 ? handicap / 2 : handicap;
@@ -548,7 +548,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                           ))}
                         </div>
                         <p className="text-sm text-ink-3">
-                          HCP {player.handicap} • {player.roundName} • {player.holesPlayed} hoyos
+                          PJ {player.handicap} • {player.roundName} • {player.holesPlayed} hoyos
                         </p>
                       </div>
                     </div>
@@ -757,7 +757,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                     })()}
                                   </div>
                                   <p className="text-xs text-ink-3">
-                                    HCP {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
+                                    PJ {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
                                   </p>
                                 </div>
                                 <p
@@ -870,7 +870,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                                 <div className="flex-1">
                                   <p className="font-semibold text-ink"><PlayerName name={item.player.name} />{item.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                                   <p className="text-xs text-ink-3">
-                                    HCP {item.player.playing_handicap}
+                                    PJ {item.player.playing_handicap}
                                   </p>
                                 </div>
                                 <p
@@ -1103,7 +1103,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                   ...availablePlayers.map((player) => ({
                     value: player.id,
                     disabled: player.handicap_pending || Boolean(player.unavailable_reason),
-                    label: `${player.name}${player.is_guest ? ' · Invitado' : ''} (HCP ${(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap})${player.handicap_pending ? ' · Pendiente' : player.unavailable_reason ? ` · ${player.unavailable_reason}` : ''}`,
+                    label: `${player.name}${player.is_guest ? ' · Invitado' : ''} (PJ ${(rounds.find(item => item.round.id === showAddPlayerModal)?.round.num_holes === 18 ? 2 : 1) * player.exact_handicap})${player.handicap_pending ? ' · Pendiente' : player.unavailable_reason ? ` · ${player.unavailable_reason}` : ''}`,
                   })),
                   { value: 'new', label: '+ Crear nuevo jugador' },
                 ]}

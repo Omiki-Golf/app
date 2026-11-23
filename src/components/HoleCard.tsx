@@ -187,8 +187,8 @@ export const HoleCard: React.FC<HoleCardProps> = ({
         const source = players.find(p => p.id === player.playerId);
         return sum + (source?.playing_handicap ?? 0);
       }, 0);
-      if (team0Handicap < team1Handicap) return { label: 'HCP', leader: 'Equipo 1', diff: 0 };
-      if (team1Handicap < team0Handicap) return { label: 'HCP', leader: 'Equipo 2', diff: 0 };
+      if (team0Handicap < team1Handicap) return { label: 'PJ', leader: 'Equipo 1', diff: 0 };
+      if (team1Handicap < team0Handicap) return { label: 'PJ', leader: 'Equipo 2', diff: 0 };
       return { label: 'AS', leader: null, diff: 0 };
     }
     if (gameMode === 'sindicato' && totals.length === 3) {
@@ -384,7 +384,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                   </div>
                   {/* Marcas del hoyo: solo iconos, en la fila del HCP para no tapar el nombre. */}
                   <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                    <p className="mr-1 text-xs text-ink-3">HCP {player.playing_handicap}</p>
+                    <p className="mr-1 text-xs text-ink-3">PJ {player.playing_handicap}</p>
                     {(pendingNoPasoRojas[player.id] ?? score?.no_paso_rojas) && (
                       <GamificationBadge productId="no-paso-rojas" size={18} detail="en este hoyo" />
                     )}

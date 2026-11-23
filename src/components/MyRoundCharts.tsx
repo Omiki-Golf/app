@@ -86,16 +86,16 @@ export function CumulativePointsChart({ evolution }: { evolution: MyRoundEvoluti
 
   return (
     <div>
-      <Legend items={[{ label: 'Mis puntos', color: 'var(--chart-quick)' }, { label: 'A tu hándicap (2 por hoyo)', color: 'var(--ink-3)', dashed: true }]} />
+      <Legend items={[{ label: 'Mis puntos', color: 'var(--chart-quick)' }, { label: 'A tus puntos de juego (2 por hoyo)', color: 'var(--ink-3)', dashed: true }]} />
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" onMouseLeave={() => setActive(null)}
-        aria-label={`Puntos acumulados: ${last.cumulativePoints} frente a ${last.handicapLine} jugando a tu hándicap (${difference >= 0 ? '+' : ''}${difference}).`}>
+        aria-label={`Puntos acumulados: ${last.cumulativePoints} frente a ${last.handicapLine} jugando a tus puntos de juego (${difference >= 0 ? '+' : ''}${difference}).`}>
         {ticks.map((tick) => (
           <g key={tick}>
             <line x1={L} x2={W - R} y1={y(tick)} y2={y(tick)} stroke="var(--line)" />
             <text x={L - 6} y={y(tick) + 3} textAnchor="end" fontSize="10" fill="var(--ink-3)">{tick}</text>
           </g>
         ))}
-        {/* Zona entre las dos líneas: verde por encima de tu hándicap, roja por debajo. */}
+        {/* Zona entre las dos líneas: verde por encima de tus puntos de juego, roja por debajo. */}
         {evolution.slice(1).map((point, index) => {
           const previous = evolution[index];
           if (!point.played || !previous.played) return null;
@@ -109,7 +109,7 @@ export function CumulativePointsChart({ evolution }: { evolution: MyRoundEvoluti
         <path d={linePath(handicap)} fill="none" stroke="var(--ink-3)" strokeWidth="1.5" strokeDasharray="4 4" />
         <path d={linePath(mine)} fill="none" stroke="var(--chart-quick)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         <HoleTargets count={count} top={T} bottom={B} active={active} onActive={setActive}
-          describe={(index) => `Hoyo ${evolution[index].holeNumber}: ${evolution[index].cumulativePoints} puntos acumulados, ${evolution[index].handicapLine} a tu hándicap`} />
+          describe={(index) => `Hoyo ${evolution[index].holeNumber}: ${evolution[index].cumulativePoints} puntos acumulados, ${evolution[index].handicapLine} a tus puntos de juego`} />
         {evolution.map((point, index) => point.played && (
           <Marker key={point.holeNumber} x={mine[index].x} y={mine[index].y} color="var(--chart-quick)"
             title={`Hoyo ${point.holeNumber}: ${point.cumulativePoints} acumulados (${point.points} en el hoyo)`} />
@@ -120,7 +120,7 @@ export function CumulativePointsChart({ evolution }: { evolution: MyRoundEvoluti
         <text x={(L + W - R) / 2} y={H - 2} textAnchor="middle" fontSize="10" fill="var(--ink-3)">Hoyo</text>
       </svg>
       <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }} aria-live="polite">
-        Hoyo {shown.holeNumber}: <strong style={{ color: 'var(--ink)' }}>{shown.cumulativePoints} puntos</strong> acumulados frente a {shown.handicapLine} a tu hándicap
+        Hoyo {shown.holeNumber}: <strong style={{ color: 'var(--ink)' }}>{shown.cumulativePoints} puntos</strong> acumulados frente a {shown.handicapLine} a tus puntos de juego
         {' '}({shown.cumulativePoints - shown.handicapLine >= 0 ? '+' : ''}{shown.cumulativePoints - shown.handicapLine}).
       </p>
     </div>

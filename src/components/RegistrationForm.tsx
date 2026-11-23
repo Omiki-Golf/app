@@ -270,13 +270,13 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
             </div>
             <div>
               <div className="mb-1 flex items-center gap-1.5">
-                <label htmlFor="register-handicap" className="block text-sm font-medium text-ink-2">Handicap de juego 18 hoyos</label>
+                <label htmlFor="register-handicap" className="block text-sm font-medium text-ink-2">Puntos de juego 18 hoyos</label>
                 <button
                   type="button"
                   onClick={() => setShowHandicapInfo(current => !current)}
                   aria-expanded={showHandicapInfo}
                   aria-controls="register-handicap-info"
-                  aria-label="Qué hándicap poner"
+                  aria-label="Qué puntos de juego poner"
                   className="rounded-full p-0.5 text-ink-3 transition-colors hover:text-ink"
                 >
                   <Info size={15} />
@@ -284,8 +284,8 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
               </div>
               {showHandicapInfo && (
                 <p id="register-handicap-info" className="mb-2 rounded-lg border border-line bg-card-2 p-2.5 text-xs leading-relaxed text-ink-2">
-                  Tu golf, tu hándicap, tus cervezas. Aquí no buscamos tu hándicap oficial con decimales:
-                  pon el hándicap con el que juegas 18 hoyos. El grupo lo irá ajustando partida a partida.
+                  Tu golf, tus puntos, tus cervezas. Aquí no buscamos tu hándicap oficial con decimales:
+                  pon los puntos de juego con los que juegas 18 hoyos. El grupo los irá ajustando partida a partida.
                 </p>
               )}
               <input id="register-handicap"

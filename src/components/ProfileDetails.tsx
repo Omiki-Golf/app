@@ -157,7 +157,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     }
     if (!profile && !displayName.trim()) return;
     if (handicap.trim() && (!Number.isInteger(Number(handicap)) || Number(handicap) < 0 || Number(handicap) > 54)) {
-      setError('Introduce un hándicap entero entre 0 y 54.');
+      setError('Introduce unos puntos de juego enteros entre 0 y 54.');
       return;
     }
     if (age.trim() && (!Number.isInteger(Number(age)) || Number(age) < 18)) {
@@ -321,7 +321,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="min-w-0">
-                      <label htmlFor="profile-handicap-9" className="block text-sm font-medium text-ink-2 mb-2">HCP 9</label>
+                      <label htmlFor="profile-handicap-9" className="block text-sm font-medium text-ink-2 mb-2">PJ 9</label>
                       <input
                         id="profile-handicap-9"
                         type="text"
@@ -340,7 +340,7 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                       />
                     </div>
                     <div className="min-w-0">
-                      <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">HCP 18</label>
+                      <label htmlFor="profile-handicap" className="block text-sm font-medium text-ink-2 mb-2">PJ 18</label>
                       <input
                         id="profile-handicap"
                         type="text"

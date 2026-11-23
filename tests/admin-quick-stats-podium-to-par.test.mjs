@@ -12,7 +12,7 @@ test('podium "vs Par Personal" belongs to the ranked player, not to the unsorted
 
 test('compact podium cards show HCP next to the name and points / vs par in two columns', () => {
   const podium = stats.slice(stats.indexOf('const renderPodiumGrid'), stats.indexOf('const renderStatisticsDetails'));
-  assert.match(podium, /<PlayerName name=\{entry\.player\.name\} \/><\/p>\s*<span[^>]*>HCP \{entry\.player\.playing_handicap\}<\/span>/);
+  assert.match(podium, /<PlayerName name=\{entry\.player\.name\} \/><\/p>\s*<span[^>]*>PJ \{entry\.player\.playing_handicap\}<\/span>/);
   assert.match(podium, /gameMode === 'stableford' \? 'grid-cols-2' : 'grid-cols-1'/);
   assert.doesNotMatch(podium, /text-5xl|p-6|border-4/);
 });
@@ -24,6 +24,6 @@ test('match and parejas show both compact cards in one row with VS centred above
   assert.equal((stats.match(/\{renderVersusCards\(/g) || []).length, 2);
   assert.match(stats, /renderVersusCards\(\s*'bg-red-600',\s*\{ label: matchResult\.isTie \? 'Empate' : 'Ganador'/);
   assert.match(stats, /renderVersusCards\(\s*'bg-blue-600',\s*\{ label: teamResult\.isTie \? 'Empate' : 'Ganadora'/);
-  assert.match(versus, /HCP \{winner\.handicap\}/);
-  assert.match(versus, /HCP \{loser\.handicap\}/);
+  assert.match(versus, /PJ \{winner\.handicap\}/);
+  assert.match(versus, /PJ \{loser\.handicap\}/);
 });

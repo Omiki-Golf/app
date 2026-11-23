@@ -840,7 +840,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                       <span className="text-xl font-black text-accent-ink">{totalPoints}</span> {totalPoints === 1 ? 'punto' : 'puntos'}
                     </p>
                     {/* Actual: -2 (neto, hoyos jugados) */}
-                    <p className="text-sm text-ink-2" title="Cómo va respecto al par, con hándicap, en los hoyos jugados">
+                    <p className="text-sm text-ink-2" title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
                       Actual:{' '}
                       <span className={`font-bold ${toPar === null ? 'text-ink-3' : toPar < 0 ? 'text-accent-ink' : toPar > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink'}`}>
                         {toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `${toPar}`}

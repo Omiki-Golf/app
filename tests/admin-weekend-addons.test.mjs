@@ -175,7 +175,7 @@ test('group rounds keep personal handicap separate and Pro-Shop separates accoun
     read('../src/components/HomeScreen.tsx'),
   ]);
   assert.match(setup, /if \(addingSelf && !currentGroup\) \{/);
-  assert.match(i18n, /No afecta a los grupos, en cada grupo tienes tu HCP por separado\./);
+  assert.match(i18n, /No afectan a los grupos: en cada grupo tienes tus PJ por separado\./);
   assert.doesNotMatch(i18n, /Cada grupo guarda el tuyo por separado/);
   assert.doesNotMatch(shop, /¿Para qué grupo\?/);
   assert.match(shop, /Configurar grupo/);

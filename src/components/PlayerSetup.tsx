@@ -312,7 +312,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
     }
     const handicapNum = Number(handicap);
     if (!handicap.trim() || !Number.isInteger(handicapNum) || handicapNum < 0 || handicapNum > (numHoles === 18 ? 54 : 27)) {
-      setError(`El hándicap debe ser un entero entre 0 y ${numHoles === 18 ? 54 : 27}`);
+      setError(`Los puntos de juego deben ser un entero entre 0 y ${numHoles === 18 ? 54 : 27}`);
       return;
     }
 
@@ -613,10 +613,10 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             className="flex-1 px-4 py-3 text-left disabled:opacity-60"
                           >
                             <p className="font-semibold text-ink"><PlayerName name={player.name} /></p>
-                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · Hándicap pendiente"}</p>
+                            <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.auth_user_id ? "Miembro registrado" : "Miembro sin cuenta vinculada"}{player.handicap_pending && " · PJ pendientes"}</p>
                             {unavailable && <p className="text-xs font-medium text-amber-700">{unavailable}</p>}
                             <p className="text-sm text-ink-3">
-                              Hándicap ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
+                              Puntos de juego ({numHoles} hoyos): {player.handicap_pending ? "Pendiente" : numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}
                             </p>
                           </button>
                           {!player.quick_suggestion && <WriteButton
@@ -669,7 +669,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                             <p className="text-xs text-ink-3">Cuenta registrada · recibirá una invitación para guardar los resultados</p>
                             {inRound && <p className="text-xs font-medium text-amber-700">{pendingInRound ? 'Invitación pendiente' : 'Ya está en esta partida'}</p>}
                             <p className="text-sm text-ink-3">
-                              Hándicap ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
+                              Puntos de juego ({numHoles} hoyos): {Math.round((numHoles === 18 ? Number(profile.exact_handicap ?? 0) : Number(profile.exact_handicap ?? 0) / 2) * 10) / 10}
                             </p>
                           </button>
                         );
@@ -714,7 +714,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                 <p className="text-xs text-ink-3 mt-2">
                   {isGuest || !selectedPlayer
                     ? 'No contará en las estadísticas ni en los ajustes automáticos del grupo si marcas Invitado.'
-                    : 'Cuenta como miembro del grupo en estadísticas, cervezas y ajustes de hándicap.'}
+                    : 'Cuenta como miembro del grupo en estadísticas, cervezas y ajustes de puntos de juego.'}
                 </p>
                 {selectedPlayer?.is_guest && canManage && (
                   <div className="mt-2">
@@ -767,7 +767,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                           {!isManualSlope && teeName && <span className="text-ink-3 ml-1">({teeName})</span>}
                         </p>
                         <p className="text-xs text-ink-3 mt-0.5">
-                          El Hándicap de Juego será calculado automáticamente
+                          Los puntos de juego se calcularán automáticamente
                         </p>
                       </div>
                       <div className="flex gap-2">
@@ -881,7 +881,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                       <div className="text-sm text-ink-3 space-y-0.5">
                         <p>Puntos de juego ({numHoles} hoyos):{numHoles === 18 ? (player.exact_handicap_18 ?? player.exact_handicap) * 2 : (player.exact_handicap_18 ?? player.exact_handicap)}</p>
                         <p className="font-medium text-accent-ink">
-                          Hándicap de Juego: {player.playing_handicap}{useSlope ? ' (con Slope)' : ''}
+                          Puntos de juego: {player.playing_handicap}{useSlope ? ' (con Slope)' : ''}
                         </p>
                       </div>
                     </div>
@@ -958,7 +958,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
       {handicapNotice && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[9999]" role="dialog" aria-modal="true" aria-labelledby="personal-handicap-title">
           <div className="bg-card text-ink rounded-xl p-6 max-w-md w-full shadow-card">
-            <h2 id="personal-handicap-title" className="text-xl font-bold mb-3">Nuevo hándicap</h2>
+            <h2 id="personal-handicap-title" className="text-xl font-bold mb-3">Nuevos puntos de juego</h2>
             <p>{handicapNotice}</p>
             <button type="button" autoFocus onClick={() => setHandicapNotice('')} className="mt-5 w-full bg-accent text-on-accent rounded-lg py-3">Entendido</button>
           </div>

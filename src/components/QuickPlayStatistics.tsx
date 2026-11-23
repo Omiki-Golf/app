@@ -663,7 +663,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                   {position}
                 </span>
                 <p className={`min-w-0 truncate text-lg font-black ${style.name}`}><PlayerName name={entry.player.name} /></p>
-                <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>HCP {entry.player.playing_handicap}</span>
+                <span className={`shrink-0 text-xs font-semibold ${style.hcp}`}>PJ {entry.player.playing_handicap}</span>
               </div>
               <div className={`grid gap-2 text-center mt-auto ${gameMode === 'stableford' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div className={`rounded-lg p-2 ${style.box}`}>
@@ -706,7 +706,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
               <p className="break-words text-sm sm:text-base font-black leading-tight text-yellow-900 line-clamp-2"><PlayerName name={winner.name} /></p>
             </div>
-            <p className="text-xs font-bold text-yellow-800">HCP {winner.handicap}</p>
+            <p className="text-xs font-bold text-yellow-800">PJ {winner.handicap}</p>
           </div>
           <div className="mt-2 pt-1 border-t border-yellow-300/40">
             <p className="text-3xl font-black leading-none text-yellow-900">{winner.points}</p>
@@ -721,7 +721,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
             <div className="mt-1 min-h-[2.75rem] flex items-center justify-center">
               <p className="break-words text-sm sm:text-base font-black leading-tight text-white line-clamp-2"><PlayerName name={loser.name} /></p>
             </div>
-            <p className="text-xs font-bold text-slate-300">HCP {loser.handicap}</p>
+            <p className="text-xs font-bold text-slate-300">PJ {loser.handicap}</p>
           </div>
           <div className="mt-2 pt-1 border-t border-slate-500/40">
             <p className="text-3xl font-black leading-none text-white">{loser.points}</p>
@@ -1304,7 +1304,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <div className="flex-1 text-center bg-amber-500/20 p-6 rounded-xl border-2 border-amber-400">
                   <span className="text-amber-300 text-xs font-black uppercase">{matchResult.isTie ? 'Empate' : 'Ganador'}</span>
                   <h2 className="text-3xl font-black text-white mt-1">{matchResult.winner?.name || '—'}</h2>
-                  <p className="text-sm font-bold text-amber-200">HCP {matchResult.winner?.playing_handicap ?? 0}</p>
+                  <p className="text-sm font-bold text-amber-200">PJ {matchResult.winner?.playing_handicap ?? 0}</p>
                   <p className="text-5xl font-black text-amber-400 mt-2">{matchResult.winnerPoints} <span className="text-sm">pts</span></p>
                 </div>
 
@@ -1316,7 +1316,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                 <div className="flex-1 text-center bg-slate-700/40 p-6 rounded-xl border border-slate-600">
                   <span className="text-slate-400 text-xs font-black uppercase">{matchResult.isTie ? 'Empate' : 'Perdedor'}</span>
                   <h2 className="text-3xl font-black text-white mt-1">{matchResult.loser?.name || '—'}</h2>
-                  <p className="text-sm font-bold text-slate-300">HCP {matchResult.loser?.playing_handicap ?? 0}</p>
+                  <p className="text-sm font-bold text-slate-300">PJ {matchResult.loser?.playing_handicap ?? 0}</p>
                   <p className="text-5xl font-black text-white mt-2">{matchResult.loserPoints} <span className="text-sm">pts</span></p>
                 </div>
               </div>
@@ -1333,7 +1333,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
                           : teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </h2>
-                      <p className="text-sm font-bold text-amber-200">HCP {teamResult.winningTeam?.handicap ?? 0}</p>
+                      <p className="text-sm font-bold text-amber-200">PJ {teamResult.winningTeam?.handicap ?? 0}</p>
                     </div>
                   </div>
                   <p className="text-5xl font-black text-amber-400 mt-auto">{teamResult.winningTeam?.totalPoints ?? teamResult.losingTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>
@@ -1353,7 +1353,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
                           ? `${teamResult.winningTeam?.players.map((p) => p.name).join(' / ') || '—'} / ${teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}`
                           : teamResult.losingTeam?.players.map((p) => p.name).join(' / ') || '—'}
                       </h2>
-                      <p className="text-sm font-bold text-slate-300">HCP {teamResult.losingTeam?.handicap ?? 0}</p>
+                      <p className="text-sm font-bold text-slate-300">PJ {teamResult.losingTeam?.handicap ?? 0}</p>
                     </div>
                   </div>
                   <p className="text-5xl font-black text-white mt-auto">{teamResult.losingTeam?.totalPoints ?? teamResult.winningTeam?.totalPoints ?? 0} <span className="text-sm">pts</span></p>

@@ -170,7 +170,7 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
             </section>
 
             {/* B. TENDENCIA DE STABLEFORD Y HÁNDICAP */}
-            <Section icon={TrendingUp} title="Tendencia de Stableford y hándicap">
+            <Section icon={TrendingUp} title="Tendencia de Stableford y puntos de juego">
               <div className="space-y-5">
                 {[{ holes: 9, rounds: trend9, average: stats.stableford9.average }, { holes: 18, rounds: trend18, average: stats.stableford18.average }]
                   .filter(group => group.rounds.length > 0)
@@ -192,16 +192,16 @@ export const CareerStatistics: React.FC<CareerStatisticsProps> = ({ account, onB
                     </div>
                   ))}
                 <div>
-                  <h3 className="mb-1 text-sm font-bold text-ink">Hándicap de juego <span className="font-semibold text-ink-3">· escala 18 hoyos</span></h3>
+                  <h3 className="mb-1 text-sm font-bold text-ink">Puntos de juego <span className="font-semibold text-ink-3">· escala 18 hoyos</span></h3>
                   <TrendLineChart
                     color="var(--chart-group)"
-                    label="HCP de juego"
+                    label="Puntos de juego"
                     fromZero={false}
                     points={stats.trend.map(round => ({
                       key: round.roundId,
                       label: trendDate(round.date),
                       value: round.handicap18,
-                      detail: `${shortDate.format(new Date(round.date))} · ${round.courseName} (${round.numHoles}h): HCP ${round.handicap18}`,
+                      detail: `${shortDate.format(new Date(round.date))} · ${round.courseName} (${round.numHoles}h): PJ ${round.handicap18}`,
                     }))}
                   />
                 </div>

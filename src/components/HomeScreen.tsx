@@ -256,7 +256,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <div className="flex h-11 shrink-0 items-center gap-2 max-[360px]:h-10">
               <div className="min-w-0 text-right">
                 <p className="max-w-[7rem] truncate text-xs font-bold text-ink">{profile?.nick || t('common.user')}</p>
-                <p className="text-xs text-ink-3">HCP {displayHcp9}/{displayHcp18}</p>
+                <p className="text-xs text-ink-3">PJ {displayHcp9}/{displayHcp18}</p>
               </div>
               <button
                 onClick={onShowProfile}

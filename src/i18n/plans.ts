@@ -118,7 +118,7 @@ const en: PlansText = {
     player: {
       subtitle: 'For players who want to analyse their rounds and handicap and keep their scorecards forever.',
       action: 'Subscribe to Player', heading: 'What you get with Omiki Player',
-      features: ['UNLIMITED quick rounds', 'Lifetime history in the cloud', 'Handicap evolution charts', 'Formats: Medal, Match Play, Pairs', 'Join friends’ groups for FREE', 'Try Omiki Team for 30 days'],
+      features: ['UNLIMITED quick rounds', 'Lifetime history in the cloud', 'Game points evolution charts', 'Formats: Medal, Match Play, Pairs', 'Join friends’ groups for FREE', 'Try Omiki Team for 30 days'],
     },
     team: {
       subtitle: 'For crew captains who run permanent leagues and bar bets.',
@@ -199,7 +199,7 @@ const fr: PlansText = {
     player: {
       subtitle: 'Pour le joueur qui veut analyser ses parties et son handicap et garder ses cartes pour toujours.',
       action: "S'abonner à Player", heading: 'Ce que vous obtenez avec Omiki Player',
-      features: ['Parties rapides ILLIMITÉES', 'Historique à vie dans le cloud', "Graphiques d'évolution du handicap", 'Formules : Medal, Match Play, Doubles', "Rejoindre GRATUITEMENT des groupes d'amis", 'Essayez Omiki Team pendant 30 jours'],
+      features: ['Parties rapides ILLIMITÉES', 'Historique à vie dans le cloud', "Graphiques d'évolution des points de jeu", 'Formules : Medal, Match Play, Doubles', "Rejoindre GRATUITEMENT des groupes d'amis", 'Essayez Omiki Team pendant 30 jours'],
     },
     team: {
       subtitle: 'Pour les capitaines de bande qui organisent des ligues permanentes et des défis entre amis.',
@@ -278,9 +278,9 @@ const it: PlansText = {
       features: ['Fino a 4 partite rapide', 'Modalità Stableford base', 'Accesso senza registrazione né e-mail', 'Nessun salvataggio nel cloud', 'Nessuna statistica di handicap'],
     },
     player: {
-      subtitle: 'Per il giocatore che vuole analizzare partite e handicap e conservare per sempre le sue carte.',
+      subtitle: 'Per il giocatore che vuole analizzare partite e punti di gioco e conservare per sempre le sue carte.',
       action: 'Abbonati a Player', heading: 'Cosa ottieni con Omiki Player',
-      features: ['Partite rapide ILLIMITATE', 'Storico permanente nel cloud', "Grafici dell'andamento dell'handicap", 'Modalità: Medal, Match Play, Coppie', 'Unisciti GRATIS ai gruppi di amici', 'Prova Omiki Team per 30 giorni'],
+      features: ['Partite rapide ILLIMITATE', 'Storico permanente nel cloud', "Grafici dell'andamento dei punti di gioco", 'Modalità: Medal, Match Play, Coppie', 'Unisciti GRATIS ai gruppi di amici', 'Prova Omiki Team per 30 giorni'],
     },
     team: {
       subtitle: 'Per i capitani di compagnia che organizzano leghe permanenti e sfide al bar.',

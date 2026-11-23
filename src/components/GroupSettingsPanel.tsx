@@ -172,13 +172,13 @@ export function GroupSettingsPanel({ groupId, isOwner = false, groupName = '', o
         </div>
       </div>
 
-      {/* Variación de HCP */}
+      {/* Variación de PJ */}
       <div>
         <label className="block text-sm font-semibold text-ink mb-1">
-          Variación de HCP
+          Variación de PJ
         </label>
         <p className="text-xs text-ink-3 mb-2">
-          A cuántos jugadores se les baja el hándicap y a cuántos se les sube para la siguiente partida.
+          A cuántos jugadores se les bajan los puntos de juego y a cuántos se les suben para la siguiente partida.
         </p>
         <div className="space-y-2">
           <label className={`flex items-start gap-3 p-3 rounded-lg border transition-all cursor-pointer ${hcpVariation === 'primero_ultimo' ? 'border-accent bg-accent-soft/20 ring-1 ring-accent' : 'border-line bg-card-2 hover:bg-neutral-hover'}`}>

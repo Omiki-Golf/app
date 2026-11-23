@@ -455,7 +455,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
 
     return (
       <div className="bg-card rounded-lg p-6 border border-line">
-        <h3 className="text-lg font-bold text-ink mb-4">Evolución de Handicap</h3>
+        <h3 className="text-lg font-bold text-ink mb-4">Evolución de puntos de juego</h3>
 
         <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="bg-blue-50 rounded-lg p-4 text-center">
@@ -480,7 +480,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
               <tr>
                 <th className="sticky left-0 z-10 bg-card-2 text-left py-2 px-3 font-semibold text-ink-2">Fecha</th>
                 <th className="text-left py-2 px-3 font-semibold text-ink-2">Campo</th>
-                <th className="text-right py-2 px-3 font-semibold text-ink-2">Handicap</th>
+                <th className="text-right py-2 px-3 font-semibold text-ink-2">PJ</th>
                 <th className="text-right py-2 px-3 font-semibold text-ink-2">Cambio</th>
               </tr>
             </thead>
@@ -889,12 +889,12 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
                     {playerStats.detailed && (
                       <>
                         <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
-                          <h3 className="text-xl font-bold text-blue-900 mb-4">Handicap</h3>
+                          <h3 className="text-xl font-bold text-blue-900 mb-4">Puntos de juego</h3>
                           <div className="text-center">
                             <p className="text-4xl font-bold text-blue-700">
                               {playerStats.detailed.current_handicap?.toFixed(1) || '0.0'}
                             </p>
-                            <p className="text-sm text-ink-3 mt-2">Handicap actual (9 hoyos)</p>
+                            <p className="text-sm text-ink-3 mt-2">Puntos de juego actuales (9 hoyos)</p>
                           </div>
                         </div>
 
@@ -1548,7 +1548,7 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
               rankingModal.type === 'corto' ? 'Ranking de jugadores con más "No pasó de Rojas"' :
               rankingModal.type === 'driverOro' ? 'Ranking de jugadores con menos "No pasó de Rojas"' :
               rankingModal.type === 'shark' ? 'Ranking de jugadores con más victorias' :
-              rankingModal.type === 'viciado' ? 'Ranking de jugadores con más partidas jugadas y HCP promedio' :
+              rankingModal.type === 'viciado' ? 'Ranking de jugadores con más partidas jugadas y PJ promedio' :
               rankingModal.type === 'francotirador' ? 'Ranking de jugadores con más eagles' :
               rankingModal.type === 'maquina' ? 'Ranking de jugadores con más birdies' :
               rankingModal.type === 'amigoDelMasUno' ? 'Ranking de jugadores con más bogeys' :

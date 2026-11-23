@@ -16,7 +16,7 @@ test('group roster includes guests and offers the same registered-or-guest addit
   assert.match(migration, /'is_guest',true/);
   assert.match(roster, /searchByNick/);
   assert.match(roster, /addGroupGuest/);
-  assert.match(roster, /HCP 18 hoyos/);
+  assert.match(roster, /PJ 18 hoyos/);
 });
 
 test('compact roster uses a trash icon and administrator crown', () => {

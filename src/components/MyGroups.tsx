@@ -315,8 +315,8 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-ink">{userNick || t('profile.player')}</p>
                       <p className="text-sm text-ink-2">
-                        {group.handicap18 === undefined ? 'HCP no disponible' : group.handicap18 === null ? 'HCP pendiente' : (
-                          <><span className="inline-block mr-3">HCP 9: <strong>{Math.round(group.handicap18 / 2)}</strong></span><span className="inline-block">HCP 18: <strong>{group.handicap18}</strong></span></>
+                        {group.handicap18 === undefined ? 'PJ no disponibles' : group.handicap18 === null ? 'PJ pendientes' : (
+                          <><span className="inline-block mr-3">PJ 9: <strong>{Math.round(group.handicap18 / 2)}</strong></span><span className="inline-block">PJ 18: <strong>{group.handicap18}</strong></span></>
                         )}
                       </p>
                     </div>

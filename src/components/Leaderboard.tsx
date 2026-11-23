@@ -282,7 +282,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                             <PlayerName name={entry.name} />{entry.hasGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}
                           </p>
                           <div className="flex gap-4 text-sm text-ink-3">
-                            <span>HCP: {entry.handicapText}</span>
+                            <span>PJ: {entry.handicapText}</span>
                             <span>Hoyos: {entry.holesCompleted}</span>
                           </div>
                           {hasGroup && entry.badges.length > 0 && (
@@ -453,7 +453,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                                     <div>
                                       <p className={`font-semibold ${style.text}`}><PlayerName name={item.player.name} />{item.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                                       <p className="text-xs text-ink-3">
-                                        HCP {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
+                                        PJ {item.player.playing_handicap} • {item.stats.scoresEntered} hoyos
                                       </p>
                                     </div>
                                   </div>

@@ -218,7 +218,7 @@ export const ArchivedRoundDetailModal: React.FC<ArchivedRoundDetailModalProps> =
                             </div>
                             <div>
                               <p className="font-semibold text-ink"><PlayerName name={player.player_name} />{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
-                              <p className="text-xs text-ink-3">HCP: {player.hcp_juego}</p>
+                              <p className="text-xs text-ink-3">PJ: {player.hcp_juego}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">

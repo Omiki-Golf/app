@@ -150,7 +150,7 @@ export const AwardRankingModal: React.FC<AwardRankingModalProps> = ({
                     <p className="mt-1 text-xs sm:text-sm text-ink-3">
                       <span className="whitespace-nowrap">{entry.rounds} partidas</span>
                       {entry.handicap !== null && entry.handicap !== undefined && (
-                        <span className="whitespace-nowrap"> · HCP {Number(entry.handicap).toFixed(1)}</span>
+                        <span className="whitespace-nowrap"> · PJ {Number(entry.handicap).toFixed(1)}</span>
                       )}
                     </p>
                   </div>

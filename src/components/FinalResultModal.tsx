@@ -47,7 +47,7 @@ export const FinalResultModal: React.FC<FinalResultModalProps> = ({ result, onCl
           )}
           {result.decidedByHandicap && (
             <p className="mt-2 text-xs font-medium text-accent-ink">
-              Empate a puntos: gana {result.mode === 'parejas' ? 'la pareja' : 'el jugador'} de hándicap más bajo.
+              Empate a puntos: gana {result.mode === 'parejas' ? 'la pareja' : 'el jugador'} con menos puntos de juego.
             </p>
           )}
         </div>

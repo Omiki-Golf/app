@@ -162,10 +162,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             {handicap18 !== undefined && (
               <div
                 className="shrink-0 text-right pl-3 sm:pl-4 border-l border-line flex flex-col items-end justify-center"
-                aria-label={`HCP 18: ${handicap18}, HCP 9: ${handicap9}`}
+                aria-label={`PJ 18: ${handicap18}, PJ 9: ${handicap9}`}
               >
                 <div className="flex items-center gap-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">HCP</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">PJ</span>
                   <button
                     type="button"
                     onClick={() => setShowHandicapInfo(true)}
@@ -181,7 +181,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <span className="text-ink-4 text-xl sm:text-2xl font-light mx-0.5 sm:mx-1">/</span>
                   <span className="text-accent-ink">{handicap18}</span>
                 </p>
-                <span className="sr-only">HCP 18: {handicap18}</span>
+                <span className="sr-only">PJ 18: {handicap18}</span>
                 <p className="text-[10px] text-ink-3 font-semibold uppercase tracking-wider">
                   9h <span className="text-ink-4">/</span> 18h
                 </p>

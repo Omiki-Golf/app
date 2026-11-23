@@ -217,7 +217,7 @@ useEffect(() => {
               <p className="text-sm text-yellow-800 font-semibold mb-1">GANADOR</p>
               <p className="text-3xl font-bold text-yellow-900"><PlayerName name={winner.player.name} />{winner.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
               <p className="text-sm text-yellow-700 mt-1">
-                HCP {winner.player.playing_handicap} • {winner.holesPlayed} hoyos
+                PJ {winner.player.playing_handicap} • {winner.holesPlayed} hoyos
               </p>
             </div>
             <div className="text-right">
@@ -299,7 +299,7 @@ useEffect(() => {
                   <div>
                     <p className="font-bold text-lg text-ink"><PlayerName name={stats.player.name} />{stats.player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
                     <p className="text-sm text-ink-3">
-                      HCP {stats.player.playing_handicap} • {stats.holesPlayed} hoyos
+                      PJ {stats.player.playing_handicap} • {stats.holesPlayed} hoyos
                     </p>
                   </div>
                 </div>

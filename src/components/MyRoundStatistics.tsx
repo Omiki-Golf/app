@@ -221,7 +221,7 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                   <dd className="mt-auto pt-1 text-3xl font-black leading-none">{myStats.points}</dd>
                 </div>
                 <div className="flex flex-col rounded-lg bg-white/35 p-2">
-                  <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide">HCP de juego</dt>
+                  <dt className="text-[11px] font-semibold uppercase leading-tight tracking-wide">Puntos de juego</dt>
                   <dd className="mt-auto pt-1 text-3xl font-black leading-none">{myStats.handicap}</dd>
                 </div>
                 <div className="flex flex-col rounded-lg bg-white/25 p-2">
@@ -340,7 +340,7 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
             {/* Evolución de la partida: dos propuestas para comparar antes de quedarnos con una. */}
             <section aria-labelledby="my-evolution" className="statistics-panel rounded-2xl p-3 md:p-5">
               <h2 id="my-evolution" className="statistics-table-title mb-3 text-xl font-black">Evolución de la partida</h2>
-              <h3 className="statistics-table-text mb-1 text-sm font-bold">Puntos acumulados frente a tu hándicap</h3>
+              <h3 className="statistics-table-text mb-1 text-sm font-bold">Puntos acumulados frente a tus puntos de juego</h3>
               <CumulativePointsChart evolution={evolution} />
               <h3 className="statistics-table-text mt-5 mb-1 text-sm font-bold">Golpes y puntos por hoyo</h3>
               <StrokesPointsChart evolution={evolution} />
@@ -365,7 +365,7 @@ export const MyRoundStatistics: React.FC<MyRoundStatisticsProps> = ({ account, o
                       <tr className="statistics-table-line border-b-2">
                         <th className="statistics-table-text p-2 text-left font-bold">Pos.</th>
                         <th className="statistics-table-text p-2 text-left font-bold">Jugador</th>
-                        <th className="statistics-table-text p-2 text-center font-bold">HCP</th>
+                        <th className="statistics-table-text p-2 text-center font-bold">PJ</th>
                         <th className="statistics-table-text p-2 text-center font-bold">Puntos</th>
                         <th className="statistics-table-text p-2 text-center font-bold">Vs Par</th>
                       </tr>

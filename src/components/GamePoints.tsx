@@ -136,7 +136,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
       }
 
       if (newHandicap > 54) {
-        setEditError('El handicap máximo es 54');
+        setEditError('El máximo de puntos de juego es 54');
         return;
       }
 
@@ -145,7 +145,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
       handleCancelEditHandicap();
     } catch (error) {
       console.error('Error actualizando handicap:', error);
-      setEditError('Error al actualizar el handicap');
+      setEditError('Error al actualizar los puntos de juego');
     }
   };
 
@@ -389,7 +389,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                   </p>
                                   <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                                   <span className="text-sm text-ink-3">
-                                    HCP: {standing.playingHandicap}
+                                    PJ: {standing.playingHandicap}
                                   </span>
                                   {standing.noPasoRojasHoles && standing.noPasoRojasHoles.length > 0 && (
                                     <div className="flex items-center gap-1">
@@ -439,7 +439,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                 <div className="flex items-center mb-4">
                   <TrendingUp className="w-6 h-6 mr-2 text-accent-ink" />
                   <h2 className="text-2xl font-semibold text-title">
-                    Nuevo Handicap
+                    Nuevos puntos de juego
                   </h2>
                 </div>
                 <div className="bg-card-2 rounded-lg p-5 border border-line">
@@ -458,11 +458,11 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                         </p>
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <p className="text-xs uppercase tracking-wide text-ink-3">HCP actual</p>
+                            <p className="text-xs uppercase tracking-wide text-ink-3">PJ actuales</p>
                             <p className="text-2xl font-bold text-ink-2">{adjustment.currentHandicap}</p>
                           </div>
                           <div>
-                            <p className="text-xs uppercase tracking-wide text-ink-3">HCP nuevo</p>
+                            <p className="text-xs uppercase tracking-wide text-ink-3">PJ nuevos</p>
                             <p className="text-2xl font-bold text-title flex items-center justify-center gap-1">
                               {adjustment.newHandicap}
                               {adjustment.adjustment !== 0 ? (
@@ -508,7 +508,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                   <div className="flex items-center">
                     <History className="w-6 h-6 mr-2 text-blue-700" />
                     <h2 className="text-2xl font-semibold text-blue-900">
-                      Histórico de Handicaps
+                      Histórico de puntos de juego
                     </h2>
                   </div>
                   {showHandicapHistory ? (
@@ -572,7 +572,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                 >
                                   <div className="flex flex-col items-center gap-1">
                                     <div className="flex items-center gap-1">
-                                      <span className="text-xs text-ink-3">HCP Juego:</span>
+                                      <span className="text-xs text-ink-3">Puntos de juego:</span>
                                       <span className="text-sm font-medium text-ink-2">
                                         {playingHandicap.toFixed(1)}
                                       </span>
@@ -596,7 +596,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                                       </div>
                                     )}
                                     <div className="flex items-center gap-1">
-                                      <span className="text-xs text-ink-3">Nuevo HCP:</span>
+                                      <span className="text-xs text-ink-3">Nuevos PJ:</span>
                                       <span className="text-sm font-bold text-blue-700">
                                         {newHandicap.toFixed(1)}
                                       </span>
@@ -638,7 +638,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
               </button>
               {showPlayers && (
                 <div className="overflow-x-hidden pr-1">
-                  <p className="text-sm text-ink-3 mb-3">Estas fichas se utilizan para jugar y guardar hándicaps e históricos. Aceptar una invitación al grupo no crea una ficha de juego.</p>
+                  <p className="text-sm text-ink-3 mb-3">Estas fichas se utilizan para jugar y guardar puntos de juego e históricos. Aceptar una invitación al grupo no crea una ficha de juego.</p>
                   {players.length === 0 ? (
                     <p className="text-ink-3 text-center py-4">
                       Todavía no hay fichas de jugadores para las partidas
@@ -679,7 +679,7 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                               {editingPlayerId === player.id ? (
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <div className="flex items-center gap-1">
-                                    <span className="text-xs text-accent-ink">HCP:</span>
+                                    <span className="text-xs text-accent-ink">PJ:</span>
                                     <input
                                       type="number"
                                       step="0.1"
@@ -707,12 +707,12 @@ export function GamePoints({ onBack, groupId, messagesButton }: GamePointsProps)
                               ) : (
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-accent-ink font-semibold text-sm whitespace-nowrap">
-                                    HCP: {(player.exact_handicap_18 ?? player.exact_handicap).toFixed(1)}
+                                    PJ: {(player.exact_handicap_18 ?? player.exact_handicap).toFixed(1)}
                                   </span>
                                   <button
                                     onClick={() => handleEditHandicapClick(player)}
                                     className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors"
-                                    title="Editar handicap"
+                                    title="Editar puntos de juego"
                                   >
                                     <Edit2 size={16} />
                                   </button>
