@@ -34,7 +34,7 @@ const markerColors = [
   // Colores separados por tono y luminosidad; cada fondo define su tinta
   // para mantener legibles las iniciales en los temas claro y oscuro.
   'bg-blue-600 border-blue-300 text-white',
-  'bg-orange-500 border-orange-200 text-slate-950',
+  'bg-red-600 border-red-300 text-white',
   'bg-yellow-300 border-yellow-100 text-slate-950',
 ] as const;
 
@@ -347,8 +347,8 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
           const team = teamAssignments[player.id] ?? (playerIndex < 2 ? 0 : 1);
           const teamLabel = team === 0 ? 'P1' : 'P2';
           const teamClasses = team === 0
-            ? 'border-blue-400 ring-1 ring-blue-100'
-            : 'border-orange-400 ring-1 ring-orange-100';
+            ? 'border-blue-500 ring-1 ring-blue-100 dark:ring-blue-900'
+            : 'border-red-500 ring-1 ring-red-100 dark:ring-red-900';
 
           // En Parejas los puntos son de la pareja: se muestran una sola vez, en la cabecera de cada pareja.
           const startsTeam = isParejas && (playerIndex === 0 || (teamAssignments[players[playerIndex - 1].id] ?? (playerIndex - 1 < 2 ? 0 : 1)) !== team);
@@ -358,7 +358,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
           return (
             <React.Fragment key={player.id}>
             {startsTeam && (
-              <div className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${playerIndex > 0 ? 'mt-2' : ''} ${team === 0 ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100' : 'bg-orange-50 text-orange-900 dark:bg-orange-950/40 dark:text-orange-100'}`}>
+              <div className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${playerIndex > 0 ? 'mt-2' : ''} ${team === 0 ? 'bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100' : 'bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-100'}`}>
                 <span className="flex min-w-0 items-center gap-2 text-sm font-semibold">
                   <ColorMarker colorIndex={team} />
                   <span className="truncate">Pareja {team + 1} · {teamMembers.map((member) => member.name).join(' / ')}</span>
@@ -729,7 +729,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
                 const badgeClass = team0Pts > team1Pts
                   ? 'bg-blue-600 text-white border-blue-400'
                   : team1Pts > team0Pts
-                  ? 'bg-orange-500 text-slate-950 border-orange-300'
+                  ? 'bg-red-600 text-white border-red-400'
                   : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                 return (
                   <div className="flex flex-wrap items-center justify-center gap-1.5 font-bold">

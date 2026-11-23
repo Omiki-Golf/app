@@ -857,12 +857,12 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                 {gameMode === 'parejas' && players.length === 4 && (
                   <div className="flex items-center justify-center gap-4 mb-2 text-xs font-semibold">
                     <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-blue-500"></span>Pareja 1</span>
-                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-orange-500"></span>Pareja 2</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-600"></span>Pareja 2</span>
                   </div>
                 )}
                 {players.map((player, idx) => {
                   const teamIdx = gameMode === 'parejas' && players.length === 4 ? (idx < 2 ? 0 : 1) : -1;
-                  const teamColor = teamIdx === 0 ? 'border-l-4 border-l-blue-500 bg-blue-50' : teamIdx === 1 ? 'border-l-4 border-l-orange-500 bg-orange-50' : 'bg-card-2 border border-line';
+                  const teamColor = teamIdx === 0 ? 'border-l-4 border-l-blue-500 bg-blue-50' : teamIdx === 1 ? 'border-l-4 border-l-red-600 bg-red-50' : 'bg-card-2 border border-line';
                   return (
                   <div
                     key={player.id}
@@ -873,7 +873,7 @@ export const PlayerSetup: React.FC<PlayerSetupProps> = ({
                         <p className="font-semibold text-ink"><PlayerName name={player.name} /></p>
                             <p className="text-xs text-ink-3">{player.is_guest ? "Invitado" : player.user_id ? "Cuenta registrada" : "Miembro sin cuenta vinculada"}</p>
                         {teamIdx >= 0 && (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${teamIdx === 0 ? 'bg-blue-200 text-blue-800' : 'bg-orange-200 text-orange-800'}`}>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${teamIdx === 0 ? 'bg-blue-200 text-blue-800' : 'bg-red-200 text-red-800'}`}>
                             P{teamIdx + 1}
                           </span>
                         )}

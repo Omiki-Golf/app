@@ -539,7 +539,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                         <td className="p-2 font-medium text-ink">
                           <div className="flex items-center gap-2">
                             {gameMode === 'parejas' && players.length === 4 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-100 dark:border dark:border-orange-700'}`}>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-100 dark:border dark:border-red-700'}`}>
                                 {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                               </span>
                             )}
@@ -675,7 +675,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                           const color = diff > 0
                             ? 'bg-blue-600 text-white border-blue-400'
                             : diff < 0
-                            ? 'bg-orange-500 text-slate-950 border-orange-300'
+                            ? 'bg-red-600 text-white border-red-400'
                             : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
@@ -704,7 +704,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                           const color = t0Accum > t1Accum
                             ? 'bg-blue-600 text-white border-blue-400'
                             : t1Accum > t0Accum
-                            ? 'bg-orange-500 text-slate-950 border-orange-300'
+                            ? 'bg-red-600 text-white border-red-400'
                             : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                           return (
                             <td key={h.hole_number} className="text-center p-1">
@@ -735,7 +735,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             const color = diff > 0
                               ? 'bg-blue-600 text-white border-blue-400'
                               : diff < 0
-                              ? 'bg-orange-500 text-slate-950 border-orange-300'
+                              ? 'bg-red-600 text-white border-red-400'
                               : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                             return <span className={`text-xs font-bold px-2 py-1 rounded border shadow-sm ${color}`}>{label}</span>;
                           }
@@ -754,7 +754,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             const color = t0 > t1
                               ? 'bg-blue-600 text-white border-blue-400'
                               : t1 > t0
-                              ? 'bg-orange-500 text-slate-950 border-orange-300'
+                              ? 'bg-red-600 text-white border-red-400'
                               : 'bg-card text-ink border-line-2 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-600';
                             return <span className={`text-xs font-bold px-2 py-1 rounded border shadow-sm ${color}`}>{label}</span>;
                           }
@@ -829,7 +829,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                         {position}º
                       </span>
                       {gameMode === 'parejas' && players.length === 4 && (
-                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
                           {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                         </span>
                       )}
@@ -880,7 +880,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             {gameMode === 'parejas' && players.length === 4 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/80 dark:text-orange-100 dark:border dark:border-orange-700'}`}>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-100 dark:border dark:border-red-700'}`}>
                                 {players.indexOf(player) < 2 ? 'P1' : 'P2'}
                               </span>
                             )}

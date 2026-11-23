@@ -629,7 +629,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
     }));
   }
 
-  // En Parejas, los dos jugadores de cada pareja comparten color (azul y naranja, como en la tarjeta).
+  // En Parejas, los dos jugadores de cada pareja comparten color (azul y rojo, como en la tarjeta).
   const teamOfPlayer = (playerId: string): 0 | 1 | null => {
     if (!isParejasMode || !roundData.players) return null;
     const position = roundData.players.findIndex((player) => player.id === playerId);
@@ -637,7 +637,7 @@ export const QuickPlayStatistics: React.FC<QuickPlayStatisticsProps> = ({ onBack
   };
   const positionBadgeClass = (index: number, team: 0 | 1 | null) =>
     team === 0 ? 'bg-blue-600 text-white' :
-    team === 1 ? 'bg-orange-700 text-white' :
+    team === 1 ? 'bg-red-600 text-white' :
     index === 0 ? 'bg-yellow-400 text-yellow-950' :
     index === 1 ? 'bg-slate-400 text-slate-900' :
     index === 2 ? 'bg-orange-400 text-orange-950' :
