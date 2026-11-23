@@ -766,14 +766,23 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                   players.map(player => {
                     const round = roundsMap.get(player.id);
                     const points = playableHoles.reduce((sum, h) => sum + (round?.scores[h.hole_number]?.stableford_points ?? 0), 0);
-                    return { player, points };
+                    // Cómo va (neto): golpes − golpes de ventaja − par, solo en los hoyos ya jugados (como la columna Netos).
+                    let toPar = 0;
+                    let holesPlayed = 0;
+                    playableHoles.forEach(h => {
+                      const score = round?.scores[h.hole_number];
+                      if (!score?.gross_strokes || score.abandoned) return;
+                      toPar += score.gross_strokes - (score.strokes_received || 0) - h.par;
+                      holesPlayed++;
+                    });
+                    return { player, points, toPar: holesPlayed > 0 ? toPar : null };
                   }),
                   entry => entry.points,
                   entry => entry.player.playing_handicap,
                 );
                 const podium = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
                 return standings.map((entry, index) => {
-                const { player, points: totalPoints } = entry;
+                const { player, points: totalPoints, toPar } = entry;
                 const position = competitionPosition(standings, index, (a, b) =>
                   a.points === b.points && a.player.playing_handicap === b.player.playing_handicap);
 
@@ -795,6 +804,14 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                     </div>
                     <p className="text-2xl font-bold text-accent-ink">{totalPoints}</p>
                     <p className="text-xs text-ink-3">{totalPoints === 1 ? 'punto' : 'puntos'}</p>
+                    {toPar !== null && (
+                      <p
+                        className={`mt-1 text-sm font-bold ${toPar < 0 ? 'text-accent-ink' : toPar > 0 ? 'text-red-600 dark:text-red-400' : 'text-ink-2'}`}
+                        title="Cómo va respecto al par, con hándicap, en los hoyos jugados"
+                      >
+                        {toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `${toPar}`}
+                      </p>
+                    )}
                   </div>
                 );
                 });
