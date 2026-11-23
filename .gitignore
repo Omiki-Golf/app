@@ -27,3 +27,6 @@ supabase/.temp/
 .local/
 src/data/generated/
 .aider*
+
+# Documentos de trabajo locales (propuestas en PDF), fuera del repositorio
+docs/
