@@ -3,12 +3,43 @@ import { Check, Save } from 'lucide-react';
 import { groupSettingsService, HandicapVariationMode, GAMIFICATION_UPDATED_EVENT } from '../services/groupSettingsService';
 import { gamificationProduct } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
+import { supabase } from '../services/supabaseClient';
 
 interface GroupSettingsPanelProps {
   groupId: string;
+  /** Solo el creador puede cambiar el nombre del grupo. */
+  isOwner?: boolean;
+  groupName?: string;
+  onRenamed?: (name: string) => void;
 }
 
-export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
+const MAX_GROUP_NAME = 60;
+
+export function GroupSettingsPanel({ groupId, isOwner = false, groupName = '', onRenamed }: GroupSettingsPanelProps) {
+  const [name, setName] = useState(groupName);
+  const [renaming, setRenaming] = useState(false);
+  const [renameMessage, setRenameMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => { setName(groupName); }, [groupName]);
+
+  const handleRename = async () => {
+    const clean = name.trim();
+    if (!clean) { setRenameMessage({ ok: false, text: 'El nombre del grupo es obligatorio.' }); return; }
+    setRenaming(true);
+    setRenameMessage(null);
+    const { data, error } = await supabase.rpc('rename_owned_group', { p_group: groupId, p_name: clean });
+    setRenaming(false);
+    if (error) {
+      console.error('Error renombrando el grupo:', error);
+      setRenameMessage({ ok: false, text: error.message || 'No se ha podido cambiar el nombre.' });
+      return;
+    }
+    const saved = typeof data === 'string' ? data : clean;
+    setName(saved);
+    onRenamed?.(saved);
+    setRenameMessage({ ok: true, text: 'Nombre actualizado' });
+    setTimeout(() => setRenameMessage(null), 3000);
+  };
+
   const [minRounds, setMinRounds] = useState<number>(0);
   const [hcpVariation, setHcpVariation] = useState<HandicapVariationMode>('mitad');
   const [loading, setLoading] = useState(true);
@@ -81,6 +112,39 @@ export function GroupSettingsPanel({ groupId }: GroupSettingsPanelProps) {
 
   return (
     <div className="space-y-4 pt-1">
+      {isOwner && (
+        <div>
+          <label htmlFor={`group-name-${groupId}`} className="block text-sm font-semibold text-ink mb-1">
+            Nombre del grupo
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              id={`group-name-${groupId}`}
+              type="text"
+              value={name}
+              maxLength={MAX_GROUP_NAME}
+              onChange={(e) => { setName(e.target.value); setRenameMessage(null); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && name.trim() && name.trim() !== groupName) void handleRename(); }}
+              className="min-w-0 flex-1 bg-card-2 border border-line rounded-lg px-3 py-2 text-ink text-base focus:outline-none focus:ring-2 focus:ring-accent"
+            />
+            <button
+              type="button"
+              disabled={renaming || !name.trim() || name.trim() === groupName}
+              onClick={handleRename}
+              className="shrink-0 inline-flex items-center gap-1 bg-accent text-on-accent px-3 py-2 rounded-lg hover:bg-accent-hover transition-colors font-semibold text-sm disabled:opacity-50"
+            >
+              <Save size={16} />
+              {renaming ? 'Guardando...' : 'Cambiar'}
+            </button>
+          </div>
+          {renameMessage && (
+            <p role={renameMessage.ok ? 'status' : 'alert'} className={`mt-1 text-xs font-semibold ${renameMessage.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>
+              {renameMessage.text}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Partidas mínimas */}
       <div>
         <label className="block text-sm font-semibold text-ink mb-1">

@@ -402,7 +402,12 @@ export default function MyGroups({ onBack, backDestination = 'back', onGroupSele
                             )}
                           </button>
                         </div>}
-                        <GroupSettingsPanel groupId={group.id} />
+                        <GroupSettingsPanel
+                          groupId={group.id}
+                          isOwner={group.access === 'owner'}
+                          groupName={group.name}
+                          onRenamed={(name) => setGroups(current => current.map(g => g.id === group.id ? { ...g, name } : g))}
+                        />
                       </div>
                     </div>
                   )}

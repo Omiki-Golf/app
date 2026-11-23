@@ -861,77 +861,63 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </>
             )}
 
-            {spanishHandsEnabled && (
-              <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
-                  <GamificationBadge productId="spanish-hand" size={22} />
-                  Spanish Hands
-                </h3>
-                <div className="space-y-3">
-                  {players.map((player) => {
-                    const playerRound = roundsMap.get(player.id);
-                    const spanishHandsHoles = playableHoles
-                      .filter(h => playerRound?.scores[h.hole_number]?.spanish_hands)
-                      .map(h => h.hole_number);
-                    return (
-                      <div key={player.id} className="bg-accent-soft border-2 border-accent-ring rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {spanishHandsHoles.length > 0
-                              ? spanishHandsHoles.map(holeNumber => (
-                                  <span key={holeNumber} className="bg-accent text-on-accent text-xs font-bold rounded-full px-2 py-0.5">
-                                    Hoyo {holeNumber}
-                                  </span>
-                                ))
-                              : <span className="text-xs text-ink-3">Ninguno</span>}
-                          </div>
-                        </div>
-                        <div className="bg-accent-soft border-2 border-accent-ring rounded-lg px-4 py-2 min-w-[60px] text-center">
-                          <p className="text-2xl font-bold text-accent-ink">{spanishHandsHoles.length}</p>
-                        </div>
+            {(() => {
+              // Rojas va arriba a todo el ancho. El resto: 1 o 2 títulos a todo el ancho; con más de 2, en dos columnas.
+              const sections = [
+                ...(spanishHandsEnabled ? [{
+                  id: 'spanish-hand', name: 'Spanish Hands', chip: 'bg-accent text-on-accent',
+                  row: 'bg-accent-soft border-accent-ring', box: 'bg-accent-soft border-accent-ring', count: 'text-accent-ink',
+                  holesFor: (playerId: string) => playableHoles
+                    .filter(h => roundsMap.get(playerId)?.scores[h.hole_number]?.spanish_hands)
+                    .map(h => h.hole_number),
+                }] : []),
+                ...extraGamification.map(product => ({
+                  id: product.id, name: product.name, chip: product.badge,
+                  row: 'bg-card-2 border-line', box: 'bg-card border-line', count: 'text-ink',
+                  holesFor: (playerId: string) => playableHoles
+                    .filter(h => roundsMap.get(playerId)?.scores[h.hole_number]?.gamification_events?.includes(product.id))
+                    .map(h => h.hole_number),
+                })),
+              ];
+              if (!sections.length) return null;
+              const twoColumns = sections.length > 2;
+              return (
+                <div className={twoColumns ? 'grid grid-cols-2 gap-x-3' : ''}>
+                  {sections.map(section => (
+                    <div key={section.id} className="min-w-0">
+                      <h3 className={`font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2 min-w-0 ${twoColumns ? 'text-sm' : ''}`}>
+                        <GamificationBadge productId={section.id} size={twoColumns ? 18 : 22} />
+                        <span className="truncate" title={section.name}>{section.name}</span>
+                      </h3>
+                      <div className={twoColumns ? 'space-y-2' : 'space-y-3'}>
+                        {players.map(player => {
+                          const holes = section.holesFor(player.id);
+                          return (
+                            <div key={player.id} className={`${section.row} border-2 rounded-lg flex items-center justify-between gap-2 ${twoColumns ? 'p-2' : 'p-3'}`}>
+                              <div className="min-w-0">
+                                <p className={`font-semibold text-ink truncate ${twoColumns ? 'text-sm' : ''}`}><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {holes.length > 0
+                                    ? holes.map(holeNumber => (
+                                        <span key={holeNumber} className={`${section.chip} font-bold rounded-full ${twoColumns ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
+                                          {twoColumns ? `H${holeNumber}` : `Hoyo ${holeNumber}`}
+                                        </span>
+                                      ))
+                                    : <span className="text-xs text-ink-3">Ninguno</span>}
+                                </div>
+                              </div>
+                              <div className={`${section.box} border-2 rounded-lg text-center shrink-0 ${twoColumns ? 'px-2 py-1 min-w-[40px]' : 'px-4 py-2 min-w-[60px]'}`}>
+                                <p className={`font-bold ${section.count} ${twoColumns ? 'text-lg' : 'text-2xl'}`}>{holes.length}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
-              </>
-            )}
-
-            {extraGamification.map(product => (
-              <React.Fragment key={product.id}>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
-                  <GamificationBadge productId={product.id} size={22} />
-                  {product.name}
-                </h3>
-                <div className="space-y-3">
-                  {players.map(player => {
-                    const playerRound = roundsMap.get(player.id);
-                    const eventHoles = playableHoles
-                      .filter(h => playerRound?.scores[h.hole_number]?.gamification_events?.includes(product.id))
-                      .map(h => h.hole_number);
-                    return (
-                      <div key={player.id} className="bg-card-2 border-2 border-line rounded-lg p-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {eventHoles.length > 0
-                              ? eventHoles.map(holeNumber => (
-                                  <span key={holeNumber} className={`${product.badge} text-xs font-bold rounded-full px-2 py-0.5`}>
-                                    Hoyo {holeNumber}
-                                  </span>
-                                ))
-                              : <span className="text-xs text-ink-3">Ninguno</span>}
-                          </div>
-                        </div>
-                        <div className="bg-card border-2 border-line rounded-lg px-4 py-2 min-w-[60px] text-center">
-                          <p className="text-2xl font-bold text-ink">{eventHoles.length}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </React.Fragment>
-            ))}
+              );
+            })()}
 
           </div>
         </div>

@@ -110,6 +110,34 @@ const AwardChampions: React.FC<{ rows: RankingRpcRow[]; type: AwardType; unit: s
     return null;
   }
 
+  return <ChampionCards absolute={absolute} fair={fair} tone={tone} />;
+};
+
+/**
+ * Ficha de cada título de gamificación, con el mismo estilo que los Premios Especiales:
+ * degradado y borde de su color, descripción y botón del ranking. Clases literales para Tailwind.
+ */
+interface GamificationAwardStyle {
+  card: string; border: string; title: string; tone: string; button: string; accent: string;
+  description: string; valueLabel: string;
+}
+const GAMIFICATION_AWARD_STYLES: Record<string, GamificationAwardStyle> = {
+  'spanish-hand': { card: 'bg-accent-soft', border: 'border-accent-ring', title: 'text-accent-ink', tone: 'text-accent-ink', button: 'bg-accent hover:bg-accent-hover text-on-accent', accent: 'bg-accent', description: 'Más Spanish Hands', valueLabel: 'Spanish Hands' },
+  buceador: { card: 'bg-gradient-to-br from-blue-50 to-blue-100', border: 'border-blue-300', title: 'text-blue-900', tone: 'text-blue-800', button: 'bg-blue-700 hover:bg-blue-800 text-white', accent: 'bg-blue-400', description: 'Más bolas al agua', valueLabel: 'bolas al agua' },
+  minero: { card: 'bg-gradient-to-br from-amber-50 to-amber-100', border: 'border-amber-300', title: 'text-amber-900', tone: 'text-amber-800', button: 'bg-amber-600 hover:bg-amber-700 text-white', accent: 'bg-amber-400', description: 'Más golpes desde el búnker', valueLabel: 'búnkers' },
+  lumberjack: { card: 'bg-gradient-to-br from-green-50 to-green-100', border: 'border-green-300', title: 'text-green-900', tone: 'text-green-800', button: 'bg-green-700 hover:bg-green-800 text-white', accent: 'bg-green-400', description: 'Más árboles golpeados', valueLabel: 'árboles' },
+  'maestro-obstaculos': { card: 'bg-gradient-to-br from-purple-50 to-purple-100', border: 'border-purple-300', title: 'text-purple-900', tone: 'text-purple-800', button: 'bg-purple-700 hover:bg-purple-800 text-white', accent: 'bg-purple-400', description: 'Más obstáculos salvados con par o mejor', valueLabel: 'salvadas' },
+  'fenomeno-tee': { card: 'bg-gradient-to-br from-cyan-50 to-cyan-100', border: 'border-cyan-300', title: 'text-cyan-900', tone: 'text-cyan-800', button: 'bg-cyan-700 hover:bg-cyan-800 text-white', accent: 'bg-cyan-400', description: 'Más mejores drives de la jornada', valueLabel: 'drives' },
+  abrelatas: { card: 'bg-gradient-to-br from-orange-50 to-orange-100', border: 'border-orange-300', title: 'text-orange-900', tone: 'text-orange-800', button: 'bg-orange-700 hover:bg-orange-800 text-white', accent: 'bg-orange-400', description: 'Más bolas perdidas', valueLabel: 'bolas perdidas' },
+  'hada-patos': { card: 'bg-gradient-to-br from-pink-50 to-pink-100', border: 'border-pink-300', title: 'text-pink-900', tone: 'text-pink-800', button: 'bg-pink-600 hover:bg-pink-700 text-white', accent: 'bg-pink-400', description: 'Más patos asustados', valueLabel: 'patos' },
+};
+const DEFAULT_GAMIFICATION_AWARD_STYLE: GamificationAwardStyle = {
+  card: 'bg-card-2', border: 'border-line', title: 'text-ink', tone: 'text-ink', button: 'bg-accent hover:bg-accent-hover text-on-accent', accent: 'bg-accent', description: 'Más marcas', valueLabel: 'marcas',
+};
+const gamificationAwardStyle = (id: string) => GAMIFICATION_AWARD_STYLES[id] ?? DEFAULT_GAMIFICATION_AWARD_STYLE;
+
+/** Rejilla de 2 tarjetas: campeón Absoluto (total) y Por partida (promedio). */
+const ChampionCards: React.FC<{ absolute: FairRankingEntry; fair: FairRankingEntry | null; tone: string }> = ({ absolute, fair, tone }) => {
   const renderCard = (label: string, entry: FairRankingEntry, isFair: boolean) => (
     <div
       key={label}
@@ -188,6 +216,9 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
     type: null,
     data: [],
   });
+
+  // Ranking completo de un título de gamificación (se calcula a partir de las partidas archivadas).
+  const [gamificationModal, setGamificationModal] = useState<{ id: string; name: string; data: ModalRankingEntry[] } | null>(null);
 
   const [phase2Stats, setPhase2Stats] = useState<Phase2Statistics | null>(null);
   const [showArchivedRoundsModal, setShowArchivedRoundsModal] = useState(false);
@@ -616,12 +647,61 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
       ...extraGamification,
     ];
     if (!products.length) return null;
+    // Partidas jugadas y hándicap medio por jugador: base del promedio "Por partida" y del ranking, igual que en los premios clásicos.
+    const roundsByPlayer = new Map<string, number>();
+    const handicapsByPlayer = new Map<string, number[]>();
+    archivedRounds.forEach(round => {
+      const seen = new Set<string>();
+      (round.player_stats || []).forEach(stat => {
+        if (seen.has(stat.player_name)) return;
+        seen.add(stat.player_name);
+        roundsByPlayer.set(stat.player_name, (roundsByPlayer.get(stat.player_name) || 0) + 1);
+        if (typeof stat.handicap === 'number') {
+          handicapsByPlayer.set(stat.player_name, [...(handicapsByPlayer.get(stat.player_name) || []), stat.handicap]);
+        }
+      });
+    });
+    const averageHandicap = (name: string) => {
+      const values = handicapsByPlayer.get(name);
+      return values?.length ? Math.round((values.reduce((sum, v) => sum + v, 0) / values.length) * 10) / 10 : null;
+    };
     return <div className="mb-6"><h3 className="mb-4 text-lg font-bold text-ink">Premios especiales · Gamificación</h3><div className="grid grid-cols-1 gap-4 md:grid-cols-2">{products.map(product => {
-      const leaders = [...(byProduct.get(product.id)?.entries() || [])].sort((a, b) => b[1] - a[1]); const max = leaders[0]?.[1] || 0;
-      return <div key={product.id} className="rounded-xl border-2 border-line bg-card-2 p-5">
-        <h4 className="flex items-center gap-2 font-bold text-ink"><GamificationBadge productId={product.id} size={26} />{product.name}</h4>
-        <p className="mt-2 text-xl font-black text-ink">{max > 0 ? leaders.filter(([, count]) => count === max).map(([name]) => name).join(' / ') : 'Sin marcas todavía'}</p>
-        <p className="text-sm text-ink-3">{max} {max === 1 ? 'marca' : 'marcas'}</p>
+      const style = gamificationAwardStyle(product.id);
+      // Solo quien tiene alguna marca opta al premio; se respeta el mínimo de partidas del grupo.
+      const rows = [...(byProduct.get(product.id)?.entries() || [])]
+        .filter(([, count]) => count > 0)
+        .map(([name, count]) => ({ player_name: name, total_rounds: roundsByPlayer.get(name) || 0, value: count }));
+      const eligible = minRounds > 0 ? rows.filter(row => row.total_rounds >= minRounds) : rows;
+      const { absolute, fair } = awardChampions(toFairEntries(eligible, row => row.value));
+      const openRanking = () => setGamificationModal({
+        id: product.id,
+        name: product.name,
+        data: eligible.map(row => ({ ...row, rounds_played: row.total_rounds, handicap: averageHandicap(row.player_name) })),
+      });
+      return <div key={product.id} className={`${style.card} rounded-lg p-5 border-2 ${style.border} shadow-soft`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <GamificationBadge productId={product.id} size={28} />
+            <h4 className={`text-lg font-bold truncate ${style.title}`}>"{product.name}"</h4>
+          </div>
+          {eligible.length > 0 && (
+            <button
+              type="button"
+              onClick={openRanking}
+              className={`${style.button} p-2 rounded-lg transition-colors shrink-0`}
+              title="Ver ranking completo"
+              aria-label={`Ver ranking completo de ${product.name}`}
+            >
+              <ChevronRight size={20} />
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-ink-2 mb-3">{style.description}</p>
+        {absolute ? <ChampionCards absolute={absolute} fair={fair} tone={style.tone} /> : (
+          <div className="mt-2 p-2.5 rounded-xl bg-card border border-line text-xs text-ink-3 text-center">
+            {rows.length > 0 ? `Sin jugadores con el mínimo de ${minRounds} ${minRounds === 1 ? 'partida' : 'partidas'}` : 'Sin marcas todavía'}
+          </div>
+        )}
       </div>;
     })}</div></div>;
   };
@@ -1549,6 +1629,22 @@ export const Statistics: React.FC<StatisticsProps> = ({ onBack, backDestination 
             }
           />
         )}
+
+        {gamificationModal && (() => {
+          const style = gamificationAwardStyle(gamificationModal.id);
+          return (
+            <AwardRankingModal
+              key={gamificationModal.id}
+              isOpen
+              onClose={() => setGamificationModal(null)}
+              title={`"${gamificationModal.name}"`}
+              description={`Ranking de jugadores: ${style.description.charAt(0).toLowerCase()}${style.description.slice(1)}`}
+              ranking={gamificationModal.data}
+              valueLabel={style.valueLabel}
+              colorScheme={{ bg: style.card, border: style.border, text: style.title, accent: style.accent }}
+            />
+          );
+        })()}
 
         {showArchivedRoundsModal && !selectedArchivedRound && (
           <ArchivedRoundsModal
