@@ -666,7 +666,7 @@ const getScoreColor = (points: number, isAbandoned?: boolean): string => {
         <div className="border-t-2 border-accent-ring bg-accent-soft p-3">
           <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-accent-ink uppercase tracking-wide">Marcador</span>
+              <span className="text-xs font-semibold text-accent-ink uppercase tracking-wide">Resultado actual</span>
             </div>
             <div className="flex w-full flex-wrap items-center justify-center gap-2 text-sm sm:w-auto sm:justify-end">
               {gameMode === 'match' && players.map((p, index) => {

@@ -613,7 +613,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                   })}
                   {isModeScoring && gameMode !== 'sindicato' && (
                     <tr className="border-b-2 border-accent-ring bg-accent-soft">
-                      <td className="p-2 font-bold text-accent-ink text-xs uppercase tracking-wide">Marcador</td>
+                      <td className="p-2 font-bold text-accent-ink text-xs uppercase tracking-wide">Resultado</td>
                       {playableHoles.map((h) => {
                         const holeScores = players.map((p) => {
                           const s = roundsMap.get(p.id)?.scores[h.hole_number];
