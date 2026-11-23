@@ -3,6 +3,7 @@ import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { PlanType, UserProfile } from '../types';
 import { effectivePlan } from '../utils/effectivePlan';
+import { clearPendingPhoto, readPendingPhoto, uploadProfilePhoto } from '../utils/profilePhoto';
 
 interface SubscriptionState {
   planType: PlanType;
@@ -41,7 +42,18 @@ export const useSubscription = (authenticatedUserId?: string | null): Subscripti
 
     try {
       // ensureProfileFromMetadata already returns the existing or newly created profile.
-      const p = await userService.ensureProfileFromMetadata(user.id, user.user_metadata || {});
+      let p = await userService.ensureProfileFromMetadata(user.id, user.user_metadata || {});
+      // Foto elegida en el alta (sin sesión entonces): se sube en el primer inicio de sesión desde este navegador.
+      const pendingPhoto = p && user.email ? readPendingPhoto(user.email) : null;
+      if (p && user.email && pendingPhoto) {
+        try {
+          const avatarUrl = await uploadProfilePhoto(user.id, pendingPhoto);
+          p = await userService.updateProfile(user.id, { avatar_url: avatarUrl });
+          clearPendingPhoto(user.email);
+        } catch (photoError) {
+          console.error('No se ha podido subir la foto del alta:', photoError);
+        }
+      }
       const subscriptionData = await userService.getSubscription(user.id);
       const plan = effectivePlan(subscriptionData);
       if (version !== refreshVersion.current) return;

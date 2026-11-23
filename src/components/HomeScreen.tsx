@@ -12,6 +12,7 @@ import { homeGroupSections } from '../utils/homeGroups';
 import { groupTier, tierColors } from '../utils/tierColors';
 import { RenewalNoticeCard, type RenewalNoticeAction } from './RenewalNoticeCard';
 import { AdditionalGroupRenewalCard, type AdditionalGroupRenewal } from './AdditionalGroupRenewalCard';
+import { showDefaultAvatarOnError } from '../utils/avatarOptions';
 
 
 interface HomeScreenProps {
@@ -264,7 +265,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 shadow-soft transition-all max-[360px]:h-10 max-[360px]:w-10 ${profile ? avatarPlanClasses[planType] : 'border-line bg-card-2'}`}
               >
                 {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />
+                  <img src={profile.avatar_url} onError={showDefaultAvatarOnError} alt="" className="h-9 w-9 rounded-full bg-white object-cover ring-1 ring-white/80" />
                 ) : (
                   <User size={21} className="text-white" />
                 )}

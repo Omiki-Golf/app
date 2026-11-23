@@ -8,6 +8,7 @@ import { registrationFieldErrors, type RegistrationField, playerSignupMetadata, 
 import { ExistingAccountNotice } from './ExistingAccountNotice';
 import { EmailSentModal } from './EmailSentModal';
 import { DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
+import { isLocalPhoto, savePendingPhoto } from '../utils/profilePhoto';
 import AvatarPicker from './AvatarPicker';
 
 // Id del control de cada campo, para llevar el foco al primero que tenga error.
@@ -133,12 +134,14 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
         email: email.trim(), password,
         options: {
           emailRedirectTo: `${window.location.origin}/?email-confirmed=1&player-registration=1`,
-          data: playerSignupMetadata({ id: checkoutId, period, plan }, { nick, displayName, avatarUrl, handicap, country, postalCode, age }),
+          data: playerSignupMetadata({ id: checkoutId, period, plan }, { nick, displayName, avatarUrl: isLocalPhoto(avatarUrl) ? DEFAULT_AVATAR_URL : avatarUrl, handicap, country, postalCode, age }),
         },
       });
       if (isExistingAccountSignup(data.user, authError)) { setExistingEmail(email.trim()); return; }
       if (authError) throw authError;
       if (!data.user) throw new Error('No se ha podido crear la cuenta.');
+      // Sin sesión todavía no se puede subir: la foto espera en este navegador al primer inicio de sesión.
+      if (isLocalPhoto(avatarUrl)) savePendingPhoto(email, avatarUrl);
       if (data.session && data.user.email_confirmed_at) { onRegistered(); return; }
       setPassword('');
       setConfirmationEmail(email.trim());
@@ -182,7 +185,10 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
           {/* Avatar selection */}
           <div className="mb-5">
             <label className="block text-sm font-medium text-ink-2 mb-2">Avatar</label>
-            <AvatarPicker value={avatarUrl} onSelect={setAvatarUrl} />
+            <AvatarPicker value={avatarUrl} onSelect={setAvatarUrl} allowPhoto />
+            {isLocalPhoto(avatarUrl) && (
+              <p className="mt-2 text-xs text-ink-3">Tu foto se guardará al entrar por primera vez tras confirmar el email, desde este mismo dispositivo.</p>
+            )}
           </div>
 
           {/* Nick with real-time validation */}

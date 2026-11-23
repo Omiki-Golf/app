@@ -73,3 +73,9 @@ export const normalizeAvatarUrl = (avatarUrl?: string): string => {
   if (!avatarUrl || avatarUrl.includes('api.dicebear.com/')) return DEFAULT_AVATAR_URL;
   return avatarUrl;
 };
+
+/** Si una foto de perfil no carga (borrada o sin conexión), muestra el avatar por defecto. */
+export const showDefaultAvatarOnError = (event: { currentTarget: HTMLImageElement }): void => {
+  const image = event.currentTarget;
+  if (!image.src.endsWith(DEFAULT_AVATAR_URL)) image.src = DEFAULT_AVATAR_URL;
+};

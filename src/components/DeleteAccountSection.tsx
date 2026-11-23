@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Loader2, Trash2, Users, X } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
+import { removeProfilePhoto } from '../utils/profilePhoto';
 
 const CONFIRMATION = 'ELIMINAR CUENTA';
 
@@ -39,6 +40,9 @@ export function DeleteAccountSection({ onDeleted, onOpenGroups, autoOpen = false
     if (confirmation !== CONFIRMATION || deleting) return;
     setDeleting(true); setError('');
     try {
+      // La foto de perfil se borra antes, mientras la sesión aún puede escribir en su carpeta.
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) await removeProfilePhoto(currentUser.id);
       const { data, error: invokeError } = await supabase.functions.invoke('delete-account', { body: { confirm: CONFIRMATION } });
       if (invokeError) {
         const context = (invokeError as { context?: Response }).context;

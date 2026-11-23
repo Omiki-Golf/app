@@ -7,6 +7,7 @@ import { UserProfile } from '../types';
 import { userService } from '../services/userService';
 import { DEFAULT_AVATAR_URL, normalizeAvatarUrl } from '../utils/avatarOptions';
 import AvatarPicker from './AvatarPicker';
+import { isLocalPhoto, isProfilePhotoUrl, removeProfilePhoto, uploadProfilePhoto } from '../utils/profilePhoto';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSwitcher } from './LanguageSwitcher';
@@ -172,12 +173,17 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
     setError('');
     setSaved(false);
     try {
+      // Foto nueva recortada: se sube a Storage y en el perfil solo se guarda su URL.
+      let savedAvatarUrl = avatarUrl;
+      if (isLocalPhoto(avatarUrl)) {
+        savedAvatarUrl = await uploadProfilePhoto(profile?.user_id ?? userId, avatarUrl);
+      }
       if (profile) {
         if (nick.trim() !== profile.nick) await userService.renameMyNick(nick.trim());
         await userService.updateProfile(profile.user_id, {
           // null (no undefined) para que vaciar un campo lo borre de verdad en la base de datos.
           display_name: displayName.trim() || null,
-          avatar_url: avatarUrl,
+          avatar_url: savedAvatarUrl,
           exact_handicap: handicap.trim() ? Number(handicap) : 0,
           country: country.trim() || null,
           postal_code: postalCode.trim() || null,
@@ -188,11 +194,16 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
           user_id: userId,
           nick: nick.trim(),
           display_name: displayName.trim(),
-          avatar_url: avatarUrl,
+          avatar_url: savedAvatarUrl,
           exact_handicap: 0,
           default_tee: 'amarillo',
           accepted_terms: false,
         });
+      }
+      setAvatarUrl(savedAvatarUrl);
+      // Si deja la foto por un avatar ilustrado, se borra el archivo para no dejarlo huérfano.
+      if (isProfilePhotoUrl(profile?.avatar_url) && !isProfilePhotoUrl(savedAvatarUrl)) {
+        await removeProfilePhoto(profile?.user_id ?? userId);
       }
       await onSaved();
       setSaved(true);
@@ -405,7 +416,11 @@ export const ProfileDetails: React.FC<ProfileDetailsProps> = ({
                     setShowSelectedAvatar(true);
                     setSaved(false);
                   }}
+                  allowPhoto
                 />
+                {isLocalPhoto(avatarUrl) && (
+                  <p className="mt-2 text-xs text-ink-3">Pulsa «Guardar» para subir tu foto.</p>
+                )}
               </fieldset>
 
               {error && <p className="rounded-xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">{error}</p>}
