@@ -1713,7 +1713,6 @@ function App() {
           decidedHoles={roundState.round.decided_holes}
           onHoleChange={handleHoleChange}
           onScoreChange={handleScoreChange}
-          onShowLeaderboard={() => setCurrentView('leaderboard')}
           onResetGame={handleBackToMain}
           onFinishRound={handleFinishRound}
           onCourseChanged={handleCourseChanged}

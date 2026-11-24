@@ -10,7 +10,7 @@ import { ScoreSymbol } from './ScoreSymbol';
 import { golfService } from '../services/golfService';
 import { getStrokesReceived } from '../utils/calculations';
 import { competitionPosition, sortByResultAndHandicap } from '../utils/ranking';
-import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
 import { FinalResultModal } from './FinalResultModal';
@@ -20,6 +20,87 @@ import { enabledExtraProducts } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
 
 import { PlayerName } from './PlayerName';
+import type { GolfRound } from '../types';
+
+const PODIUM_MEDALS = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
+
+interface StandingEntry {
+  key: string;
+  name: string;
+  isGuest?: boolean;
+  handicap: number;
+  points: number;
+  /** Neto respecto al par en los hoyos jugados; null si aún no ha jugado ninguno. */
+  toPar: number | null;
+  /** Etiqueta junto al nombre (P1/P2 en Parejas, «Tu partida» en la general del grupo). */
+  tag?: React.ReactNode;
+}
+
+/** Ordena por puntos y, a igualdad, por menos puntos de juego; añade posición y frase respecto al líder. */
+function rankStandings(entries: StandingEntry[]) {
+  const sorted = sortByResultAndHandicap(entries, entry => entry.points, entry => entry.handicap);
+  const leaderPoints = sorted[0]?.points ?? 0;
+  const tiedAtTop = sorted.filter(entry => entry.points === leaderPoints && entry.handicap === sorted[0].handicap).length > 1;
+  return sorted.map((entry, index) => {
+    const position = competitionPosition(sorted, index, (a, b) => a.points === b.points && a.handicap === b.handicap);
+    const gap = leaderPoints - entry.points;
+    const subtitle = position === 1
+      ? (tiedAtTop ? 'Empatado en cabeza' : 'Líder provisional')
+      : gap === 0 ? 'Mismos puntos que el líder' : `A ${gap} ${gap === 1 ? 'pt' : 'pts'} del líder`;
+    return { entry, position, subtitle };
+  });
+}
+
+/** Ficha de clasificación: medalla, nombre, situación respecto al líder, puntos y «Actual». */
+function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandings>[number]) {
+  const { toPar } = entry;
+  const toParLabel = toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `−${Math.abs(toPar)}`;
+  const toParClass = toPar === null || toPar === 0
+    ? 'text-ink-2'
+    : toPar < 0
+    ? 'text-accent-ink'
+    : 'text-red-600 dark:text-red-400';
+  // Puntos (con fondo) y «Actual» (sin fondo) comparten tamaño, peso y caja para verse iguales.
+  const valueBox = 'rounded-full px-3 py-0.5 text-lg font-black leading-tight tabular-nums';
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-accent-ring bg-accent-soft p-3 text-left min-w-0">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black shadow-sm ${PODIUM_MEDALS[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
+        {position}º
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0">
+          {entry.tag}
+          <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={entry.name} />{entry.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+        </div>
+        <p className="truncate text-sm text-ink-3">{subtitle}</p>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <span className={`${valueBox} bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
+        <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
+          Actual {toParLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Puntos Stableford y neto respecto al par en los hoyos jugados (no abandonados). */
+function playerTotals(scores: Iterable<RoundScore>, parOf: (holeNumber: number) => number | undefined) {
+  let points = 0;
+  let toPar = 0;
+  let played = 0;
+  for (const score of scores) {
+    points += score.stableford_points ?? 0;
+    const par = parOf(score.hole_number);
+    if (!score.gross_strokes || score.abandoned || par === undefined) continue;
+    toPar += score.gross_strokes - (score.strokes_received || 0) - par;
+    played++;
+  }
+  return { points, toPar: played > 0 ? toPar : null };
+}
+
+const sameLocalDay = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
+
 interface ScorecardProps {
   holes: GolfHole[];
   players: RoundPlayer[];
@@ -47,7 +128,6 @@ interface ScorecardProps {
   decidedHoles?: number[] | null;
   onHoleChange: (holeNumber: number) => void;
   onScoreChange: (playerId: string, holeNumber: number, score: ScoreChangeInput | null) => void;
-  onShowLeaderboard: () => void;
   onResetGame: () => void;
   backDestination?: 'back' | 'home';
   onFinishRound: () => void;
@@ -77,7 +157,6 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   decidedHoles = null,
   onHoleChange,
   onScoreChange,
-  onShowLeaderboard,
   onResetGame, backDestination = 'back',
   onFinishRound,
   onCourseChanged,
@@ -97,6 +176,36 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     window.addEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated);
     return () => { cancelled = true; window.removeEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated); };
   }, [groupId]);
+  // Clasificación general del grupo: todas las tarjetas del grupo de hoy (activas o ya finalizadas).
+  const [groupDayRounds, setGroupDayRounds] = useState<Array<{ round: GolfRound; players: RoundPlayer[]; scores: RoundScore[]; pars: Map<number, number> }>>([]);
+  const courseParsCache = useRef(new Map<string, Map<number, number>>());
+  useEffect(() => {
+    if (!groupId) { setGroupDayRounds([]); return; }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const rounds = (await golfService.getActiveRounds(groupId))
+          .filter(round => round.group_id === groupId && (round.status === 'active' || round.status === 'completed') && sameLocalDay(round.created_at));
+        const details = await Promise.all(rounds.map(async round => {
+          const parsKey = `${round.course_id}:${round.num_holes}:${round.holes_range ?? ''}`;
+          let pars = courseParsCache.current.get(parsKey);
+          if (!pars) {
+            const courseHoles = await golfService.getCourseHoles(round.course_id, round.num_holes, round.holes_range);
+            pars = new Map(courseHoles.map(h => [h.hole_number, h.par]));
+            courseParsCache.current.set(parsKey, pars);
+          }
+          const [roundPlayers, roundScores] = await Promise.all([golfService.getRoundPlayers(round.id), golfService.getRoundScores(round.id)]);
+          return { round, players: roundPlayers, scores: roundScores, pars };
+        }));
+        if (!cancelled) setGroupDayRounds(details);
+      } catch (loadError) {
+        console.error('No se ha podido cargar la clasificación general del grupo:', loadError);
+      }
+    };
+    void load();
+    const timer = window.setInterval(() => { void load(); }, 30000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [groupId, roundId]);
   const legacyRojas = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isDivend = groupCode === 'DIVEND' || (enabledGamification ? enabledGamification.includes('no-paso-rojas') : legacyRojas);
   const spanishHandsEnabled = groupCode !== null && (enabledGamification ? enabledGamification.includes('spanish-hand') : true);
@@ -128,6 +237,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     ? Math.max(...playableHoles.map((playableHole) => playableHole.hole_number))
     : numHoles;
   const roundsMap = new Map(rounds.map((r) => [r.playerId, r]));
+  // Hay partida en marcha en cuanto alguien tiene un golpe anotado.
+  const hasStartedScoring = rounds.some(round => Object.values(round.scores).some(score => (score?.gross_strokes ?? 0) > 0));
 
   const isEnteredScore = (score?: RoundScore) => !!score && (score.abandoned || score.gross_strokes > 0);
   const allScoresComplete = players.every((player) => {
@@ -288,51 +399,55 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               <ThemeToggle className="!h-11 !w-11" />
             </div>
             <div className="flex justify-center">{messagesButton}</div>
-            <div className="flex justify-end">
-              <button
-                onClick={onShowLeaderboard}
-                className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
-                aria-label="Clasificación"
-              >
-                <Trophy size={20} />
-                <span className="hidden sm:inline">Clasificación</span>
-              </button>
-            </div>
+            {/* La clasificación ya se ve en la propia tarjeta; esta columna mantiene centrado el botón de avisos. */}
+            <div aria-hidden="true" />
           </div>
-          <h1 className="mb-6 text-center text-2xl font-bold text-title md:text-3xl">
+          {/* Desde el primer golpe la cabecera se compacta: lo importante pasa a ser el hoyo. */}
+          <h1 className={hasStartedScoring ? 'sr-only' : 'mb-6 text-center text-2xl font-bold text-title md:text-3xl'}>
             Tarjeta de Puntuación
           </h1>
 
-          <div className="mb-4 bg-accent rounded-lg p-4 text-on-accent">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-lg font-bold">{courseName || 'Campo de Golf'}</span>
-                  {/* Cambiar de campo es tarea del creador; con el código solo se informan golpes. */}
-                  {hasEditAccess && isCreator && onCourseChanged && roundId && courseId && (
-                    <WriteButton
-                      onClick={() => setShowCourseChangeModal(true)}
-                      disabled={changingCourse}
-                      className="bg-black/10 hover:bg-black/20 text-on-accent text-xs px-2 py-1 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Cambiar campo de golf"
-                    >
-                      <MapPin size={12} />
-                      Cambiar
-                    </WriteButton>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-1 text-sm text-on-accent/90">
-                  <span>Hoyo {displayedHoleNumber} de {displayedHoleTotal}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="bg-black/10 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide leading-4">
-                    {modeLabels[gameMode]}
-                  </span>
-                </div>
-              </div>
+          <div className={`mb-4 bg-accent-deep rounded-lg text-white ${hasStartedScoring ? 'p-3' : 'p-4'}`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className={`min-w-0 truncate font-bold ${hasStartedScoring ? 'text-base' : 'text-lg'}`}>{courseName || 'Campo de Golf'}</span>
+              {/* Cambiar de campo es tarea del creador; con el código solo se informan golpes. */}
+              {hasEditAccess && isCreator && onCourseChanged && roundId && courseId && (
+                <WriteButton
+                  onClick={() => setShowCourseChangeModal(true)}
+                  disabled={changingCourse}
+                  className="shrink-0 bg-white/10 hover:bg-white/20 text-white text-xs px-2 py-1 rounded-md flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Cambiar campo de golf"
+                  aria-label="Cambiar campo de golf"
+                >
+                  <MapPin size={12} />
+                  {!hasStartedScoring && 'Cambiar'}
+                </WriteButton>
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-1 text-sm text-on-deep min-w-0">
+              <span className="shrink-0">Hoyo {displayedHoleNumber} de {displayedHoleTotal}</span>
+              <span aria-hidden="true">·</span>
+              <span className="shrink-0 bg-white/10 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wide leading-4">
+                {modeLabels[gameMode]}
+              </span>
+              {hasStartedScoring && accessCode && hasEditAccess && (
+                <span className="ml-auto flex shrink-0 items-center gap-1" title="Código para ver y editar la partida">
+                  <Lock size={14} aria-hidden="true" />
+                  <code className="font-bold tracking-widest">{showAccessCode ? accessCode : '••••'}</code>
+                  <button
+                    onClick={() => setShowAccessCode(!showAccessCode)}
+                    className="rounded-md p-1 hover:bg-white/10 transition-colors"
+                    aria-label={showAccessCode ? 'Ocultar código' : 'Mostrar código'}
+                    title={showAccessCode ? 'Ocultar código' : 'Mostrar código'}
+                  >
+                    {showAccessCode ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </span>
+              )}
             </div>
           </div>
 
-          {accessCode && hasEditAccess && (
+          {!hasStartedScoring && accessCode && hasEditAccess && (
             <div className="mb-4 bg-card border-2 border-accent-ring rounded-lg p-3 shadow-soft">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -792,96 +907,78 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
             <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación en este momento</h3>
             <div className="grid grid-cols-1 gap-2 mb-6">
-              {(() => {
-                // Puntos Stableford acumulados; empate → menor hándicap de juego, como en la clasificación.
-                const standings = sortByResultAndHandicap(
-                  players.map(player => {
-                    const round = roundsMap.get(player.id);
-                    const points = playableHoles.reduce((sum, h) => sum + (round?.scores[h.hole_number]?.stableford_points ?? 0), 0);
-                    // Cómo va (neto): golpes − golpes de ventaja − par, solo en los hoyos ya jugados (como la columna Netos).
-                    let toPar = 0;
-                    let holesPlayed = 0;
-                    playableHoles.forEach(h => {
-                      const score = round?.scores[h.hole_number];
-                      if (!score?.gross_strokes || score.abandoned) return;
-                      toPar += score.gross_strokes - (score.strokes_received || 0) - h.par;
-                      holesPlayed++;
-                    });
-                    return { player, points, toPar: holesPlayed > 0 ? toPar : null };
-                  }),
-                  entry => entry.points,
-                  entry => entry.player.playing_handicap,
+              {rankStandings(players.map(player => {
+                const round = roundsMap.get(player.id);
+                const totals = playerTotals(
+                  playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score)),
+                  holeNumber => playableHoles.find(h => h.hole_number === holeNumber)?.par,
                 );
-                const podium = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
-                const leaderPoints = standings[0]?.points ?? 0;
-                const tiedAtTop = standings.filter(entry => entry.points === leaderPoints && entry.player.playing_handicap === standings[0].player.playing_handicap).length > 1;
-                return standings.map((entry, index) => {
-                const { player, points: totalPoints, toPar } = entry;
-                const position = competitionPosition(standings, index, (a, b) =>
-                  a.points === b.points && a.player.playing_handicap === b.player.playing_handicap);
-                const gap = leaderPoints - totalPoints;
-                const subtitle = position === 1
-                  ? (tiedAtTop ? 'Empatado en cabeza' : 'Líder provisional')
-                  : gap === 0 ? 'Mismos puntos que el líder' : `A ${gap} ${gap === 1 ? 'pt' : 'pts'} del líder`;
-                const toParLabel = toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `−${Math.abs(toPar)}`;
-                const toParClass = toPar === null || toPar === 0
-                  ? 'bg-card-2 text-ink-2 border border-line'
-                  : toPar < 0
-                  ? 'bg-emerald-300 text-emerald-950'
-                  : 'bg-red-200 text-red-900';
-
-                return (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-3 rounded-2xl border border-accent-ring bg-accent-soft p-3 text-left min-w-0"
-                  >
-                    {/* Medalla con la posición */}
-                    <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-black shadow-sm ${podium[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
-                      {position}º
+                const isParejas = gameMode === 'parejas' && players.length === 4;
+                const team = players.indexOf(player) < 2 ? 0 : 1;
+                return {
+                  key: player.id,
+                  name: player.name,
+                  isGuest: player.is_guest,
+                  handicap: player.playing_handicap,
+                  ...totals,
+                  tag: isParejas ? (
+                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                      {team === 0 ? 'P1' : 'P2'}
                     </span>
-                    {/* Nombre y situación respecto al líder */}
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {gameMode === 'parejas' && players.length === 4 && (
-                          <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                            {players.indexOf(player) < 2 ? 'P1' : 'P2'}
-                          </span>
-                        )}
-                        <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                      </div>
-                      <p className="truncate text-sm text-ink-3">{subtitle}</p>
-                    </div>
-                    {/* Puntos y cómo va (neto, hoyos jugados) */}
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <p className="text-2xl font-black leading-none text-accent-ink tabular-nums">{totalPoints} pts</p>
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold tabular-nums ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
-                        Actual {toParLabel}
-                      </span>
-                    </div>
-                  </div>
-                );
-                });
-              })()}
+                  ) : undefined,
+                };
+              })).map(row => <StandingRow key={row.entry.key} {...row} />)}
             </div>
 
-            {isDivend && (
+            {(() => {
+              // General del grupo: solo con más de una tarjeta hoy. Esta tarjeta usa sus datos en vivo.
+              if (!groupId || groupDayRounds.length < 2) return null;
+              const entries: StandingEntry[] = groupDayRounds.flatMap(({ round, players: roundPlayers, scores: roundScores, pars }) => {
+                const mine = round.id === roundId;
+                return roundPlayers.map(player => {
+                  const scores = mine
+                    ? Object.values(roundsMap.get(player.id)?.scores ?? {})
+                    : roundScores.filter(score => score.player_id === player.id);
+                  return {
+                    key: `${round.id}:${player.id}`,
+                    name: player.name,
+                    isGuest: player.is_guest,
+                    handicap: player.playing_handicap,
+                    ...playerTotals(scores, holeNumber => pars.get(holeNumber)),
+                    tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
+                  };
+                });
+              });
+              return (
+                <>
+                  <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general del grupo</h3>
+                  <div className="grid grid-cols-1 gap-2 mb-6">
+                    {rankStandings(entries).map(row => <StandingRow key={row.entry.key} {...row} />)}
+                  </div>
+                </>
+              );
+            })()}
+
+            {isDivend && (() => {
+              // Solo quien tiene alguna marca, de más a menos; sin marcas, la sección no aparece.
+              const marked = players
+                .map(player => ({
+                  player,
+                  noPasoRojasHoles: playableHoles
+                    .filter(h => roundsMap.get(player.id)?.scores[h.hole_number]?.no_paso_rojas)
+                    .map(h => h.hole_number),
+                }))
+                .filter(item => item.noPasoRojasHoles.length > 0)
+                .sort((a, b) => b.noPasoRojasHoles.length - a.noPasoRojasHoles.length);
+              if (!marked.length) return null;
+              return (
               <>
                 <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
                   <GamificationBadge productId="no-paso-rojas" size={22} />
                   No pasó de rojas
                 </h3>
                 <div className="space-y-3">
-                  {players.map((player) => {
-                    const round = roundsMap.get(player.id);
-                    const noPasoRojasHoles: number[] = [];
-
-                    playableHoles.forEach((h) => {
-                      const score = round?.scores[h.hole_number];
-                      if (score?.no_paso_rojas) {
-                        noPasoRojasHoles.push(h.hole_number);
-                      }
-                    });
-
+                  {marked.map(({ player, noPasoRojasHoles }) => {
                     const noPasoRojasCount = noPasoRojasHoles.length;
 
                     return (
@@ -899,13 +996,11 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                             <p className="font-semibold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {noPasoRojasHoles.length > 0
-                              ? noPasoRojasHoles.map(holeNumber => (
-                                  <span key={holeNumber} className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
-                                    Hoyo {holeNumber}
-                                  </span>
-                                ))
-                              : <span className="text-xs text-ink-3">Ninguno</span>}
+                            {noPasoRojasHoles.map(holeNumber => (
+                              <span key={holeNumber} className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                                Hoyo {holeNumber}
+                              </span>
+                            ))}
                           </div>
                         </div>
                         <div className="bg-red-100 border-2 border-red-300 rounded-lg px-4 py-2 min-w-[60px] text-center">
@@ -916,7 +1011,8 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                   })}
                 </div>
               </>
-            )}
+              );
+            })()}
 
             {(() => {
               // Rojas va arriba a todo el ancho. El resto: 1 o 2 títulos a todo el ancho; con más de 2, en dos columnas.
@@ -936,31 +1032,38 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                     .map(h => h.hole_number),
                 })),
               ];
-              if (!sections.length) return null;
-              const twoColumns = sections.length > 2;
+              // Solo secciones con alguna marca y, en cada una, solo los jugadores marcados (de más a menos).
+              const visible = sections
+                .map(section => ({
+                  ...section,
+                  marked: players
+                    .map(player => ({ player, holes: section.holesFor(player.id) }))
+                    .filter(item => item.holes.length > 0)
+                    .sort((a, b) => b.holes.length - a.holes.length),
+                }))
+                .filter(section => section.marked.length > 0);
+              if (!visible.length) return null;
+              const twoColumns = visible.length > 2;
               return (
                 <div className={twoColumns ? 'grid grid-cols-2 gap-x-3' : ''}>
-                  {sections.map(section => (
+                  {visible.map(section => (
                     <div key={section.id} className="min-w-0">
                       <h3 className={`font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2 min-w-0 ${twoColumns ? 'text-sm' : ''}`}>
                         <GamificationBadge productId={section.id} size={twoColumns ? 18 : 22} />
                         <span className="truncate" title={section.name}>{section.name}</span>
                       </h3>
                       <div className={twoColumns ? 'space-y-2' : 'space-y-3'}>
-                        {players.map(player => {
-                          const holes = section.holesFor(player.id);
+                        {section.marked.map(({ player, holes }) => {
                           return (
                             <div key={player.id} className={`${section.row} border-2 rounded-lg flex items-center justify-between gap-2 ${twoColumns ? 'p-2' : 'p-3'}`}>
                               <div className="min-w-0">
                                 <p className={`font-semibold text-ink truncate ${twoColumns ? 'text-sm' : ''}`}><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
                                 <div className="flex flex-wrap gap-1 mt-1">
-                                  {holes.length > 0
-                                    ? holes.map(holeNumber => (
-                                        <span key={holeNumber} className={`${section.chip} font-bold rounded-full ${twoColumns ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
-                                          {twoColumns ? `H${holeNumber}` : `Hoyo ${holeNumber}`}
-                                        </span>
-                                      ))
-                                    : <span className="text-xs text-ink-3">Ninguno</span>}
+                                  {holes.map(holeNumber => (
+                                    <span key={holeNumber} className={`${section.chip} font-bold rounded-full ${twoColumns ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
+                                      {twoColumns ? `H${holeNumber}` : `Hoyo ${holeNumber}`}
+                                    </span>
+                                  ))}
                                 </div>
                               </div>
                               <div className={`${section.box} border-2 rounded-lg text-center shrink-0 ${twoColumns ? 'px-2 py-1 min-w-[40px]' : 'px-4 py-2 min-w-[60px]'}`}>
