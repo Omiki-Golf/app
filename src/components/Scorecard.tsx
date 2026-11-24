@@ -53,52 +53,74 @@ function rankStandings(entries: StandingEntry[]) {
   });
 }
 
-/** Ficha de clasificación: medalla, nombre, situación respecto al líder, puntos y «Actual». */
+/** Ficha de clasificación: medalla | nombre y situación | puntos y neto al par; debajo, las marcas de gamificación. */
 function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandings>[number]) {
   const { toPar } = entry;
   const toParLabel = toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `−${Math.abs(toPar)}`;
-  // Bajo par en azul, al par en blanco (con contorno oscuro para leerse sobre el verde claro) y sobre par en rojo.
+  // Bajo par en azul, al par con el color del texto y sobre par en rojo.
   const toParClass = toPar === null
     ? 'text-ink-2'
     : toPar < 0
     ? 'text-blue-600 dark:text-blue-400'
     : toPar === 0
-    ? 'text-white [text-shadow:0_0_2px_rgb(0_0_0/0.75),0_1px_2px_rgb(0_0_0/0.5)]'
+    ? 'text-ink'
     : 'text-red-600 dark:text-red-400';
   // Puntos (con fondo) y neto al par (sin fondo, centrado debajo): entre los dos, la altura de la medalla con nombre y situación.
   const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';
+  const marks = entry.marks ?? [];
+  const [showAllMarks, setShowAllMarks] = useState(false);
+  const visibleMarkLimit = 5;
+  const hiddenMarkCount = marks.length - visibleMarkLimit;
+  const visibleMarks = showAllMarks ? marks : marks.slice(0, visibleMarkLimit);
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-accent-ring bg-accent-soft p-3 text-left min-w-0">
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black shadow-sm ${PODIUM_MEDALS[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
-        {position}º
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 min-w-0">
-          {entry.tag}
-          <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={entry.name} />{entry.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-        </div>
-        <p className="truncate text-sm text-ink-3">{subtitle}</p>
-        {entry.marks && entry.marks.length > 0 && (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            {entry.marks.map(mark => (
-              <span key={mark.productId} className="inline-flex items-center gap-0.5">
-                <GamificationBadge
-                  productId={mark.productId}
-                  size={18}
-                  detail={`${mark.holes.length === 1 ? 'Hoyo' : 'Hoyos'} ${mark.holes.join(', ')}`}
-                />
-                {mark.holes.length > 1 && <span className="text-xs font-bold text-ink-2 tabular-nums">×{mark.holes.length}</span>}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-      <div className="flex shrink-0 flex-col items-center gap-0.5">
-        <span className={`${valueBox} py-0.5 bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
-        <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
-          {toParLabel}
+    <div className="rounded-xl border border-accent-ring bg-card px-2.5 py-2 text-left min-w-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black shadow-sm ${PODIUM_MEDALS[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
+          {position}º
         </span>
+        <div className="min-w-0 flex-1 self-stretch border-l border-accent-ring pl-2 flex flex-col justify-center">
+          <div className="flex items-center gap-2 min-w-0">
+            <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={entry.name} />{entry.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+            {entry.tag}
+          </div>
+          <p className="truncate text-sm text-ink-3">{subtitle}</p>
+        </div>
+        <div className="flex min-w-[5.25rem] shrink-0 flex-col items-center gap-0.5 self-stretch justify-center border-l border-accent-ring pl-2">
+          <span className={`${valueBox} py-0.5 bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
+          <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
+            {toParLabel}
+          </span>
+        </div>
       </div>
+      {/* Marcas de gamificación: una píldora por título, solo icono y «×N» si se repite. */}
+      {marks.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-accent-ring pt-1.5">
+          {visibleMarks.map(mark => (
+            <span
+              key={mark.productId}
+              className="inline-flex min-w-9 items-center justify-center gap-1 rounded-full border border-accent-ring bg-card-2 px-1.5 py-px"
+            >
+              <GamificationBadge
+                productId={mark.productId}
+                size={19}
+                detail={`${mark.holes.length === 1 ? 'Hoyo' : 'Hoyos'} ${mark.holes.join(', ')}`}
+              />
+              {mark.holes.length > 1 && <span className="text-xs font-bold text-ink tabular-nums">×{mark.holes.length}</span>}
+            </span>
+          ))}
+          {hiddenMarkCount > 0 && (
+            <button
+              type="button"
+              aria-expanded={showAllMarks}
+              aria-label={showAllMarks ? 'Mostrar menos marcas' : `Mostrar ${hiddenMarkCount} marcas más`}
+              className="min-h-8 min-w-8 rounded-full border border-accent-ring px-2 text-xs font-bold text-ink"
+              onClick={() => setShowAllMarks(current => !current)}
+            >
+              {showAllMarks ? '−' : `+${hiddenMarkCount}`}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -313,7 +335,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             handicap: player.playing_handicap,
             ...playerTotals(scores, holeNumber => pars.get(holeNumber)),
             marks: gamificationMarks(scores),
-            tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
+            tag: mine ? <span className="shrink-0 rounded-md border border-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-ink">Tu partida</span> : undefined,
           };
         });
       }))

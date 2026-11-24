@@ -8,11 +8,10 @@ test('standings rows use a smaller medal and compact points with the to-par valu
   const source = await read();
   assert.match(source, /flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base/);
   assert.match(source, /const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';/);
-  assert.match(source, /<div className="flex shrink-0 flex-col items-center gap-0\.5">\s*<span className=\{`\$\{valueBox\} py-0\.5 bg-emerald-300 text-emerald-950`\}>\{entry\.points\} pts<\/span>/);
+  assert.match(source, /flex-col items-center gap-0\.5 self-stretch justify-center border-l border-accent-ring/);
   assert.match(source, /title="Cómo va respecto al par[^"]*">\s*\{toParLabel\}\s*<\/span>/);
   assert.match(source, /<span className=\{`\$\{valueBox\} \$\{toParClass\}`\}/);
-  // Bajo par azul, al par blanco y sobre par rojo.
-  assert.match(source, /toPar < 0\s*\? 'text-blue-600 dark:text-blue-400'\s*: toPar === 0\s*\? 'text-white [^']*'\s*: 'text-red-600 dark:text-red-400'/);
+  assert.match(source, /toPar < 0\s*\? 'text-blue-600 dark:text-blue-400'\s*: toPar === 0\s*\? 'text-ink'\s*: 'text-red-600 dark:text-red-400'/);
 });
 
 test('group cards show the general group standings only with more than one card that day', async () => {
@@ -54,7 +53,10 @@ test('gamification sections show only marked players and hide when nobody is mar
 test('standing rows show the gamification icons of each player for the whole round', async () => {
   const source = await read();
   assert.match(source, /marks\?: Array<\{ productId: string; holes: number\[\] \}>/);
-  assert.match(source, /entry\.marks\.map\(mark => \([\s\S]{0,200}<GamificationBadge\s+productId=\{mark\.productId\}/);
+  assert.match(source, /visibleMarks\.map\(mark => \([\s\S]{0,300}<GamificationBadge\s+productId=\{mark\.productId\}/);
+  // Píldoras bajo una línea, solo icono y «×N» cuando se repite.
+  assert.match(source, /border-t border-accent-ring pt-1\.5/);
+  assert.match(source, /\{mark\.holes\.length > 1 && <span className="text-xs font-bold text-ink tabular-nums">×\{mark\.holes\.length\}<\/span>\}/);
   assert.match(source, /marks: gamificationMarks\(cardScores\)/);
   // La general del grupo usa los golpes de cada tarjeta (en vivo para la propia).
   assert.match(source, /\.\.\.playerTotals\(scores, holeNumber => pars\.get\(holeNumber\)\),\s*marks: gamificationMarks\(scores\)/);
