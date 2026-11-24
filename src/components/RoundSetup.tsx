@@ -639,13 +639,15 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         {currentGroup && (
           <div
             onClick={onViewGamePoints}
-            className="bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
+            className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-2 border-blue-300 dark:border-blue-700 rounded-lg shadow-card cursor-pointer hover:shadow-2xl transition-shadow flex flex-col"
           >
-            <h2 className="text-2xl font-bold text-blue-900 mb-4">{t('roundSetup.points')}</h2>
-            <p className="text-ink-2 mb-6">
-              Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus puntos de juego.
-            </p>
-            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+            <div className="p-5 pb-4 flex-1">
+              <h2 className="text-2xl font-bold text-blue-900 dark:text-blue-100 mb-3">{t('roundSetup.points')}</h2>
+              <p className="text-ink-2 text-base leading-relaxed">
+                Consulta la clasificación de cada día en que el grupo ha completado partidas, los jugadores registrados y sus puntos de juego.
+              </p>
+            </div>
+            <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
               {t('roundSetup.viewPoints')}
               <ChevronRight size={20} />
             </button>
@@ -656,14 +658,16 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         {currentGroup && onViewStatistics && (
           <div
             onClick={onViewStatistics}
-            className="bg-gradient-to-br from-purple-50 to-purple-100 border-2 border-purple-300 rounded-lg shadow-card p-6 md:p-8 cursor-pointer hover:shadow-xl transition-shadow"
+            className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-2 border-purple-300 dark:border-purple-700 rounded-lg shadow-card cursor-pointer hover:shadow-2xl transition-shadow flex flex-col"
           >
-            <h2 className="text-2xl font-bold text-purple-900 mb-4">{t('roundSetup.statistics')}</h2>
-            <p className="text-ink-2 mb-6">
-              Consulta estadísticas de jugadores, del grupo y de campos. Solo para multipartidetas archivadas.
-            </p>
-            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
-              Ver Estadísticas
+            <div className="p-5 pb-4 flex-1">
+              <h2 className="text-2xl font-bold text-purple-900 dark:text-purple-100 mb-3">{t('roundSetup.statistics')}</h2>
+              <p className="text-ink-2 text-base leading-relaxed">
+                Consulta estadísticas de jugadores, del grupo y de campos. Solo para multipartidetas archivadas.
+              </p>
+            </div>
+            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-b-md flex items-center justify-center gap-2 transition-colors text-base">
+              {t('roundSetup.viewStatistics')}
               <ChevronRight size={20} />
             </button>
           </div>
