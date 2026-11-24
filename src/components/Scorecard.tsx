@@ -10,7 +10,7 @@ import { ScoreSymbol } from './ScoreSymbol';
 import { golfService } from '../services/golfService';
 import { getStrokesReceived } from '../utils/calculations';
 import { competitionPosition, sortByResultAndHandicap } from '../utils/ranking';
-import { ChevronLeft, ChevronRight, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
 import { ThemeToggle } from './ThemeToggle';
 import { FinalResultModal } from './FinalResultModal';
@@ -99,7 +99,6 @@ function playerTotals(scores: Iterable<RoundScore>, parOf: (holeNumber: number) 
   return { points, toPar: played > 0 ? toPar : null };
 }
 
-const sameLocalDay = (iso: string) => new Date(iso).toDateString() === new Date().toDateString();
 
 interface ScorecardProps {
   holes: GolfHole[];
@@ -119,6 +118,8 @@ interface ScorecardProps {
   canFinishRound?: boolean;
   isRoundFinished?: boolean;
   courseName?: string;
+  /** Fecha de creación de la partida: marca el día de la clasificación general del grupo. */
+  roundDate?: string | null;
   groupCode?: string | null;
   groupId?: string | null;
   hoyo19Enabled?: boolean;
@@ -149,6 +150,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   canFinishRound = false,
   isRoundFinished = false,
   courseName = '',
+  roundDate = null,
   groupCode = null,
   groupId = null,
   hoyo19Enabled,
@@ -176,7 +178,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     window.addEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated);
     return () => { cancelled = true; window.removeEventListener(GAMIFICATION_UPDATED_EVENT, onUpdated); };
   }, [groupId]);
-  // Clasificación general del grupo: todas las tarjetas del grupo de hoy (activas o ya finalizadas).
+  // Clasificación general del grupo: todas las tarjetas del grupo del día de esta partida.
   const [groupDayRounds, setGroupDayRounds] = useState<Array<{ round: GolfRound; players: RoundPlayer[]; scores: RoundScore[]; pars: Map<number, number> }>>([]);
   const courseParsCache = useRef(new Map<string, Map<number, number>>());
   useEffect(() => {
@@ -184,8 +186,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     let cancelled = false;
     const load = async () => {
       try {
-        const rounds = (await golfService.getActiveRounds(groupId))
-          .filter(round => round.group_id === groupId && (round.status === 'active' || round.status === 'completed') && sameLocalDay(round.created_at));
+        const rounds = await golfService.getGroupRoundsOfDay(groupId, roundDate ?? new Date().toISOString());
         const details = await Promise.all(rounds.map(async round => {
           const parsKey = `${round.course_id}:${round.num_holes}:${round.holes_range ?? ''}`;
           let pars = courseParsCache.current.get(parsKey);
@@ -205,7 +206,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
     void load();
     const timer = window.setInterval(() => { void load(); }, 30000);
     return () => { cancelled = true; window.clearInterval(timer); };
-  }, [groupId, roundId]);
+  }, [groupId, roundId, roundDate]);
   const legacyRojas = hoyo19Enabled ?? groupCode === 'DIVEND';
   const isDivend = groupCode === 'DIVEND' || (enabledGamification ? enabledGamification.includes('no-paso-rojas') : legacyRojas);
   const spanishHandsEnabled = groupCode !== null && (enabledGamification ? enabledGamification.includes('spanish-hand') : true);
@@ -239,6 +240,50 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   const roundsMap = new Map(rounds.map((r) => [r.playerId, r]));
   // Hay partida en marcha en cuanto alguien tiene un golpe anotado.
   const hasStartedScoring = rounds.some(round => Object.values(round.scores).some(score => (score?.gross_strokes ?? 0) > 0));
+  const [showFinalStandings, setShowFinalStandings] = useState(false);
+
+  // Clasificación de esta tarjeta (puntos Stableford y neto respecto al par en los hoyos jugados).
+  const cardStandings = rankStandings(players.map(player => {
+    const round = roundsMap.get(player.id);
+    const totals = playerTotals(
+      playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score)),
+      holeNumber => playableHoles.find(h => h.hole_number === holeNumber)?.par,
+    );
+    const isParejas = gameMode === 'parejas' && players.length === 4;
+    const team = players.indexOf(player) < 2 ? 0 : 1;
+    return {
+      key: player.id,
+      name: player.name,
+      isGuest: player.is_guest,
+      handicap: player.playing_handicap,
+      ...totals,
+      tag: isParejas ? (
+        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+          {team === 0 ? 'P1' : 'P2'}
+        </span>
+      ) : undefined,
+    };
+  }));
+
+  // General del grupo: solo con más de una tarjeta ese día. Esta tarjeta usa sus datos en vivo.
+  const groupStandings = groupId && groupDayRounds.length >= 2
+    ? rankStandings(groupDayRounds.flatMap(({ round, players: roundPlayers, scores: roundScores, pars }) => {
+        const mine = round.id === roundId;
+        return roundPlayers.map((player): StandingEntry => {
+          const scores = mine
+            ? Object.values(roundsMap.get(player.id)?.scores ?? {})
+            : roundScores.filter(score => score.player_id === player.id);
+          return {
+            key: `${round.id}:${player.id}`,
+            name: player.name,
+            isGuest: player.is_guest,
+            handicap: player.playing_handicap,
+            ...playerTotals(scores, holeNumber => pars.get(holeNumber)),
+            tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
+          };
+        });
+      }))
+    : null;
 
   const isEnteredScore = (score?: RoundScore) => !!score && (score.abandoned || score.gross_strokes > 0);
   const allScoresComplete = players.every((player) => {
@@ -399,8 +444,19 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               <ThemeToggle className="!h-11 !w-11" />
             </div>
             <div className="flex justify-center">{messagesButton}</div>
-            {/* La clasificación ya se ve en la propia tarjeta; esta columna mantiene centrado el botón de avisos. */}
-            <div aria-hidden="true" />
+            {/* Durante la partida la clasificación ya se ve en la tarjeta; con la partida finalizada, la copa abre la final. */}
+            <div className="flex justify-end">
+              {isRoundFinished && (
+                <button
+                  onClick={() => setShowFinalStandings(true)}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                  aria-label="Clasificación final"
+                >
+                  <Trophy size={20} />
+                  <span className="hidden sm:inline">Clasificación</span>
+                </button>
+              )}
+            </div>
           </div>
           {/* Desde el primer golpe la cabecera se compacta: lo importante pasa a ser el hoyo. */}
           <h1 className={hasStartedScoring ? 'sr-only' : 'mb-6 text-center text-2xl font-bold text-title md:text-3xl'}>
@@ -907,57 +963,17 @@ export const Scorecard: React.FC<ScorecardProps> = ({
 
             <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación en este momento</h3>
             <div className="grid grid-cols-1 gap-2 mb-6">
-              {rankStandings(players.map(player => {
-                const round = roundsMap.get(player.id);
-                const totals = playerTotals(
-                  playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score)),
-                  holeNumber => playableHoles.find(h => h.hole_number === holeNumber)?.par,
-                );
-                const isParejas = gameMode === 'parejas' && players.length === 4;
-                const team = players.indexOf(player) < 2 ? 0 : 1;
-                return {
-                  key: player.id,
-                  name: player.name,
-                  isGuest: player.is_guest,
-                  handicap: player.playing_handicap,
-                  ...totals,
-                  tag: isParejas ? (
-                    <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
-                      {team === 0 ? 'P1' : 'P2'}
-                    </span>
-                  ) : undefined,
-                };
-              })).map(row => <StandingRow key={row.entry.key} {...row} />)}
+              {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
             </div>
 
-            {(() => {
-              // General del grupo: solo con más de una tarjeta hoy. Esta tarjeta usa sus datos en vivo.
-              if (!groupId || groupDayRounds.length < 2) return null;
-              const entries: StandingEntry[] = groupDayRounds.flatMap(({ round, players: roundPlayers, scores: roundScores, pars }) => {
-                const mine = round.id === roundId;
-                return roundPlayers.map(player => {
-                  const scores = mine
-                    ? Object.values(roundsMap.get(player.id)?.scores ?? {})
-                    : roundScores.filter(score => score.player_id === player.id);
-                  return {
-                    key: `${round.id}:${player.id}`,
-                    name: player.name,
-                    isGuest: player.is_guest,
-                    handicap: player.playing_handicap,
-                    ...playerTotals(scores, holeNumber => pars.get(holeNumber)),
-                    tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
-                  };
-                });
-              });
-              return (
-                <>
-                  <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general del grupo</h3>
-                  <div className="grid grid-cols-1 gap-2 mb-6">
-                    {rankStandings(entries).map(row => <StandingRow key={row.entry.key} {...row} />)}
-                  </div>
-                </>
-              );
-            })()}
+            {groupStandings && (
+              <>
+                <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general del grupo</h3>
+                <div className="grid grid-cols-1 gap-2 mb-6">
+                  {groupStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
+                </div>
+              </>
+            )}
 
             {isDivend && (() => {
               // Solo quien tiene alguna marca, de más a menos; sin marcas, la sección no aparece.
@@ -1082,6 +1098,42 @@ export const Scorecard: React.FC<ScorecardProps> = ({
           </div>
         </div>
       </div>
+
+      {showFinalStandings && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowFinalStandings(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="final-standings-title"
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl"
+            onClick={event => event.stopPropagation()}
+          >
+            <h2 id="final-standings-title" className="flex items-center gap-2 text-lg font-bold text-ink">
+              <Trophy size={20} className="text-amber-500" aria-hidden="true" />
+              Clasificación final
+            </h2>
+            <h3 className="font-semibold text-ink-2 mb-3 mt-4">Clasificación final de la partida</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
+            </div>
+            {groupStandings && (
+              <>
+                <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general final del grupo</h3>
+                <div className="grid grid-cols-1 gap-2">
+                  {groupStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowFinalStandings(false)}
+              className="mt-5 w-full rounded-xl border border-line px-4 py-3 font-semibold text-ink-2"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
 
       {showFinishModal && (
         <ConfirmModal

@@ -1704,6 +1704,7 @@ function App() {
           isCreator={roundState.isCreator}
           canFinishRound={roundState.isCreator}
           isRoundFinished={roundState.round.status === 'completed' || roundState.round.status === 'archived'}
+          roundDate={roundState.round.created_at}
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
           groupId={currentGroup?.id}

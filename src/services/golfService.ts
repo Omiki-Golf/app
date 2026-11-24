@@ -486,6 +486,23 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     return groupId ? data || [] : this.withCodeQuickRounds(data || []);
   },
 
+  /** Tarjetas de un grupo creadas el mismo día (hora local) que `dateIso`: en juego, finalizadas o archivadas. */
+  async getGroupRoundsOfDay(groupId: string, dateIso: string): Promise<GolfRound[]> {
+    const day = new Date(dateIso);
+    const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+    const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    const { data, error } = await supabase
+      .from('golf_rounds')
+      .select('*')
+      .eq('group_id', groupId)
+      .in('status', ['active', 'completed', 'archived'])
+      .gte('created_at', start.toISOString())
+      .lt('created_at', end.toISOString())
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  },
+
   /** Añade las partidas rápidas activas en las que se entró con el código; no rompe la lista si falla. */
   async withCodeQuickRounds(own: GolfRound[]): Promise<GolfRound[]> {
     const { data, error } = await supabase.rpc('list_my_code_quick_rounds');
