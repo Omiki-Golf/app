@@ -34,6 +34,8 @@ interface StandingEntry {
   toPar: number | null;
   /** Etiqueta junto al nombre (P1/P2 en Parejas, «Tu partida» en la general del grupo). */
   tag?: React.ReactNode;
+  /** Títulos de gamificación marcados (en toda la partida) y en qué hoyos. */
+  marks?: Array<{ productId: string; holes: number[] }>;
 }
 
 /** Ordena por puntos y, a igualdad, por menos puntos de juego; añade posición y frase respecto al líder. */
@@ -73,6 +75,20 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
           <p className="min-w-0 truncate text-lg font-bold text-ink"><PlayerName name={entry.name} />{entry.isGuest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
         </div>
         <p className="truncate text-sm text-ink-3">{subtitle}</p>
+        {entry.marks && entry.marks.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {entry.marks.map(mark => (
+              <span key={mark.productId} className="inline-flex items-center gap-0.5">
+                <GamificationBadge
+                  productId={mark.productId}
+                  size={18}
+                  detail={`${mark.holes.length === 1 ? 'Hoyo' : 'Hoyos'} ${mark.holes.join(', ')}`}
+                />
+                {mark.holes.length > 1 && <span className="text-xs font-bold text-ink-2 tabular-nums">×{mark.holes.length}</span>}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1">
         <span className={`${valueBox} bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
@@ -242,11 +258,24 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   const hasStartedScoring = rounds.some(round => Object.values(round.scores).some(score => (score?.gross_strokes ?? 0) > 0));
   const [showFinalStandings, setShowFinalStandings] = useState(false);
 
+  const markedHoles = (scores: RoundScore[], isMarked: (score: RoundScore) => boolean | undefined) =>
+    scores.filter(score => isMarked(score)).map(score => score.hole_number).sort((a, b) => a - b);
+  // Iconos de las fichas de clasificación: títulos activos del grupo con alguna marca en la partida.
+  const gamificationMarks = (scores: RoundScore[]) => [
+    ...(isDivend ? [{ productId: 'no-paso-rojas', holes: markedHoles(scores, score => score.no_paso_rojas) }] : []),
+    ...(spanishHandsEnabled ? [{ productId: 'spanish-hand', holes: markedHoles(scores, score => score.spanish_hands) }] : []),
+    ...extraGamification.map(product => ({
+      productId: product.id,
+      holes: markedHoles(scores, score => score.gamification_events?.includes(product.id)),
+    })),
+  ].filter(mark => mark.holes.length > 0);
+
   // Clasificación de esta tarjeta (puntos Stableford y neto respecto al par en los hoyos jugados).
   const cardStandings = rankStandings(players.map(player => {
     const round = roundsMap.get(player.id);
+    const cardScores = playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score));
     const totals = playerTotals(
-      playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score)),
+      cardScores,
       holeNumber => playableHoles.find(h => h.hole_number === holeNumber)?.par,
     );
     const isParejas = gameMode === 'parejas' && players.length === 4;
@@ -257,6 +286,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
       isGuest: player.is_guest,
       handicap: player.playing_handicap,
       ...totals,
+      marks: gamificationMarks(cardScores),
       tag: isParejas ? (
         <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
           {team === 0 ? 'P1' : 'P2'}
@@ -279,11 +309,143 @@ export const Scorecard: React.FC<ScorecardProps> = ({
             isGuest: player.is_guest,
             handicap: player.playing_handicap,
             ...playerTotals(scores, holeNumber => pars.get(holeNumber)),
+            marks: gamificationMarks(scores),
             tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
           };
         });
       }))
     : null;
+
+  // Gamificación (No pasó de rojas, Spanish Hands y títulos del Pro-Shop): solo jugadores con marcas
+  // y sin secciones vacías. Se usa para esta tarjeta y para todas las del grupo ese día.
+  interface GamificationPerson { key: string; player: RoundPlayer; tag?: React.ReactNode; scores: RoundScore[] }
+  const cardGamificationPeople: GamificationPerson[] = players.map(player => {
+    const round = roundsMap.get(player.id);
+    const isParejas = gameMode === 'parejas' && players.length === 4;
+    const team = players.indexOf(player) < 2 ? 0 : 1;
+    return {
+      key: player.id,
+      player,
+      scores: playableHoles.map(h => round?.scores[h.hole_number]).filter((score): score is RoundScore => Boolean(score)),
+      tag: isParejas ? (
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-100 dark:border dark:border-red-700'}`}>
+          {team === 0 ? 'P1' : 'P2'}
+        </span>
+      ) : undefined,
+    };
+  });
+  const groupGamificationPeople: GamificationPerson[] = groupStandings
+    ? groupDayRounds.flatMap(({ round, players: roundPlayers, scores: roundScores }) => {
+        const mine = round.id === roundId;
+        return roundPlayers.map(player => ({
+          key: `${round.id}:${player.id}`,
+          player,
+          scores: mine
+            ? Object.values(roundsMap.get(player.id)?.scores ?? {})
+            : roundScores.filter(score => score.player_id === player.id),
+          tag: mine ? <span className="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-on-accent">Tu partida</span> : undefined,
+        }));
+      })
+    : [];
+  const playerLabel = (person: GamificationPerson, small = false) => (
+    <div className="flex items-center gap-2 min-w-0">
+      {person.tag}
+      <p className={`font-semibold text-ink truncate ${small ? 'text-sm' : ''}`}><PlayerName name={person.player.name} />{person.player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
+    </div>
+  );
+  const renderGamification = (people: GamificationPerson[], titleSuffix: string) => {
+    // Rojas va arriba a todo el ancho; el resto, 1 o 2 títulos a todo el ancho y con más de 2, en dos columnas.
+    const rojas = isDivend
+      ? people
+          .map(person => ({ person, holes: markedHoles(person.scores, score => score.no_paso_rojas) }))
+          .filter(item => item.holes.length > 0)
+          .sort((a, b) => b.holes.length - a.holes.length)
+      : [];
+    const sections = [
+      ...(spanishHandsEnabled ? [{
+        id: 'spanish-hand', name: 'Spanish Hands', chip: 'bg-accent text-on-accent',
+        row: 'bg-accent-soft border-accent-ring', box: 'bg-accent-soft border-accent-ring', count: 'text-accent-ink',
+        isMarked: (score: RoundScore) => score.spanish_hands,
+      }] : []),
+      ...extraGamification.map(product => ({
+        id: product.id, name: product.name, chip: product.badge,
+        row: 'bg-card-2 border-line', box: 'bg-card border-line', count: 'text-ink',
+        isMarked: (score: RoundScore) => score.gamification_events?.includes(product.id),
+      })),
+    ]
+      .map(section => ({
+        ...section,
+        marked: people
+          .map(person => ({ person, holes: markedHoles(person.scores, section.isMarked) }))
+          .filter(item => item.holes.length > 0)
+          .sort((a, b) => b.holes.length - a.holes.length),
+      }))
+      .filter(section => section.marked.length > 0);
+    if (!rojas.length && !sections.length) return null;
+    const twoColumns = sections.length > 2;
+    return (
+      <>
+        {rojas.length > 0 && (
+          <>
+            <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
+              <GamificationBadge productId="no-paso-rojas" size={22} />
+              No pasó de rojas{titleSuffix}
+            </h3>
+            <div className="space-y-3">
+              {rojas.map(({ person, holes }) => (
+                <div key={person.key} className="bg-red-50 border-2 border-red-200 rounded-lg p-3 flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    {playerLabel(person)}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {holes.map(holeNumber => (
+                        <span key={holeNumber} className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                          Hoyo {holeNumber}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-red-100 border-2 border-red-300 rounded-lg px-4 py-2 min-w-[60px] text-center">
+                    <p className="text-2xl font-bold text-red-600">{holes.length}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        {sections.length > 0 && (
+          <div className={twoColumns ? 'grid grid-cols-2 gap-x-3' : ''}>
+            {sections.map(section => (
+              <div key={section.id} className="min-w-0">
+                <h3 className={`font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2 min-w-0 ${twoColumns ? 'text-sm' : ''}`}>
+                  <GamificationBadge productId={section.id} size={twoColumns ? 18 : 22} />
+                  <span className="truncate" title={`${section.name}${titleSuffix}`}>{section.name}{titleSuffix}</span>
+                </h3>
+                <div className={twoColumns ? 'space-y-2' : 'space-y-3'}>
+                  {section.marked.map(({ person, holes }) => (
+                    <div key={person.key} className={`${section.row} border-2 rounded-lg flex items-center justify-between gap-2 ${twoColumns ? 'p-2' : 'p-3'}`}>
+                      <div className="min-w-0">
+                        {playerLabel(person, twoColumns)}
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {holes.map(holeNumber => (
+                            <span key={holeNumber} className={`${section.chip} font-bold rounded-full ${twoColumns ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
+                              {twoColumns ? `H${holeNumber}` : `Hoyo ${holeNumber}`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className={`${section.box} border-2 rounded-lg text-center shrink-0 ${twoColumns ? 'px-2 py-1 min-w-[40px]' : 'px-4 py-2 min-w-[60px]'}`}>
+                        <p className={`font-bold ${section.count} ${twoColumns ? 'text-lg' : 'text-2xl'}`}>{holes.length}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </>
+    );
+  };
 
   const isEnteredScore = (score?: RoundScore) => !!score && (score.abandoned || score.gross_strokes > 0);
   const allScoresComplete = players.every((player) => {
@@ -449,11 +611,12 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               {isRoundFinished && (
                 <button
                   onClick={() => setShowFinalStandings(true)}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 px-3 sm:px-4 rounded-lg flex h-11 items-center gap-2 font-semibold transition-colors"
+                  type="button"
+                  className="inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-amber-500 bg-amber-400 p-0 text-amber-950 shadow-soft transition-all hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
                   aria-label="Clasificación final"
+                  title="Clasificación final"
                 >
-                  <Trophy size={20} />
-                  <span className="hidden sm:inline">Clasificación</span>
+                  <Trophy size={22} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -966,134 +1129,19 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
             </div>
 
+            {/* Gamificación de esta tarjeta. */}
+            {renderGamification(cardGamificationPeople, '')}
+
             {groupStandings && (
               <>
                 <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general del grupo</h3>
                 <div className="grid grid-cols-1 gap-2 mb-6">
                   {groupStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
                 </div>
+                {/* Gamificación de todas las tarjetas del grupo de ese día. */}
+                {renderGamification(groupGamificationPeople, ' · grupo')}
               </>
             )}
-
-            {isDivend && (() => {
-              // Solo quien tiene alguna marca, de más a menos; sin marcas, la sección no aparece.
-              const marked = players
-                .map(player => ({
-                  player,
-                  noPasoRojasHoles: playableHoles
-                    .filter(h => roundsMap.get(player.id)?.scores[h.hole_number]?.no_paso_rojas)
-                    .map(h => h.hole_number),
-                }))
-                .filter(item => item.noPasoRojasHoles.length > 0)
-                .sort((a, b) => b.noPasoRojasHoles.length - a.noPasoRojasHoles.length);
-              if (!marked.length) return null;
-              return (
-              <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2">
-                  <GamificationBadge productId="no-paso-rojas" size={22} />
-                  No pasó de rojas
-                </h3>
-                <div className="space-y-3">
-                  {marked.map(({ player, noPasoRojasHoles }) => {
-                    const noPasoRojasCount = noPasoRojasHoles.length;
-
-                    return (
-                      <div
-                        key={player.id}
-                        className="bg-red-50 border-2 border-red-200 rounded-lg p-3 flex items-center justify-between"
-                      >
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            {gameMode === 'parejas' && players.length === 4 && (
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${players.indexOf(player) < 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/80 dark:text-blue-100 dark:border dark:border-blue-700' : 'bg-red-100 text-red-800 dark:bg-red-900/80 dark:text-red-100 dark:border dark:border-red-700'}`}>
-                                {players.indexOf(player) < 2 ? 'P1' : 'P2'}
-                              </span>
-                            )}
-                            <p className="font-semibold text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                          </div>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {noPasoRojasHoles.map(holeNumber => (
-                              <span key={holeNumber} className="bg-red-600 text-white text-xs font-bold rounded-full px-2 py-0.5">
-                                Hoyo {holeNumber}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="bg-red-100 border-2 border-red-300 rounded-lg px-4 py-2 min-w-[60px] text-center">
-                          <p className="text-2xl font-bold text-red-600">{noPasoRojasCount}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-              );
-            })()}
-
-            {(() => {
-              // Rojas va arriba a todo el ancho. El resto: 1 o 2 títulos a todo el ancho; con más de 2, en dos columnas.
-              const sections = [
-                ...(spanishHandsEnabled ? [{
-                  id: 'spanish-hand', name: 'Spanish Hands', chip: 'bg-accent text-on-accent',
-                  row: 'bg-accent-soft border-accent-ring', box: 'bg-accent-soft border-accent-ring', count: 'text-accent-ink',
-                  holesFor: (playerId: string) => playableHoles
-                    .filter(h => roundsMap.get(playerId)?.scores[h.hole_number]?.spanish_hands)
-                    .map(h => h.hole_number),
-                }] : []),
-                ...extraGamification.map(product => ({
-                  id: product.id, name: product.name, chip: product.badge,
-                  row: 'bg-card-2 border-line', box: 'bg-card border-line', count: 'text-ink',
-                  holesFor: (playerId: string) => playableHoles
-                    .filter(h => roundsMap.get(playerId)?.scores[h.hole_number]?.gamification_events?.includes(product.id))
-                    .map(h => h.hole_number),
-                })),
-              ];
-              // Solo secciones con alguna marca y, en cada una, solo los jugadores marcados (de más a menos).
-              const visible = sections
-                .map(section => ({
-                  ...section,
-                  marked: players
-                    .map(player => ({ player, holes: section.holesFor(player.id) }))
-                    .filter(item => item.holes.length > 0)
-                    .sort((a, b) => b.holes.length - a.holes.length),
-                }))
-                .filter(section => section.marked.length > 0);
-              if (!visible.length) return null;
-              const twoColumns = visible.length > 2;
-              return (
-                <div className={twoColumns ? 'grid grid-cols-2 gap-x-3' : ''}>
-                  {visible.map(section => (
-                    <div key={section.id} className="min-w-0">
-                      <h3 className={`font-semibold text-ink-2 mb-3 mt-6 flex items-center gap-2 min-w-0 ${twoColumns ? 'text-sm' : ''}`}>
-                        <GamificationBadge productId={section.id} size={twoColumns ? 18 : 22} />
-                        <span className="truncate" title={section.name}>{section.name}</span>
-                      </h3>
-                      <div className={twoColumns ? 'space-y-2' : 'space-y-3'}>
-                        {section.marked.map(({ player, holes }) => {
-                          return (
-                            <div key={player.id} className={`${section.row} border-2 rounded-lg flex items-center justify-between gap-2 ${twoColumns ? 'p-2' : 'p-3'}`}>
-                              <div className="min-w-0">
-                                <p className={`font-semibold text-ink truncate ${twoColumns ? 'text-sm' : ''}`}><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal text-ink-3">(Invitado)</span>}</p>
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {holes.map(holeNumber => (
-                                    <span key={holeNumber} className={`${section.chip} font-bold rounded-full ${twoColumns ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2 py-0.5'}`}>
-                                      {twoColumns ? `H${holeNumber}` : `Hoyo ${holeNumber}`}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className={`${section.box} border-2 rounded-lg text-center shrink-0 ${twoColumns ? 'px-2 py-1 min-w-[40px]' : 'px-4 py-2 min-w-[60px]'}`}>
-                                <p className={`font-bold ${section.count} ${twoColumns ? 'text-lg' : 'text-2xl'}`}>{holes.length}</p>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
 
           </div>
         </div>

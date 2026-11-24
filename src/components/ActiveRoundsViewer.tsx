@@ -587,14 +587,13 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
                 <div className="flex flex-wrap justify-end gap-2">
                     <>
                       <button
+                        type="button"
                         onClick={() => setShowGlobalLeaderboard(true)}
-                        className="bg-yellow-600 hover:bg-yellow-700 text-amber-950 font-bold h-11 px-4 rounded-lg flex items-center gap-2 transition-colors"
+                        className="inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-amber-500 bg-amber-400 p-0 text-amber-950 shadow-soft transition-all hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
                         aria-label="Clasificación"
+                        title="Clasificación"
                       >
-                        <Trophy size={20} />
-                        <span className="hidden sm:inline">
-                          Clasificación
-                        </span>
+                        <Trophy size={22} aria-hidden="true" />
                       </button>
                       {/* Solo Clasificación arriba: archivar y eliminar van en cada partida. */}
                     </>
@@ -602,11 +601,11 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
               )}
               </div>
 
-              <h1 className="text-3xl font-bold text-title">
-                {currentGroup
-                  ? `Partidas ${currentGroup.name || 'del Grupo'}`
-                  : 'Partida en curso'}
-              </h1>
+              {currentGroup ? (
+                <h1 className="text-center text-3xl font-bold text-title">{currentGroup.name || 'Grupo'}</h1>
+              ) : (
+                <h1 className="text-3xl font-bold text-title">Partida en curso</h1>
+              )}
             </div>
 
         {error && (
@@ -624,6 +623,11 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
             <p className="text-ink-3 text-lg">No hay partidas activas en este momento</p>
           </div>
         ) : (
+          // En un grupo, las partidas van dentro de una ficha como la de «Partidas» del inicio.
+          <section className={currentGroup ? 'rounded-2xl border border-line bg-card p-3 shadow-soft' : undefined}>
+            {currentGroup && (
+              <h2 className="mb-2 ml-0.5 text-xs font-semibold text-ink-2">{rounds.length === 1 ? 'Partida' : 'Partidas'}</h2>
+            )}
           <div className="space-y-4">
             {rounds.map((roundStats) => {
               const isExpanded = !currentGroup || selectedRound === roundStats.round.id;
@@ -961,6 +965,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
               );
             })}
           </div>
+          </section>
         )}
           </>
         )}

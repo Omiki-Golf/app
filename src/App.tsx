@@ -1064,6 +1064,12 @@ function App() {
     }
   };
 
+  // Desde una partida de grupo se vuelve a la lista de partidas, no al inicio del grupo.
+  const handleBackFromScorecard = () => {
+    handleBackToMain();
+    if (currentGroup) setCurrentView('active-rounds');
+  };
+
   const handleFinishRound = async () => {
     if (!roundState.round) return;
 
@@ -1681,7 +1687,7 @@ function App() {
       )}
 
       {currentView === 'scorecard' && roundState.round && (
-        <Scorecard backDestination={currentGroup ? 'home' : 'back'}
+        <Scorecard backDestination="back"
           holes={roundState.holes}
           players={roundState.players}
           rounds={roundState.players.map((player) => ({
@@ -1714,7 +1720,7 @@ function App() {
           decidedHoles={roundState.round.decided_holes}
           onHoleChange={handleHoleChange}
           onScoreChange={handleScoreChange}
-          onResetGame={handleBackToMain}
+          onResetGame={handleBackFromScorecard}
           onFinishRound={handleFinishRound}
           onCourseChanged={handleCourseChanged}
           messagesButton={inlineMessagesButton}
