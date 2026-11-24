@@ -8,7 +8,7 @@ test('standings rows use a smaller medal and compact points with the to-par valu
   const source = await read();
   assert.match(source, /flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base/);
   assert.match(source, /const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';/);
-  assert.match(source, /flex-col items-center gap-0\.5 self-stretch justify-center border-l border-accent-ring/);
+  assert.match(source, /flex-col items-center gap-0\.5 self-stretch justify-center">/);
   assert.match(source, /title="Cómo va respecto al par[^"]*">\s*\{toParLabel\}\s*<\/span>/);
   assert.match(source, /<span className=\{`\$\{valueBox\} \$\{toParClass\}`\}/);
   assert.match(source, /toPar < 0\s*\? 'text-blue-600 dark:text-blue-400'\s*: toPar === 0\s*\? 'text-ink'\s*: 'text-red-600 dark:text-red-400'/);
@@ -53,9 +53,10 @@ test('gamification sections show only marked players and hide when nobody is mar
 test('standing rows show the gamification icons of each player for the whole round', async () => {
   const source = await read();
   assert.match(source, /marks\?: Array<\{ productId: string; holes: number\[\] \}>/);
-  assert.match(source, /visibleMarks\.map\(mark => \([\s\S]{0,300}<GamificationBadge\s+productId=\{mark\.productId\}/);
+  assert.match(source, /visibleMarks\.map\(mark => \([\s\S]{0,500}<GamificationBadge\s+productId=\{mark\.productId\}/);
+  assert.match(source, /className=\{mark\.holes\.length > 1\s*\? '[^']*border border-accent-ring[^']*'\s*: 'inline-flex items-center'\}/);
   // Píldoras bajo una línea, solo icono y «×N» cuando se repite.
-  assert.match(source, /border-t border-accent-ring pt-1\.5/);
+  assert.match(source, /ml-\[calc\(3\.5rem\+1px\)\].*border-t border-accent-ring pt-1\.5/);
   assert.match(source, /\{mark\.holes\.length > 1 && <span className="text-xs font-bold text-ink tabular-nums">×\{mark\.holes\.length\}<\/span>\}/);
   assert.match(source, /marks: gamificationMarks\(cardScores\)/);
   // La general del grupo usa los golpes de cada tarjeta (en vivo para la propia).

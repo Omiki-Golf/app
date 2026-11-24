@@ -85,7 +85,7 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
           </div>
           <p className="truncate text-sm text-ink-3">{subtitle}</p>
         </div>
-        <div className="flex min-w-[5.25rem] shrink-0 flex-col items-center gap-0.5 self-stretch justify-center border-l border-accent-ring pl-2">
+        <div className="flex min-w-[5.25rem] shrink-0 flex-col items-center gap-0.5 self-stretch justify-center">
           <span className={`${valueBox} py-0.5 bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
           <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
             {toParLabel}
@@ -94,11 +94,13 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
       </div>
       {/* Marcas de gamificación: una píldora por título, solo icono y «×N» si se repite. */}
       {marks.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-accent-ring pt-1.5">
+        <div className="ml-[calc(3.5rem+1px)] mt-2 flex flex-wrap items-center gap-1.5 border-t border-accent-ring pt-1.5">
           {visibleMarks.map(mark => (
             <span
               key={mark.productId}
-              className="inline-flex min-w-9 items-center justify-center gap-1 rounded-full border border-accent-ring bg-card-2 px-1.5 py-px"
+              className={mark.holes.length > 1
+                ? 'inline-flex min-w-9 items-center justify-center gap-1 rounded-full border border-accent-ring bg-card-2 px-1.5 py-px'
+                : 'inline-flex items-center'}
             >
               <GamificationBadge
                 productId={mark.productId}
