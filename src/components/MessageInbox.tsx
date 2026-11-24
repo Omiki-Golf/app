@@ -7,7 +7,7 @@ function getMessageIcon(title: string, body?: string) {
     return { icon: Flag, color: 'text-red-600 bg-red-600/10' };
   }
   if (text.includes('spanish hands') || text.includes('spanish')) {
-    return { icon: Hand, color: 'text-sky-500 bg-sky-500/10' };
+    return { icon: Hand, color: 'text-emerald-500 bg-emerald-500/10' };
   }
   if (text.includes('hoyo en uno') || text.includes('hole in one')) {
     return { icon: Trophy, color: 'text-amber-500 bg-amber-500/10' };

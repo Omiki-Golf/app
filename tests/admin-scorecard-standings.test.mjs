@@ -4,12 +4,15 @@ import { readFile } from 'node:fs/promises';
 
 const read = () => readFile(new URL('../src/components/Scorecard.tsx', import.meta.url), 'utf8');
 
-test('standings rows use a smaller medal and the same size for points and Actual', async () => {
+test('standings rows use a smaller medal and compact points with the to-par value centered below, without «Actual»', async () => {
   const source = await read();
   assert.match(source, /flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base/);
-  assert.match(source, /const valueBox = 'rounded-full px-3 py-0\.5 text-lg font-black leading-tight tabular-nums';/);
-  assert.match(source, /<span className=\{`\$\{valueBox\} bg-emerald-300 text-emerald-950`\}>\{entry\.points\} pts<\/span>/);
+  assert.match(source, /const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';/);
+  assert.match(source, /<div className="flex shrink-0 flex-col items-center gap-0\.5">\s*<span className=\{`\$\{valueBox\} py-0\.5 bg-emerald-300 text-emerald-950`\}>\{entry\.points\} pts<\/span>/);
+  assert.match(source, /title="Cómo va respecto al par[^"]*">\s*\{toParLabel\}\s*<\/span>/);
   assert.match(source, /<span className=\{`\$\{valueBox\} \$\{toParClass\}`\}/);
+  // Bajo par azul, al par blanco y sobre par rojo.
+  assert.match(source, /toPar < 0\s*\? 'text-blue-600 dark:text-blue-400'\s*: toPar === 0\s*\? 'text-white [^']*'\s*: 'text-red-600 dark:text-red-400'/);
 });
 
 test('group cards show the general group standings only with more than one card that day', async () => {
@@ -83,4 +86,11 @@ test('the rounds list shows a round trophy, the centered group name and a Partid
   assert.match(viewer, /<h1 className="text-center text-3xl font-bold text-title">\{currentGroup\.name \|\| 'Grupo'\}<\/h1>/);
   assert.match(viewer, /\{rounds\.length === 1 \? 'Partida' : 'Partidas'\}/);
   assert.match(viewer, /<section className=\{currentGroup \? 'rounded-2xl border border-line bg-card p-3 shadow-soft' : undefined\}>/);
+});
+
+test('the Spanish Hands hand is green in notifications and messages, like on the card', async () => {
+  const bell = await readFile(new URL('../src/components/NotificationsBell.tsx', import.meta.url), 'utf8');
+  const inbox = await readFile(new URL('../src/components/MessageInbox.tsx', import.meta.url), 'utf8');
+  assert.match(bell, /isSpanishHands\s*\? 'text-emerald-500 bg-emerald-500\/10'/);
+  assert.match(inbox, /icon: Hand, color: 'text-emerald-500 bg-emerald-500\/10'/);
 });

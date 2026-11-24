@@ -57,13 +57,16 @@ function rankStandings(entries: StandingEntry[]) {
 function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandings>[number]) {
   const { toPar } = entry;
   const toParLabel = toPar === null ? '-' : toPar === 0 ? 'Par' : toPar > 0 ? `+${toPar}` : `−${Math.abs(toPar)}`;
-  const toParClass = toPar === null || toPar === 0
+  // Bajo par en azul, al par en blanco (con contorno oscuro para leerse sobre el verde claro) y sobre par en rojo.
+  const toParClass = toPar === null
     ? 'text-ink-2'
     : toPar < 0
-    ? 'text-accent-ink'
+    ? 'text-blue-600 dark:text-blue-400'
+    : toPar === 0
+    ? 'text-white [text-shadow:0_0_2px_rgb(0_0_0/0.75),0_1px_2px_rgb(0_0_0/0.5)]'
     : 'text-red-600 dark:text-red-400';
-  // Puntos (con fondo) y «Actual» (sin fondo) comparten tamaño, peso y caja para verse iguales.
-  const valueBox = 'rounded-full px-3 py-0.5 text-lg font-black leading-tight tabular-nums';
+  // Puntos (con fondo) y neto al par (sin fondo, centrado debajo): entre los dos, la altura de la medalla con nombre y situación.
+  const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';
   return (
     <div className="flex items-center gap-3 rounded-2xl border border-accent-ring bg-accent-soft p-3 text-left min-w-0">
       <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-black shadow-sm ${PODIUM_MEDALS[position - 1] ?? 'bg-card-2 text-ink-2 border border-line'}`}>
@@ -90,10 +93,10 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
           </div>
         )}
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className={`${valueBox} bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
+      <div className="flex shrink-0 flex-col items-center gap-0.5">
+        <span className={`${valueBox} py-0.5 bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
         <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
-          Actual {toParLabel}
+          {toParLabel}
         </span>
       </div>
     </div>

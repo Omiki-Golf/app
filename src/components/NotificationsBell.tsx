@@ -167,7 +167,7 @@ export const NotificationsBell: React.FC<NotificationsBellProps> = ({ userId, on
               : isNoPasoRojas
               ? 'text-red-600 bg-red-600/10'
               : isSpanishHands
-              ? 'text-sky-500 bg-sky-500/10'
+              ? 'text-emerald-500 bg-emerald-500/10'
               : 'text-accent-ink bg-accent-soft';
             const label = product
               ? product.name
