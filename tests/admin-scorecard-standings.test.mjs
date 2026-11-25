@@ -7,10 +7,10 @@ const read = () => readFile(new URL('../src/components/Scorecard.tsx', import.me
 test('standings rows use a smaller medal and compact points with the to-par value centered below, without «Actual»', async () => {
   const source = await read();
   assert.match(source, /flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base/);
-  assert.match(source, /const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';/);
-  assert.match(source, /flex-col items-center gap-0\.5 self-stretch justify-center">/);
+  assert.match(source, /const valueBox = 'rounded-full px-3 text-\[1\.0625rem\] font-black leading-5 tabular-nums';/);
+  assert.match(source, /flex-col items-center gap-1\.5 self-stretch justify-center">/);
   assert.match(source, /title="Cómo va respecto al par[^"]*">\s*\{toParLabel\}\s*<\/span>/);
-  assert.match(source, /<span className=\{`\$\{valueBox\} \$\{toParClass\}`\}/);
+  assert.match(source, /<span className=\{`\$\{valueBox\} pt-0\.5 \$\{toParClass\}`\}/);
   assert.match(source, /toPar < 0\s*\? 'text-blue-600 dark:text-blue-400'\s*: toPar === 0\s*\? 'text-ink'\s*: 'text-red-600 dark:text-red-400'/);
 });
 
@@ -36,11 +36,17 @@ test('the header compacts after the first stroke and keeps the access code in th
   assert.match(source, /\{!hasStartedScoring && accessCode && hasEditAccess && \(/);
 });
 
-test('the trophy appears only once the round is finished and opens both final standings', async () => {
+test('the trophy is always shown and opens the same leaderboard as the rounds list', async () => {
   const source = await read();
-  assert.match(source, /\{isRoundFinished && \(\s*<button\s*onClick=\{\(\) => setShowFinalStandings\(true\)\}/);
-  assert.match(source, /Clasificación final de la partida<\/h3>\s*<div className="grid grid-cols-1 gap-2">\s*\{cardStandings\.map/);
-  assert.match(source, /Clasificación general final del grupo<\/h3>\s*<div className="grid grid-cols-1 gap-2">\s*\{groupStandings\.map/);
+  assert.doesNotMatch(source, /\{isRoundFinished && \(\s*<button\s*onClick=\{\(\) => setShowLeaderboard/);
+  assert.doesNotMatch(source, /Clasificación final de la partida/);
+  assert.match(source, /<GlobalLeaderboard\s+rounds=\{leaderboardRounds\}/);
+  assert.match(source, /Clasificación de tu partida<\/h3>/);
+  const viewer = await readFile(new URL('../src/components/ActiveRoundsViewer.tsx', import.meta.url), 'utf8');
+  assert.match(viewer, /<GlobalLeaderboard\s+rounds=\{rounds\}/);
+  const board = await readFile(new URL('../src/components/GlobalLeaderboard.tsx', import.meta.url), 'utf8');
+  assert.match(board, /export const buildGlobalLeaderboard/);
+  assert.match(board, /\{player\.holesPlayed\} hoyos/);
 });
 
 test('gamification sections show only marked players and hide when nobody is marked', async () => {
@@ -50,7 +56,7 @@ test('gamification sections show only marked players and hide when nobody is mar
   assert.match(source, /\.filter\(section => section\.marked\.length > 0\);\s*if \(!rojas\.length && !sections\.length\) return null;/);
 });
 
-test('standing rows show the gamification icons of each player for the whole round', async () => {
+test('group standing rows show the gamification icons; the own card leaves them to the cards below', async () => {
   const source = await read();
   assert.match(source, /marks\?: Array<\{ productId: string; holes: number\[\] \}>/);
   assert.match(source, /visibleMarks\.map\(mark => \([\s\S]{0,500}<GamificationBadge\s+productId=\{mark\.productId\}/);
@@ -58,7 +64,7 @@ test('standing rows show the gamification icons of each player for the whole rou
   // Píldoras bajo una línea, solo icono y «×N» cuando se repite.
   assert.match(source, /ml-\[calc\(3\.5rem\+1px\)\].*border-t border-accent-ring pt-1\.5/);
   assert.match(source, /\{mark\.holes\.length > 1 && <span className="text-xs font-bold text-ink tabular-nums">×\{mark\.holes\.length\}<\/span>\}/);
-  assert.match(source, /marks: gamificationMarks\(cardScores\)/);
+  assert.doesNotMatch(source, /marks: gamificationMarks\(cardScores\)/);
   // La general del grupo usa los golpes de cada tarjeta (en vivo para la propia).
   assert.match(source, /\.\.\.playerTotals\(scores, holeNumber => pars\.get\(holeNumber\)\),\s*marks: gamificationMarks\(scores\)/);
 });
@@ -73,7 +79,7 @@ test('the group standings also show the gamification of every card that day', as
 
 test('the trophy button is round like the other top buttons', async () => {
   const source = await read();
-  assert.match(source, /onClick=\{\(\) => setShowFinalStandings\(true\)\}[\s\S]{0,120}h-11 w-11[^"]*rounded-full/);
+  assert.match(source, /onClick=\{\(\) => setShowLeaderboard\(true\)\}[\s\S]{0,120}h-11 w-11[^"]*rounded-full/);
 });
 
 test('leaving a group round goes back to the list of rounds, not the group home', async () => {

@@ -28,7 +28,8 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { PlansComparison } from './components/PlansComparison';
 import { clearPlanLink, readPlanLink } from './utils/planLink';
 import { PlayerCheckout } from './components/PlayerCheckout';
-import { playerIntent, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
+import { playerIntent, pendingGiftCode, type BillingPeriod, type PaidPlan } from './utils/playerRegistration';
+import { giftCodeLabel, giftCodeService } from './services/giftCodeService';
 import { RegistrationForm } from './components/RegistrationForm';
 import { HomeScreen } from './components/HomeScreen';
 import { ProfileScreen } from './components/ProfileScreen';
@@ -123,6 +124,8 @@ function App() {
   }, []);
   const [registrationPlan, setRegistrationPlan] = useState<PaidPlan>('player');
   const [registrationPeriod, setRegistrationPeriod] = useState<BillingPeriod>('annual');
+  // Registro abierto desde «¿Tienes un código regalo?»: el campo del código empieza desplegado.
+  const [registrationWithGift, setRegistrationWithGift] = useState(false);
   const [plansContext, setPlansContext] = useState<'default' | 'express-limit' | 'express-modes' | 'team'>('default');
   const [authReturnView, setAuthReturnView] = useState<ViewType>('main');
   const [emailConfirmed, setEmailConfirmed] = useState(
@@ -232,6 +235,31 @@ function App() {
   useEffect(() => { messagesOpenRef.current = messagesOpen; }, [messagesOpen]);
   // Paid access comes from the server-confirmed database subscription.
   const activePlanType = planType;
+
+  // Código regalo indicado en el alta: se canjea al primer inicio de sesión y se borra de la cuenta.
+  const pendingGift = user ? pendingGiftCode(user.user_metadata || {}) : null;
+  const [giftNotice, setGiftNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const redeemingGift = useRef<string | null>(null);
+  useEffect(() => {
+    if (!user || !pendingGift || redeemingGift.current === pendingGift) return;
+    redeemingGift.current = pendingGift;
+    void (async () => {
+      try {
+        const result = await giftCodeService.redeem(pendingGift);
+        setGiftNotice({ ok: true, text: `${giftCodeLabel(result.plan, result.duration)} activado con tu código regalo.` });
+      } catch (cause) {
+        const reason = cause instanceof Error ? cause.message : 'No se ha podido canjear.';
+        setGiftNotice({ ok: false, text: `Código regalo ${pendingGift}: ${reason} Puedes reintentarlo desde tu perfil.` });
+      }
+      await supabase.auth.updateUser({ data: { gift_code: null } }).catch(() => undefined);
+      await refreshSubscription();
+    })();
+  }, [user, pendingGift, refreshSubscription]);
+  useEffect(() => {
+    if (!giftNotice) return;
+    const timeoutId = window.setTimeout(() => setGiftNotice(null), giftNotice.ok ? 6000 : 12000);
+    return () => window.clearTimeout(timeoutId);
+  }, [giftNotice]);
 
   const pendingPlayer = playerIntent(user?.user_metadata || {});
   const pendingPlayerId = pendingPlayer && user?.user_metadata.player_checkout_acknowledged !== pendingPlayer.id ? pendingPlayer.id : null;
@@ -1147,6 +1175,13 @@ function App() {
   const notificationCount = pendingInvitations + (teamOffer ? 1 : 0) + (renewal ? 1 : 0);
   const inlineMessagesButton = <GlobalMessagesButton count={notificationCount} onClick={openMessages} variant="inline" />;
   const withMessages = (content: React.ReactNode) => <>
+    {giftNotice && (
+      <div role="status" className={`fixed top-16 left-1/2 z-[210] flex w-[min(92vw,28rem)] -translate-x-1/2 items-start gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium text-ink shadow-card ${giftNotice.ok ? 'border-accent-ring' : 'border-red-300'}`}>
+        {giftNotice.ok ? <CheckCircle2 size={19} className="shrink-0 text-accent-ink" /> : <AlertTriangle size={19} className="shrink-0 text-red-600" />}
+        <span className="flex-1">{giftNotice.text}</span>
+        <button type="button" onClick={() => setGiftNotice(null)} className="text-xs font-semibold text-ink-3" aria-label="Cerrar aviso">Cerrar</button>
+      </div>
+    )}
     {error && <div role="alert" className="bg-red-50 text-red-800 p-4 flex items-center justify-between gap-3"><p>{error}</p><button type="button" onClick={() => setError('')} aria-label="Cerrar aviso">Cerrar</button></div>}
     {showExitHint && (
       <div role="status" className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-lg">
@@ -1231,6 +1266,7 @@ function App() {
               }
             }}
             onRegisterPlan={async (plan, period) => {
+              setRegistrationWithGift(false);
               setRegistrationPlan(plan);
               setRegistrationPeriod(period);
               if (user) {
@@ -1242,6 +1278,7 @@ function App() {
               } else setCurrentView('registration');
             }}
             onShowAuth={user || plansContext === 'express-limit' ? undefined : () => openAuth('plans')}
+            onGiftCode={user ? () => setCurrentView('profile') : () => { setRegistrationWithGift(true); setCurrentView('registration'); }}
           />
         </div>
       </>
@@ -1260,7 +1297,8 @@ function App() {
             onLogin={() => openAuth('plans')}
             onBack={() => setCurrentView('plans')}
             onConfirmationAccepted={() => openAuth('plans')}
-            onRegistered={() => { setEmailConfirmed(false); setCurrentView('player-checkout'); }}
+            startWithGiftCode={registrationWithGift}
+            onRegistered={withGiftCode => { setEmailConfirmed(false); setCurrentView(withGiftCode ? 'main' : 'player-checkout'); }}
           />
         </div>
       </>
@@ -1309,6 +1347,7 @@ function App() {
             onShowRoundStats={() => openFromProfile(currentGroup ? 'statistics' : 'my-round-statistics')}
             onShowCareerStats={() => setCurrentView('career-statistics')}
             onShowPlans={() => { setPlansContext('default'); openFromProfile('plans'); }}
+            onGiftRedeemed={readOnly ? undefined : refreshSubscription}
             onShowProShop={() => setCurrentView('pro-shop')}
             onShowGroups={() => openFromProfile('my-groups')}
             hasGroups={hasGroupMembership}
@@ -1714,6 +1753,7 @@ function App() {
           courseName={roundState.courseName}
           groupCode={currentGroup?.group_code}
           groupId={currentGroup?.id}
+          groupName={currentGroup?.name}
           hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
           gameMode={roundState.round.game_mode}
           decidedResult={roundState.round.decided_result}

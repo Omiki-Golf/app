@@ -36,9 +36,10 @@ export function isExistingAccountSignup(user: { identities?: unknown[] | null } 
   if (error?.message?.toLowerCase().includes('already registered')) return true;
   return !!user && Array.isArray(user.identities) && user.identities.length === 0;
 }
-export function playerSignupMetadata(intent: PlayerIntent, fields: { nick: string; displayName: string; avatarUrl: string; handicap: string; country: string; postalCode: string; age: string }) {
+// Con código regalo no hay pago: se guarda el código (se canjea al primer inicio de sesión) en lugar del plan a pagar.
+export function playerSignupMetadata(intent: PlayerIntent, fields: { nick: string; displayName: string; avatarUrl: string; handicap: string; country: string; postalCode: string; age: string }, giftCode?: string | null) {
   return {
-    registration_pending: true, player_checkout: intent,
+    registration_pending: true, ...(giftCode ? { gift_code: giftCode } : { player_checkout: intent }),
     nick: fields.nick.trim(), display_name: fields.displayName.trim() || null,
     avatar_url: fields.avatarUrl, exact_handicap: fields.handicap ? Number(fields.handicap) : 0,
     default_tee: 'amarillo', country: fields.country.trim(), postal_code: fields.postalCode.trim() || null,
@@ -76,3 +77,7 @@ export async function activateSimulation(store: CheckoutStore, userId: string, i
   if (!saved) throw new Error('No se ha podido verificar la activación. Puedes reintentar.');
   return accept(saved);
 }
+
+/** Código regalo pendiente de canjear que se indicó al registrarse. */
+export const pendingGiftCode = (metadata: Record<string, unknown>): string | null =>
+  typeof metadata.gift_code === 'string' && /^[0-9A-F]{8}$/.test(metadata.gift_code) ? metadata.gift_code : null;

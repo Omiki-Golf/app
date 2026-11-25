@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, Circle, Crown, Gem, LogIn, Plane, User, Users, X, Zap } from 'lucide-react';
+import { Check, Circle, Crown, Gem, Gift, LogIn, Plane, User, Users, X, Zap } from 'lucide-react';
 import { PlanType } from '../types';
 import { planCatalog, planPrice, DisplayPlan } from '../data/planCatalog';
 import { type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
@@ -28,6 +28,8 @@ interface PlansComparisonProps {
   expressLimit?: boolean;
   /** Express que intenta usar una modalidad bloqueada: solo Express (actual) y Player, sin inicio de sesión. */
   expressModes?: boolean;
+  /** «¿Tienes un código regalo?»: alta con código o canje desde el perfil. */
+  onGiftCode?: () => void;
 }
 
 const styles = {
@@ -40,7 +42,7 @@ const styles = {
 // Weekend es un pago puntual: nunca se considera "incluido" en otro plan.
 const planRank: Record<DisplayPlan, number> = { express: 0, player: 1, team: 2, premium: 3, weekend: 99 };
 
-export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false, initialPlan, initialAnnual }) => {
+export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSelectPlan, onShowAuth: showAuth, onRegisterPlan, currentPlan: planInUse, currentBillingPeriod, currentPeriodEnd, teamTrialUsed = false, onStartTeamTrial, onStartWeekend, expressLimit = false, expressModes = false, initialPlan, initialAnnual, onGiftCode }) => {
   const { t, i18n } = useTranslation();
   const currency = useDisplayCurrency();
   const money = (value: number) => formatDisplayPrice(value, currency, i18n.resolvedLanguage);
@@ -185,6 +187,7 @@ export const PlansComparison: React.FC<PlansComparisonProps> = ({ onBack, onSele
         </div>}
         {comingSoon && <p role="status" className="mt-3 rounded-xl bg-accent-soft p-3 text-center text-sm font-semibold text-accent-ink">{p('comingSoon')}</p>}
         {updateError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-center text-sm text-red-700">{updateError}</p>}
+        {!expressLimit && onGiftCode && <button type="button" onClick={onGiftCode} className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl border border-accent-ring bg-accent-soft px-4 py-3 text-sm font-semibold text-accent-ink"><Gift size={18} className="shrink-0" aria-hidden="true" />{p('giftCode')}</button>}
         {!expressLimit && onShowAuth && <button type="button" onClick={onShowAuth} className="mt-6 flex w-full items-center justify-center gap-2 border-t border-line pt-5 text-sm text-ink-2 hover:text-accent-ink"><LogIn size={18} className="shrink-0" /><span>{p('alreadyRegistered')} <span className="font-semibold underline">{p('signIn')}</span></span></button>}
       </div>
       {confirmPlayer && <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="player-choice-title" onKeyDown={event => { if (event.key === 'Escape') setConfirmPlayer(false); }}>

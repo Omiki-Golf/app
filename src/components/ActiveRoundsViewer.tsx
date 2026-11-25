@@ -1,7 +1,6 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { ThemeToggle } from './ThemeToggle';
-import { TopBar } from './TopBar';
 import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { shouldRefreshRoundList } from '../utils/roundListEvents';
 import { GolfRound, RoundPlayer, RoundScore, Group, Player, UserProfile } from '../types';
@@ -13,7 +12,8 @@ import { SelectMenu } from './SelectMenu';
 import { AdminPinModal } from './AdminPinModal';
 import { adminPinUtils } from '../utils/adminPin';
 import { getUserId, isVerifiedLocalRoundCreator } from '../utils/userId';
-import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, Archive, Hand } from 'lucide-react';
+import { Eye, EyeOff, Trash2, Trophy, UserX, UserPlus, Archive } from 'lucide-react';
+import { GlobalLeaderboard } from './GlobalLeaderboard';
 import { InfoHint, GAME_POINTS_HINT } from './InfoHint';
 import { getErrorMessage } from '../utils/errorMessage';
 import { GamificationBadge } from './GamificationBadge';
@@ -419,160 +419,16 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     };
   };
 
-  const getGlobalLeaderboard = () => {
-    const allPlayers: Array<{
-      name: string;
-      is_guest?: boolean;
-      handicap: number;
-      totalPoints: number;
-      holesPlayed: number;
-      roundName: string;
-      noPasoRojasHoles: number[];
-      spanishHandsHoles: number[];
-      gamificationEvents: Array<{ productId: string; holeNumber: number }>;
-    }> = [];
-
-    rounds.forEach((roundStats) => {
-      roundStats.players.forEach((player) => {
-        const stats = getPlayerStats(roundStats, player.id);
-        const playerScores = roundStats.scores.filter((s) => s.player_id === player.id);
-        const noPasoRojasHoles = playerScores
-          .filter((s) => s.no_paso_rojas === true)
-          .map((s) => s.hole_number)
-          .sort((a, b) => a - b);
-        const spanishHandsHoles = playerScores
-          .filter((s) => s.spanish_hands === true)
-          .map((s) => s.hole_number)
-          .sort((a, b) => a - b);
-        const gamificationEvents = playerScores.flatMap(score =>
-          (score.gamification_events || []).map(productId => ({ productId, holeNumber: score.hole_number }))
-        );
-
-        allPlayers.push({
-          name: player.name,
-          is_guest: player.is_guest,
-          handicap: player.playing_handicap,
-          totalPoints: stats.totalPoints,
-          holesPlayed: stats.scoresEntered,
-          roundName: roundStats.round.num_holes === 9 ? '9 Hoyos' : '18 Hoyos',
-          noPasoRojasHoles,
-          spanishHandsHoles,
-          gamificationEvents,
-        });
-      });
-    });
-
-    return allPlayers.sort((a, b) => {
-      if (b.totalPoints !== a.totalPoints) {
-        return b.totalPoints - a.totalPoints;
-      }
-      return a.handicap - b.handicap;
-    });
-  };
-
-
   return (
     <div className="min-h-screen bg-app p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         {showGlobalLeaderboard ? (
-          <div>
-            <TopBar
-              className="mb-3"
-              left={<>
-                <NavigationButton destination="back" onClick={() => setShowGlobalLeaderboard(false)} />
-                <ThemeToggle className="!h-11 !w-11" />
-              </>}
-              center={messagesButton}
-            />
-
-            <h1 className="mb-6 text-center text-3xl font-bold text-title">
-              {currentGroup
-                ? `Clasificación ${currentGroup.name || 'del Grupo'}`
-                : 'Clasificación'}
-            </h1>
-
-            <div className="bg-card rounded-lg shadow-card p-6">
-              <div className="space-y-3">
-                {getGlobalLeaderboard().map((player, index) => (
-                  <div
-                    key={index}
-                    className={`p-4 rounded-lg flex items-center justify-between ${
-                      index === 0
-                        ? 'bg-gradient-to-r from-yellow-100 to-yellow-50 border-2 border-yellow-400'
-                        : index === 1
-                        ? 'bg-card-2 border-2 border-line-2'
-                        : index === 2
-                        ? 'bg-gradient-to-r from-orange-100 to-orange-50 border-2 border-orange-400'
-                        : 'bg-card-2 border border-line'
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-full ${
-                          index === 0
-                            ? 'bg-yellow-400 text-yellow-900'
-                            : index === 1
-                            ? 'bg-ink-4 text-ink'
-                            : index === 2
-                            ? 'bg-orange-400 text-orange-900'
-                            : 'bg-neutral-hover text-ink-2'
-                        }`}
-                      >
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-bold text-lg text-ink"><PlayerName name={player.name} />{player.is_guest && <span className="ml-1 text-xs font-normal">(Invitado)</span>}</p>
-                          {player.noPasoRojasHoles.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              {player.noPasoRojasHoles.map((holeNumber) => (
-                                <GamificationBadge key={`rojas-${holeNumber}`} productId="no-paso-rojas" size={24} detail={`Hoyo ${holeNumber}`} />
-                              ))}
-                            </div>
-                          )}
-                          {player.spanishHandsHoles.length > 0 && (
-                            <div className="flex items-center gap-1">
-                              {player.spanishHandsHoles.map((holeNumber) => (
-                                <span
-                                  key={`sh-${holeNumber}`}
-                                  title={`Spanish Hands · Hoyo ${holeNumber}`}
-                                  className="bg-accent text-on-accent text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-soft"
-                                >
-                                  <Hand size={13} />
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {player.gamificationEvents.map(({ productId, holeNumber }, eventIndex) => (
-                            <GamificationBadge key={`${productId}-${holeNumber}-${eventIndex}`} productId={productId} size={24} detail={`Hoyo ${holeNumber}`} />
-                          ))}
-                        </div>
-                        <p className="text-sm text-ink-3">
-                          PJ {player.handicap} • {player.roundName} • {player.holesPlayed} hoyos
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-3xl font-bold ${
-                          index === 0
-                            ? 'text-yellow-800'
-                            : index === 1
-                            ? 'text-ink-3'
-                            : index === 2
-                            ? 'text-orange-600'
-                            : 'text-accent-ink'
-                        }`}
-                      >
-                        {player.totalPoints}
-                      </p>
-                      <p className="text-xs text-ink-3">puntos</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <GlobalLeaderboard
+            rounds={rounds}
+            title={currentGroup ? `Clasificación ${currentGroup.name || 'del Grupo'}` : 'Clasificación'}
+            onBack={() => setShowGlobalLeaderboard(false)}
+            messagesButton={messagesButton}
+          />
         ) : (
           <>
             <div className="mb-6">

@@ -1,7 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import React, { useState, useRef, useEffect } from 'react';
-import { Eye, EyeOff, Check, X, AlertCircle, Info } from 'lucide-react';
+import { Eye, EyeOff, Check, X, AlertCircle, Info, Gift } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { userService } from '../services/userService';
 import { registrationFieldErrors, type RegistrationField, playerSignupMetadata, isExistingAccountSignup, type BillingPeriod, type PaidPlan } from '../utils/playerRegistration';
@@ -10,6 +10,8 @@ import { EmailSentModal } from './EmailSentModal';
 import { DEFAULT_AVATAR_URL } from '../utils/avatarOptions';
 import { isLocalPhoto, savePendingPhoto } from '../utils/profilePhoto';
 import AvatarPicker from './AvatarPicker';
+import { GiftCodeCheck } from './GiftCodeField';
+import { giftCodeLabel, giftCodeService, type GiftCodeInfo } from '../services/giftCodeService';
 
 // Id del control de cada campo, para llevar el foco al primero que tenga error.
 const FIELD_IDS: Record<RegistrationField, string> = {
@@ -40,13 +42,20 @@ interface RegistrationFormProps {
   plan?: PaidPlan;
   onLogin: () => void;
   onBack: () => void;
-  onRegistered: () => void;
+  /** Con código regalo no hay pago pendiente: se vuelve al inicio, donde se canjea. */
+  onRegistered: (withGiftCode: boolean) => void;
   onConfirmationAccepted: () => void;
+  /** Abre el formulario con el campo del código regalo desplegado. */
+  startWithGiftCode?: boolean;
 }
 
 
 
-export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan = 'player', onLogin, onBack, onRegistered, onConfirmationAccepted }) => {
+export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan = 'player', onLogin, onBack, onRegistered, onConfirmationAccepted, startWithGiftCode = false }) => {
+  const [giftOpen, setGiftOpen] = useState(startWithGiftCode);
+  const [giftCode, setGiftCode] = useState('');
+  const [giftInfo, setGiftInfo] = useState<GiftCodeInfo | null>(null);
+  const [giftError, setGiftError] = useState<string | undefined>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -122,6 +131,17 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
     setLoading(true);
     setExistingEmail('');
     try {
+      // Un código escrito tiene que ser válido: si no, se avisa en vez de registrar sin él.
+      let gift = giftOpen && giftCode ? giftInfo : null;
+      if (giftOpen && giftCode && !gift) {
+        gift = await giftCodeService.check(giftCode);
+        setGiftInfo(gift);
+        if (!gift) {
+          setGiftError('Código no válido: no existe, ya se ha usado o ha caducado.');
+          document.getElementById('register-gift-code')?.focus();
+          return;
+        }
+      }
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) throw sessionError;
       if (session) throw new Error('Ya tienes una sesión abierta. Vuelve a tu perfil para continuar.');
@@ -134,7 +154,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
         email: email.trim(), password,
         options: {
           emailRedirectTo: `${window.location.origin}/?email-confirmed=1&player-registration=1`,
-          data: playerSignupMetadata({ id: checkoutId, period, plan }, { nick, displayName, avatarUrl: isLocalPhoto(avatarUrl) ? DEFAULT_AVATAR_URL : avatarUrl, handicap, country, postalCode, age }),
+          data: playerSignupMetadata({ id: checkoutId, period, plan }, { nick, displayName, avatarUrl: isLocalPhoto(avatarUrl) ? DEFAULT_AVATAR_URL : avatarUrl, handicap, country, postalCode, age }, gift?.code),
         },
       });
       if (isExistingAccountSignup(data.user, authError)) { setExistingEmail(email.trim()); return; }
@@ -142,7 +162,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
       if (!data.user) throw new Error('No se ha podido crear la cuenta.');
       // Sin sesión todavía no se puede subir: la foto espera en este navegador al primer inicio de sesión.
       if (isLocalPhoto(avatarUrl)) savePendingPhoto(email, avatarUrl);
-      if (data.session && data.user.email_confirmed_at) { onRegistered(); return; }
+      if (data.session && data.user.email_confirmed_at) { onRegistered(!!gift); return; }
       setPassword('');
       setConfirmationEmail(email.trim());
     } catch (cause) {
@@ -171,8 +191,20 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({ period, plan
         />
 
         <form onSubmit={event => { event.preventDefault(); void handleSubmit(); }} className="bg-card rounded-2xl shadow-card p-6 md:p-8">
-          <h1 className="text-2xl font-bold text-ink mb-1">Crear cuenta {plan === 'premium' ? 'Premium' : plan === 'team' ? 'Team' : 'Player'}</h1>
+          <h1 className="text-2xl font-bold text-ink mb-1">{giftInfo ? `Crear cuenta · ${giftCodeLabel(giftInfo.plan, giftInfo.duration)}` : `Crear cuenta ${plan === 'premium' ? 'Premium' : plan === 'team' ? 'Team' : 'Player'}`}</h1>
           <p className="text-sm text-ink-3 mb-6">Configura tu perfil de jugador</p>
+
+          {/* Código regalo (premios, tarjetas): da el plan sin pagar. */}
+          <div className="mb-5 rounded-xl border border-accent-ring bg-accent-soft p-3">
+            {giftOpen ? (
+              <GiftCodeCheck code={giftCode} info={giftInfo} error={giftError}
+                onChange={(code, info, message) => { setGiftCode(code); setGiftInfo(info); setGiftError(message); }} />
+            ) : (
+              <button type="button" onClick={() => setGiftOpen(true)} className="flex w-full items-center gap-2 text-left text-sm font-semibold text-accent-ink">
+                <Gift size={18} aria-hidden="true" /> ¿Tienes un código regalo?
+              </button>
+            )}
+          </div>
 
           {existingEmail && <ExistingAccountNotice email={existingEmail} onLogin={onLogin} />}
           {error && (

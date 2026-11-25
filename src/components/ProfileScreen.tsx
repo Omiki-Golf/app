@@ -1,4 +1,5 @@
 import { NavigationButton } from './NavigationButton';
+import { GiftCodeRedeem } from './GiftCodeField';
 import React, { useEffect, useState } from 'react';
 import { Settings, BarChart3, LandPlot, Crown, ChevronRight, CreditCard, Gem, Info, LogOut, X } from 'lucide-react';
 import { UserProfile, PlanType } from '../types';
@@ -34,9 +35,12 @@ interface ProfileScreenProps {
   renewal?: RenewalNoticeAction | null;
   handicap9?: number;
   handicap18?: number;
+  /** Canjear un código regalo en esta cuenta; tras canjearlo se recarga el plan. */
+  onGiftRedeemed?: () => Promise<void> | void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  onGiftRedeemed,
   profile,
   planType,
   subscription,
@@ -212,6 +216,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </React.Fragment>
           ))}
         </div>
+
+        {onGiftRedeemed && <div className="mt-4"><GiftCodeRedeem onRedeemed={onGiftRedeemed} /></div>}
 
         {/* Oferta, prueba Team y Weekend, justo encima de Cerrar sesión. */}
         {renewal && <RenewalNoticeCard renewal={renewal} className="mt-4" />}

@@ -20,6 +20,7 @@ import { enabledExtraProducts } from '../data/gamification';
 import { GamificationBadge } from './GamificationBadge';
 
 import { PlayerName } from './PlayerName';
+import { GlobalLeaderboard, type LeaderboardRound } from './GlobalLeaderboard';
 import type { GolfRound } from '../types';
 
 const PODIUM_MEDALS = ['bg-amber-400 text-amber-950', 'bg-slate-300 text-slate-900', 'bg-orange-300 text-orange-950'];
@@ -66,7 +67,7 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
     ? 'text-ink'
     : 'text-red-600 dark:text-red-400';
   // Puntos (con fondo) y neto al par (sin fondo, centrado debajo): entre los dos, la altura de la medalla con nombre y situación.
-  const valueBox = 'rounded-full px-3 text-base font-black leading-5 tabular-nums';
+  const valueBox = 'rounded-full px-3 text-[1.0625rem] font-black leading-5 tabular-nums';
   const marks = entry.marks ?? [];
   const [showAllMarks, setShowAllMarks] = useState(false);
   const visibleMarkLimit = 5;
@@ -85,9 +86,9 @@ function StandingRow({ entry, position, subtitle }: ReturnType<typeof rankStandi
           </div>
           <p className="truncate text-sm text-ink-3">{subtitle}</p>
         </div>
-        <div className="flex min-w-[5.25rem] shrink-0 flex-col items-center gap-0.5 self-stretch justify-center">
+        <div className="flex min-w-[5.25rem] shrink-0 flex-col items-center gap-1.5 self-stretch justify-center">
           <span className={`${valueBox} py-0.5 bg-emerald-300 text-emerald-950`}>{entry.points} pts</span>
-          <span className={`${valueBox} ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
+          <span className={`${valueBox} pt-0.5 ${toParClass}`} title="Cómo va respecto al par, con puntos de juego, en los hoyos jugados">
             {toParLabel}
           </span>
         </div>
@@ -177,6 +178,8 @@ interface ScorecardProps {
   onFinishRound: () => void;
   onCourseChanged?: (courseId: string, numHoles: 9 | 18, holes: GolfHole[], players?: RoundPlayer[]) => void;
   messagesButton?: React.ReactNode;
+  /** Nombre del grupo para el título de la clasificación de la copa. */
+  groupName?: string | null;
 }
 
 export const Scorecard: React.FC<ScorecardProps> = ({
@@ -206,6 +209,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   onFinishRound,
   onCourseChanged,
   messagesButton,
+  groupName = null,
 }) => {
   // null = aún no leída (o error): se usa el comportamiento clásico del grupo.
   const [enabledGamification, setEnabledGamification] = useState<string[] | null>(null);
@@ -283,7 +287,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   const roundsMap = new Map(rounds.map((r) => [r.playerId, r]));
   // Hay partida en marcha en cuanto alguien tiene un golpe anotado.
   const hasStartedScoring = rounds.some(round => Object.values(round.scores).some(score => (score?.gross_strokes ?? 0) > 0));
-  const [showFinalStandings, setShowFinalStandings] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const markedHoles = (scores: RoundScore[], isMarked: (score: RoundScore) => boolean | undefined) =>
     scores.filter(score => isMarked(score)).map(score => score.hole_number).sort((a, b) => a - b);
@@ -313,7 +317,6 @@ export const Scorecard: React.FC<ScorecardProps> = ({
       isGuest: player.is_guest,
       handicap: player.playing_handicap,
       ...totals,
-      marks: gamificationMarks(cardScores),
       tag: isParejas ? (
         <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${team === 0 ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
           {team === 0 ? 'P1' : 'P2'}
@@ -342,6 +345,18 @@ export const Scorecard: React.FC<ScorecardProps> = ({
         });
       }))
     : null;
+
+  // Datos de la copa: las tarjetas del grupo de ese día (o solo esta) con los golpes en vivo de la propia.
+  const liveScores = players.flatMap(player =>
+    Object.values(roundsMap.get(player.id)?.scores ?? {}).map(score => ({ ...score, player_id: player.id })),
+  );
+  const ownDayRound = groupDayRounds.find(item => item.round.id === roundId);
+  const leaderboardRounds: LeaderboardRound[] = [
+    ...groupDayRounds.map(item => (item.round.id === roundId ? { ...item, players, scores: liveScores } : item)),
+    ...(!ownDayRound
+      ? [{ round: { id: roundId ?? 'local', num_holes: numHoles } as GolfRound, players, scores: liveScores }]
+      : []),
+  ];
 
   // Gamificación (No pasó de rojas, Spanish Hands y títulos del Pro-Shop): solo jugadores con marcas
   // y sin secciones vacías. Se usa para esta tarjeta y para todas las del grupo ese día.
@@ -633,19 +648,17 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               <ThemeToggle className="!h-11 !w-11" />
             </div>
             <div className="flex justify-center">{messagesButton}</div>
-            {/* Durante la partida la clasificación ya se ve en la tarjeta; con la partida finalizada, la copa abre la final. */}
+            {/* La copa abre la misma clasificación que la lista de partidas (con los hoyos de cada jugador). */}
             <div className="flex justify-end">
-              {isRoundFinished && (
-                <button
-                  onClick={() => setShowFinalStandings(true)}
-                  type="button"
-                  className="inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-amber-500 bg-amber-400 p-0 text-amber-950 shadow-soft transition-all hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
-                  aria-label="Clasificación final"
-                  title="Clasificación final"
-                >
-                  <Trophy size={22} aria-hidden="true" />
-                </button>
-              )}
+              <button
+                onClick={() => setShowLeaderboard(true)}
+                type="button"
+                className="inline-flex h-11 w-11 min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-amber-500 bg-amber-400 p-0 text-amber-950 shadow-soft transition-all hover:bg-amber-500 active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+                aria-label="Clasificación"
+                title="Clasificación"
+              >
+                <Trophy size={22} aria-hidden="true" />
+              </button>
             </div>
           </div>
           {/* Desde el primer golpe la cabecera se compacta: lo importante pasa a ser el hoyo. */}
@@ -1151,7 +1164,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </div>
             </div>
 
-            <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación en este momento</h3>
+            <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación de tu partida</h3>
             <div className="grid grid-cols-1 gap-2 mb-6">
               {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
             </div>
@@ -1174,38 +1187,15 @@ export const Scorecard: React.FC<ScorecardProps> = ({
         </div>
       </div>
 
-      {showFinalStandings && (
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowFinalStandings(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="final-standings-title"
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl"
-            onClick={event => event.stopPropagation()}
-          >
-            <h2 id="final-standings-title" className="flex items-center gap-2 text-lg font-bold text-ink">
-              <Trophy size={20} className="text-amber-500" aria-hidden="true" />
-              Clasificación final
-            </h2>
-            <h3 className="font-semibold text-ink-2 mb-3 mt-4">Clasificación final de la partida</h3>
-            <div className="grid grid-cols-1 gap-2">
-              {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
-            </div>
-            {groupStandings && (
-              <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general final del grupo</h3>
-                <div className="grid grid-cols-1 gap-2">
-                  {groupStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
-                </div>
-              </>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowFinalStandings(false)}
-              className="mt-5 w-full rounded-xl border border-line px-4 py-3 font-semibold text-ink-2"
-            >
-              Cerrar
-            </button>
+      {showLeaderboard && (
+        <div className="fixed inset-0 z-[150] overflow-y-auto bg-app p-4 md:p-8">
+          <div className="max-w-4xl mx-auto">
+            <GlobalLeaderboard
+              rounds={leaderboardRounds}
+              title={groupId ? `Clasificación ${groupName || 'del Grupo'}` : 'Clasificación'}
+              onBack={() => setShowLeaderboard(false)}
+              messagesButton={messagesButton}
+            />
           </div>
         </div>
       )}
