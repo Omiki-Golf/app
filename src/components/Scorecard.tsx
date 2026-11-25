@@ -288,6 +288,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   // Hay partida en marcha en cuanto alguien tiene un golpe anotado.
   const hasStartedScoring = rounds.some(round => Object.values(round.scores).some(score => (score?.gross_strokes ?? 0) > 0));
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const standingsTitle = 'mb-3 mt-6 border-l-4 border-accent pl-3 text-lg font-bold leading-6 text-title';
 
   const markedHoles = (scores: RoundScore[], isMarked: (score: RoundScore) => boolean | undefined) =>
     scores.filter(score => isMarked(score)).map(score => score.hole_number).sort((a, b) => a - b);
@@ -1164,17 +1165,18 @@ export const Scorecard: React.FC<ScorecardProps> = ({
               </div>
             </div>
 
-            <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación de tu partida</h3>
+            {/* Títulos destacados e iguales para separar bien las dos clasificaciones. */}
+            <h3 className={standingsTitle}>Clasificación de tu partida</h3>
             <div className="grid grid-cols-1 gap-2 mb-6">
               {cardStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
             </div>
 
-            {/* Gamificación de esta tarjeta. */}
-            {renderGamification(cardGamificationPeople, '')}
+            {/* Gamificación de esta tarjeta: solo sin general del grupo (si la hay, va debajo de ella con la de todas). */}
+            {!groupStandings && renderGamification(cardGamificationPeople, '')}
 
             {groupStandings && (
               <>
-                <h3 className="font-semibold text-ink-2 mb-3 mt-6">Clasificación general del grupo</h3>
+                <h3 className={standingsTitle}>Clasificación general del grupo</h3>
                 <div className="grid grid-cols-1 gap-2 mb-6">
                   {groupStandings.map(row => <StandingRow key={row.entry.key} {...row} />)}
                 </div>

@@ -41,7 +41,10 @@ test('the trophy is always shown and opens the same leaderboard as the rounds li
   assert.doesNotMatch(source, /\{isRoundFinished && \(\s*<button\s*onClick=\{\(\) => setShowLeaderboard/);
   assert.doesNotMatch(source, /Clasificación final de la partida/);
   assert.match(source, /<GlobalLeaderboard\s+rounds=\{leaderboardRounds\}/);
-  assert.match(source, /Clasificación de tu partida<\/h3>/);
+  assert.match(source, /<h3 className=\{standingsTitle\}>Clasificación de tu partida<\/h3>/);
+  // Sin línea separadora: los dos títulos con el mismo formato.
+  assert.match(source, /<>\s*<h3 className=\{standingsTitle\}>Clasificación general del grupo<\/h3>/);
+  assert.match(source, /const standingsTitle = '[^']*border-l-4 border-accent[^']*text-lg font-bold[^']*';/);
   const viewer = await readFile(new URL('../src/components/ActiveRoundsViewer.tsx', import.meta.url), 'utf8');
   assert.match(viewer, /<GlobalLeaderboard\s+rounds=\{rounds\}/);
   const board = await readFile(new URL('../src/components/GlobalLeaderboard.tsx', import.meta.url), 'utf8');
@@ -71,7 +74,8 @@ test('group standing rows show the gamification icons; the own card leaves them 
 
 test('the group standings also show the gamification of every card that day', async () => {
   const source = await read();
-  assert.match(source, /\{renderGamification\(cardGamificationPeople, ''\)\}/);
+  // La de la tarjeta solo sale si no hay general del grupo; con ella, solo la del grupo, debajo.
+  assert.match(source, /\{!groupStandings && renderGamification\(cardGamificationPeople, ''\)\}/);
   assert.match(source, /\{groupStandings\.map\(row => <StandingRow key=\{row\.entry\.key\} \{\.\.\.row\} \/>\)\}\s*<\/div>\s*\{\/\*[^*]*\*\/\}\s*\{renderGamification\(groupGamificationPeople, ' · grupo'\)\}/);
   // La tarjeta propia usa sus golpes en vivo también para la gamificación del grupo.
   assert.match(source, /const groupGamificationPeople[\s\S]{0,400}mine\s*\? Object\.values\(roundsMap\.get\(player\.id\)\?\.scores \?\? \{\}\)/);
