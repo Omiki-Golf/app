@@ -7,7 +7,7 @@ export type GiftCodeStatus = 'available' | 'redeemed' | 'expired' | 'revoked';
 
 export interface GiftCodeInfo { code: string; plan: GiftPlan; duration: GiftDuration; expires_at: string }
 export interface GiftCodeRow {
-  code: string; plan: GiftPlan; duration: GiftDuration; note: string | null;
+  code: string; plan: GiftPlan; duration: GiftDuration; note: string | null; batch_id: string | null;
   expires_at: string; created_at: string; redeemed_at: string | null; redeemed_nick: string | null;
   revoked_at: string | null; status: GiftCodeStatus;
 }
@@ -50,6 +50,17 @@ export const giftCodeService = {
     const { data, error } = await supabase.rpc('admin_list_gift_codes', { p_status: status });
     if (error) throw new Error(message(error, 'No se han podido cargar los códigos.'));
     return (data as GiftCodeRow[]) ?? [];
+  },
+  /** Anula los códigos aún canjeables de una tanda; devuelve cuántos. */
+  async adminRevokeBatch(batchId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('admin_revoke_gift_code_batch', { p_batch: batchId });
+    if (error) throw new Error(message(error, 'No se ha podido anular la tanda.'));
+    return Number(data) || 0;
+  },
+  /** Nueva fecha límite de canje (también reactiva un código caducado). */
+  async adminSetExpiry(code: string, expiresAt: string): Promise<void> {
+    const { error } = await supabase.rpc('admin_set_gift_code_expiry', { p_code: code, p_expires_at: expiresAt });
+    if (error) throw new Error(message(error, 'No se ha podido cambiar la fecha.'));
   },
   async adminRevoke(code: string): Promise<void> {
     const { error } = await supabase.rpc('admin_revoke_gift_code', { p_code: code });

@@ -26,6 +26,7 @@ async function database() {
     CREATE TABLE groups(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_auth_id uuid, archived_at timestamptz, group_type text, weekend_days smallint, weekend_mode_until timestamptz);
   `);
   await db.exec(await read('../supabase/migrations/20261202100000_gift_codes.sql'));
+  await db.exec(await read('../supabase/migrations/20261203100000_gift_codes_management.sql'));
   const as = async id => { await db.query('DELETE FROM test_session'); if (id) await db.query('INSERT INTO test_session VALUES($1)', [id]); };
   const admin = crypto.randomUUID();
   await db.query("INSERT INTO app_administrators VALUES($1,'Fede','active')", [admin]);
@@ -150,7 +151,14 @@ test('registration, plans, profile and the admin portal offer gift codes', async
   const portal = await read('../src/components/admin/AdminPortal.tsx');
   assert.match(portal, /\{ id: 'giftCodes', label: 'Códigos regalo' \}/);
   const admin = await read('../src/components/admin/AdminGiftCodes.tsx');
-  assert.match(admin, /giftCodeService\.adminCreate\(plan, duration, amount, until, note\)/);
+  assert.match(admin, /giftCodeService\.adminCreate\(plan, duration, amount, endOfDay\(expires\), note\)/);
+  // Gestión: resumen por estado, búsqueda, filtro por plan, vista por tanda, cambio de fecha y CSV.
+  assert.match(admin, /STATUS_ORDER\.map\(id => \(\s*<button key=\{id\}/);
+  assert.match(admin, /placeholder="Buscar código, nota o nick"/);
+  assert.match(admin, /aria-label="Filtrar por plan"/);
+  assert.match(admin, /giftCodeService\.adminRevokeBatch\(batchId\)/);
+  assert.match(admin, /giftCodeService\.adminSetExpiry\(code, endOfDay\(day\)\)/);
+  assert.match(admin, /downloadCsv\(filtered\)/);
   const service = await read('../src/services/giftCodeService.ts');
   assert.match(service, /weekend: \[\{ id: '7d', label: '7 días' \}, \{ id: '90d', label: '3 meses' \}\]/);
 });
@@ -160,4 +168,48 @@ test('the gift code fields keep only «Comprobar» and are ignored by password a
   assert.doesNotMatch(field, /Probar código|GiftCodeTestButton/);
   assert.doesNotMatch(await read('../src/services/giftCodeService.ts'), /GIFT_CODE_TEST_BUTTON/);
   assert.equal(field.match(/data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"/g)?.length, 2);
+});
+
+test('codes created together form a batch whose available codes can be revoked at once', async () => {
+  const { db, as, admin, create, redeem } = await database();
+  const batch = await create('team', 'annual', 3);
+  const other = await create('team', 'annual', 1);
+  await redeem(crypto.randomUUID(), batch[0]);
+  await as(admin);
+  const list = (await db.query("SELECT public.admin_list_gift_codes('') AS l")).rows[0].l;
+  const batchId = list.find(item => item.code === batch[0]).batch_id;
+  assert.ok(batchId);
+  assert.deepEqual(list.filter(item => item.batch_id === batchId).map(item => item.code).sort(), [...batch].sort());
+  assert.notEqual(list.find(item => item.code === other[0]).batch_id, batchId);
+  assert.equal((await db.query('SELECT public.admin_revoke_gift_code_batch($1) AS n', [batchId])).rows[0].n, 2);
+  const after = Object.fromEntries((await db.query("SELECT public.admin_list_gift_codes('') AS l")).rows[0].l.map(item => [item.code, item.status]));
+  assert.equal(after[batch[0]], 'redeemed');
+  assert.equal(after[batch[1]], 'revoked');
+  assert.equal(after[batch[2]], 'revoked');
+  assert.equal(after[other[0]], 'available');
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM app_admin_audit WHERE action = 'gift_codes.batch_revoked'")).rows[0].n, 1);
+});
+
+test('the redeem-by date can be changed, reactivating an expired code, but not on used or revoked ones', async () => {
+  const { db, as, admin, create, redeem } = await database();
+  const [expired, used, revoked] = await create('player', 'monthly', 3);
+  await db.query("UPDATE gift_codes SET expires_at = now() - interval '1 day' WHERE code = $1", [expired]);
+  await redeem(crypto.randomUUID(), used);
+  await as(admin);
+  await db.query('SELECT public.admin_revoke_gift_code($1)', [revoked]);
+  await db.query("SELECT public.admin_set_gift_code_expiry($1, now() + interval '2 months')", [expired.toLowerCase()]);
+  await as(null);
+  assert.equal((await db.query('SELECT public.check_gift_code($1) AS c', [expired])).rows[0].c.plan, 'player');
+  await as(admin);
+  await assert.rejects(db.query("SELECT public.admin_set_gift_code_expiry($1, now() - interval '1 day')", [expired]), /futura/);
+  await assert.rejects(db.query("SELECT public.admin_set_gift_code_expiry($1, now() + interval '1 day')", [used]), /canjeado/);
+  await assert.rejects(db.query("SELECT public.admin_set_gift_code_expiry($1, now() + interval '1 day')", [revoked]), /anulado/);
+  await as(crypto.randomUUID());
+  await assert.rejects(db.query("SELECT public.admin_set_gift_code_expiry($1, now() + interval '1 day')", [expired]), /Acceso denegado/);
+  await assert.rejects(db.query('SELECT public.admin_revoke_gift_code_batch(gen_random_uuid())'), /Acceso denegado/);
+});
+
+test('existing codes are grouped into batches by creator and creation time', async () => {
+  const sql = await read('../supabase/migrations/20261203100000_gift_codes_management.sql');
+  assert.match(sql, /GROUP BY created_by, created_at/);
 });
