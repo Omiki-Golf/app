@@ -1,50 +1,11 @@
-import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, FlaskConical, Gift, Loader2 } from 'lucide-react';
-import { GIFT_CODE_TEST_BUTTON, giftCodeLabel, giftCodeService, isGiftCodeFormat, normalizeGiftCode, type GiftCodeInfo } from '../services/giftCodeService';
+import { useState } from 'react';
+import { Check, Gift, Loader2 } from 'lucide-react';
+import { giftCodeLabel, giftCodeService, isGiftCodeFormat, normalizeGiftCode, type GiftCodeInfo } from '../services/giftCodeService';
 
 const inputClass = (invalid: boolean) =>
   `w-full rounded-xl border px-4 py-2.5 font-mono text-lg font-bold uppercase tracking-[0.3em] text-ink placeholder:tracking-normal placeholder:font-sans placeholder:text-sm placeholder:font-normal focus:border-transparent focus:ring-2 ${
     invalid ? 'border-red-500 focus:ring-red-400' : 'border-line-2 focus:ring-accent'
   }`;
-
-/** Pruebas previas a producción: comprueba el código (sin canjearlo) y lo dice en un aviso. */
-export function GiftCodeTestButton({ code }: { code: string }) {
-  const [busy, setBusy] = useState(false);
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
-  useEffect(() => {
-    if (!toast) return;
-    const timeoutId = window.setTimeout(() => setToast(null), 5000);
-    return () => window.clearTimeout(timeoutId);
-  }, [toast]);
-  if (!GIFT_CODE_TEST_BUTTON) return null;
-  const test = async () => {
-    if (!isGiftCodeFormat(code)) { setToast({ ok: false, text: 'Código incorrecto: tiene que tener 8 caracteres (0-9 y A-F).' }); return; }
-    setBusy(true);
-    try {
-      const found = await giftCodeService.check(code);
-      setToast(found
-        ? { ok: true, text: `Código correcto: ${giftCodeLabel(found.plan, found.duration)}.` }
-        : { ok: false, text: 'Código incorrecto: no existe, ya se ha usado, está anulado o ha caducado.' });
-    } catch (cause) {
-      setToast({ ok: false, text: cause instanceof Error ? cause.message : 'No se ha podido comprobar el código.' });
-    } finally { setBusy(false); }
-  };
-  return (
-    <>
-      <button type="button" onClick={() => void test()} disabled={busy || !code}
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-dashed border-amber-500 px-3 py-1.5 text-xs font-semibold text-amber-700 disabled:opacity-50 dark:text-amber-300">
-        {busy ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : <FlaskConical size={14} aria-hidden="true" />}
-        Probar código (pruebas)
-      </button>
-      {toast && (
-        <div role="status" className={`fixed top-16 left-1/2 z-[220] flex w-[min(92vw,26rem)] -translate-x-1/2 items-start gap-2 rounded-xl border bg-card px-4 py-3 text-sm font-medium text-ink shadow-card ${toast.ok ? 'border-accent-ring' : 'border-red-300'}`}>
-          {toast.ok ? <Check size={19} className="shrink-0 text-accent-ink" aria-hidden="true" /> : <AlertTriangle size={19} className="shrink-0 text-red-600" aria-hidden="true" />}
-          <span>{toast.text}</span>
-        </div>
-      )}
-    </>
-  );
-}
 
 interface GiftCodeCheckProps {
   code: string;
@@ -70,7 +31,8 @@ export function GiftCodeCheck({ code, info, error, onChange }: GiftCodeCheckProp
     <div>
       <label htmlFor="register-gift-code" className="mb-1 block text-sm font-medium text-ink-2">Código regalo</label>
       <div className="flex gap-2">
-        <input id="register-gift-code" value={code} maxLength={9} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+        <input id="register-gift-code" value={code} name="gift-code" inputMode="text" maxLength={9} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"
           placeholder="Ej.: 3FA9C21B" aria-invalid={!!error} aria-describedby={error ? 'register-gift-code-error' : undefined}
           className={inputClass(!!error)}
           onChange={event => onChange(normalizeGiftCode(event.target.value).slice(0, 8), null)} />
@@ -79,7 +41,6 @@ export function GiftCodeCheck({ code, info, error, onChange }: GiftCodeCheckProp
           {checking ? <Loader2 size={18} className="animate-spin" aria-label="Comprobando" /> : 'Comprobar'}
         </button>
       </div>
-      <GiftCodeTestButton code={code} />
       {error && <p id="register-gift-code-error" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
       {info && (
         <p className="mt-2 flex items-start gap-2 rounded-xl border border-accent-ring bg-accent-soft p-3 text-sm text-ink">
@@ -123,7 +84,8 @@ export function GiftCodeRedeem({ onRedeemed }: { onRedeemed: () => Promise<void>
             <Gift size={18} className="text-accent-ink" aria-hidden="true" /> Canjear código regalo
           </label>
           <div className="flex gap-2">
-            <input id="profile-gift-code" value={code} maxLength={9} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+            <input id="profile-gift-code" value={code} name="gift-code" inputMode="text" maxLength={9} autoComplete="off" autoCapitalize="characters" spellCheck={false}
+          data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"
               placeholder="Ej.: 3FA9C21B" className={inputClass(!!error)} aria-invalid={!!error}
               onChange={event => { setCode(normalizeGiftCode(event.target.value).slice(0, 8)); setError(''); setDone(''); }} />
             <button type="button" onClick={() => void redeem()} disabled={busy || !code}
@@ -131,7 +93,6 @@ export function GiftCodeRedeem({ onRedeemed }: { onRedeemed: () => Promise<void>
               {busy ? <Loader2 size={18} className="animate-spin" aria-label="Canjeando" /> : 'Canjear'}
             </button>
           </div>
-          <GiftCodeTestButton code={code} />
           {error && <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </>
       )}

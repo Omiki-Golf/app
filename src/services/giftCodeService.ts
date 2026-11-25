@@ -1,10 +1,6 @@
 import { supabase } from './supabaseClient';
 
 // Códigos regalo: 8 caracteres hexadecimales en mayúsculas, de un solo uso.
-/** Botón «Probar código» (solo comprueba, no canjea) para las pruebas previas a producción.
- *  Poner a false al pasar a producción con clientes reales. */
-export const GIFT_CODE_TEST_BUTTON = true;
-
 export type GiftPlan = 'player' | 'team' | 'weekend';
 export type GiftDuration = 'monthly' | 'annual' | '7d' | '90d';
 export type GiftCodeStatus = 'available' | 'redeemed' | 'expired' | 'revoked';

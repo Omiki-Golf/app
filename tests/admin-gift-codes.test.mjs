@@ -155,12 +155,9 @@ test('registration, plans, profile and the admin portal offer gift codes', async
   assert.match(service, /weekend: \[\{ id: '7d', label: '7 días' \}, \{ id: '90d', label: '3 meses' \}\]/);
 });
 
-test('until real customers, a test button checks the code (without redeeming) and shows a toast', async () => {
+test('the gift code fields keep only «Comprobar» and are ignored by password and alias managers', async () => {
   const field = await read('../src/components/GiftCodeField.tsx');
-  assert.match(field, /Probar código \(pruebas\)/);
-  assert.match(field, /Código correcto: \$\{giftCodeLabel/);
-  assert.match(field, /Código incorrecto: no existe/);
-  assert.equal(field.match(/<GiftCodeTestButton code=\{code\} \/>/g)?.length, 2);
-  assert.doesNotMatch(field.slice(field.indexOf('export function GiftCodeTestButton'), field.indexOf('interface GiftCodeCheckProps')), /redeem/);
-  assert.match(await read('../src/services/giftCodeService.ts'), /export const GIFT_CODE_TEST_BUTTON = true;/);
+  assert.doesNotMatch(field, /Probar código|GiftCodeTestButton/);
+  assert.doesNotMatch(await read('../src/services/giftCodeService.ts'), /GIFT_CODE_TEST_BUTTON/);
+  assert.equal(field.match(/data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"/g)?.length, 2);
 });
