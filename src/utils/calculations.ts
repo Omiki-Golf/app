@@ -118,36 +118,90 @@ export const calculateMatchPoints = (playerId: string, allScores: ModeScoreInput
   return 0;
 };
 
-export const calculateSindicatoPoints = (playerId: string, allScores: ModeScoreInput[]): number => {
-  const valid = getEnteredModeScores(allScores);
-  if (valid.length < 3) return 0;
-  const myScore = valid.find(s => s.playerId === playerId);
-  if (!myScore) return 0;
-  const sorted = [...valid].sort((a, b) => a.netStrokes - b.netStrokes);
-  const myIdx = sorted.findIndex(s => s.playerId === playerId);
-  if (sorted.length === 3) {
-    if (sorted[0].netStrokes === sorted[1].netStrokes && sorted[1].netStrokes === sorted[2].netStrokes) {
-      return 2;
-    }
-    if (sorted[0].netStrokes === sorted[1].netStrokes) {
-      return myIdx <= 1 ? 3 : 0;
-    }
-    if (sorted[1].netStrokes === sorted[2].netStrokes) {
-      return myIdx === 0 ? 4 : 1;
-    }
-    return [4, 2, 0][myIdx];
-  }
-  return 0;
+// --- Puntos configurables por partida (Sindicato y Parejas) ---
+
+/** Puntos por puesto en Sindicato: [1º, 2º, 3º]. */
+export type SindicatoPoints = [number, number, number];
+/** Puntos de Parejas por ganar la comparación de mejor y de peor bola. */
+export interface ParejasPoints { best: number; worst: number }
+/** Reparto guardado en golf_rounds.mode_points_config. */
+export interface ModePointsConfig {
+  sindicato?: SindicatoPoints;
+  parejas?: ParejasPoints;
+}
+
+export const DEFAULT_SINDICATO_POINTS: SindicatoPoints = [6, 4, 2];
+export const DEFAULT_PAREJAS_POINTS: ParejasPoints = { best: 1, worst: 1 };
+/** Reglamento de las partidas creadas antes de poder configurar los puntos. */
+export const LEGACY_SINDICATO_POINTS: SindicatoPoints = [4, 2, 0];
+export const LEGACY_PAREJAS_POINTS: ParejasPoints = { best: 1, worst: 0.5 };
+
+/** Puntos efectivos de una partida; sin configuración se usa el reglamento antiguo. */
+export const resolveModePoints = (config?: ModePointsConfig | null) => ({
+  sindicato: config?.sindicato ?? LEGACY_SINDICATO_POINTS,
+  parejas: config?.parejas ?? LEGACY_PAREJAS_POINTS,
+});
+
+/** Configuración por defecto que se guarda al crear una partida de ese modo. */
+export const defaultModePointsConfig = (mode: GameMode): ModePointsConfig | null => {
+  if (mode === 'sindicato') return { sindicato: [...DEFAULT_SINDICATO_POINTS] };
+  if (mode === 'parejas') return { parejas: { ...DEFAULT_PAREJAS_POINTS } };
+  return null;
 };
 
-export const PAREJAS_BEST_BALL_POINTS = 1;
-export const PAREJAS_WORST_BALL_POINTS = 0.5;
-export const PAREJAS_MAX_POINTS_PER_HOLE = PAREJAS_BEST_BALL_POINTS + PAREJAS_WORST_BALL_POINTS;
+const isHalfStep = (value: number) => Number.isFinite(value) && Number.isInteger(value * 2);
+const inRange = (value: number) => isHalfStep(value) && value >= 0 && value <= 99;
+
+/** Misma regla que valid_mode_points_config en la base de datos. */
+export const isValidSindicatoPoints = ([p1, p2, p3]: number[]): boolean =>
+  [p1, p2, p3].every(inRange) && p1 >= p2 && p2 >= p3 && p1 > p3;
+
+export const isValidParejasPoints = ({ best, worst }: ParejasPoints): boolean =>
+  inRange(best) && inRange(worst) && best + worst > 0;
+
+/** Ventaja máxima que puede ganarse en un hoyo; la usa el cierre anticipado. */
+export const sindicatoMaxSwingPerHole = (config?: ModePointsConfig | null) => {
+  const [p1, , p3] = resolveModePoints(config).sindicato;
+  return p1 - p3;
+};
+export const parejasMaxPointsPerHole = (config?: ModePointsConfig | null) => {
+  const { best, worst } = resolveModePoints(config).parejas;
+  return best + worst;
+};
+
+const formatPoints = (value: number) => String(value).replace('.', ',');
+export const formatSindicatoPoints = (config?: ModePointsConfig | null) =>
+  resolveModePoints(config).sindicato.map(formatPoints).join(' / ');
+export const formatParejasPoints = (config?: ModePointsConfig | null) => {
+  const { best, worst } = resolveModePoints(config).parejas;
+  return { best: formatPoints(best), worst: formatPoints(worst) };
+};
+
+export const calculateSindicatoPoints = (
+  playerId: string,
+  allScores: ModeScoreInput[],
+  points: SindicatoPoints = LEGACY_SINDICATO_POINTS
+): number => {
+  const valid = getEnteredModeScores(allScores);
+  if (valid.length !== 3) return 0;
+  const myScore = valid.find(s => s.playerId === playerId);
+  if (!myScore) return 0;
+  // Los empatados se reparten a partes iguales los puntos de los puestos que
+  // ocupan: con 6-4-2, empate en cabeza 5-5-2, detrás 6-3-3 y triple 4-4-4.
+  const sorted = [...valid].sort((a, b) => a.netStrokes - b.netStrokes);
+  const tiedPositions = sorted
+    .map((s, index) => ({ s, index }))
+    .filter(({ s }) => s.netStrokes === myScore.netStrokes)
+    .map(({ index }) => index);
+  const shared = tiedPositions.reduce((sum, index) => sum + points[index], 0);
+  return shared / tiedPositions.length;
+};
 
 export const calculateParejasPoints = (
   playerId: string,
   allScores: ModeScoreInput[],
-  teamAssignments: Record<string, 0 | 1>
+  teamAssignments: Record<string, 0 | 1>,
+  ballPoints: ParejasPoints = LEGACY_PAREJAS_POINTS
 ): number => {
   const enteredScores = getEnteredModeScores(allScores);
   if (enteredScores.length < 4) return 0;
@@ -162,17 +216,17 @@ export const calculateParejasPoints = (
 
   if (teamScores.length < 2 || oppScores.length < 2) return 0;
 
-  // Se comparan las mejores bolas netas (1 punto) y las peores (0,5 puntos).
-  // Un empate en cualquiera de las dos comparaciones no reparte nada; eso
-  // incluye el hoyo en el que los cuatro marcan raya.
+  // Se comparan las mejores bolas netas y las peores; cada comparación vale lo
+  // configurado en la partida. Un empate en cualquiera de las dos no reparte
+  // nada; eso incluye el hoyo en el que los cuatro marcan raya.
   const teamBest = Math.min(...teamScores.map(s => s.netStrokes));
   const teamWorst = Math.max(...teamScores.map(s => s.netStrokes));
   const oppBest = Math.min(...oppScores.map(s => s.netStrokes));
   const oppWorst = Math.max(...oppScores.map(s => s.netStrokes));
 
   let points = 0;
-  if (teamBest < oppBest) points += PAREJAS_BEST_BALL_POINTS;
-  if (teamWorst < oppWorst) points += PAREJAS_WORST_BALL_POINTS;
+  if (teamBest < oppBest) points += ballPoints.best;
+  if (teamWorst < oppWorst) points += ballPoints.worst;
 
   return points;
 };
@@ -181,15 +235,17 @@ export const calculateModePoints = (
   mode: GameMode,
   playerId: string,
   allScores: ModeScoreInput[],
-  teamAssignments?: Record<string, 0 | 1>
+  teamAssignments?: Record<string, 0 | 1>,
+  config?: ModePointsConfig | null
 ): number => {
+  const points = resolveModePoints(config);
   switch (mode) {
     case 'match':
       return calculateMatchPoints(playerId, allScores);
     case 'sindicato':
-      return calculateSindicatoPoints(playerId, allScores);
+      return calculateSindicatoPoints(playerId, allScores, points.sindicato);
     case 'parejas':
-      return calculateParejasPoints(playerId, allScores, teamAssignments || {});
+      return calculateParejasPoints(playerId, allScores, teamAssignments || {}, points.parejas);
     default:
       return 0;
   }
@@ -281,7 +337,8 @@ export const checkMatchPlayStatus = (
 export const checkParejasStatus = (
   roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string }[],
-  playableHoles: { hole_number: number }[]
+  playableHoles: { hole_number: number }[],
+  config?: ModePointsConfig | null
 ): MatchStatusResult => {
   if (players.length < 4) return { isFinished: false, leaderName: '', marginText: '' };
 
@@ -313,7 +370,7 @@ export const checkParejasStatus = (
   }
 
   const remainingHoles = playableHoles.length - playedHolesCount;
-  const maxPossiblePointsLeft = remainingHoles * PAREJAS_MAX_POINTS_PER_HOLE;
+  const maxPossiblePointsLeft = remainingHoles * parejasMaxPointsPerHole(config);
   const lead = Math.abs(t0Points - t1Points);
   const isFinished = lead > maxPossiblePointsLeft && remainingHoles >= 0;
 
@@ -331,7 +388,8 @@ export const checkParejasStatus = (
 export const checkSindicatoStatus = (
   roundsMap: Map<string, { scores: Record<number, RoundScoreLike> }>,
   players: { id: string; name: string; playing_handicap: number }[],
-  playableHoles: { hole_number: number }[]
+  playableHoles: { hole_number: number }[],
+  config?: ModePointsConfig | null
 ): MatchStatusResult => {
   if (players.length < 3) return { isFinished: false, leaderName: '', marginText: '' };
 
@@ -357,7 +415,7 @@ export const checkSindicatoStatus = (
   );
   const remainingHoles = playableHoles.length - playedHolesCount;
   const lead = sorted[0].points - sorted[1].points;
-  const isFinished = lead > remainingHoles * 4 && remainingHoles >= 0;
+  const isFinished = lead > remainingHoles * sindicatoMaxSwingPerHole(config) && remainingHoles >= 0;
 
   return {
     isFinished,

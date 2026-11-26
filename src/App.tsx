@@ -890,7 +890,9 @@ function App() {
         });
 
         for (const existing of otherScores) {
-          const newModePoints = calculateModePoints(gameMode, existing.player_id, allInputs, teamAssignments);
+          const newModePoints = calculateModePoints(
+            gameMode, existing.player_id, allInputs, teamAssignments, roundState.round.mode_points_config,
+          );
           if (newModePoints !== existing.mode_points) {
             updatedOtherScores.push({
               ...existing,
@@ -1756,6 +1758,7 @@ function App() {
           groupName={currentGroup?.name}
           hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
           gameMode={roundState.round.game_mode}
+          modePointsConfig={roundState.round.mode_points_config}
           decidedResult={roundState.round.decided_result}
           decidedHoles={roundState.round.decided_holes}
           onHoleChange={handleHoleChange}
@@ -1786,6 +1789,7 @@ function App() {
           hasGroup={!!currentGroup}
           groupId={currentGroup?.id ?? null}
           gameMode={roundState.round.game_mode}
+          modePointsConfig={roundState.round.mode_points_config}
           messagesButton={inlineMessagesButton}
         />
       )}
@@ -1873,6 +1877,7 @@ function App() {
                 hasGroup={!!currentGroup}
                 groupId={currentGroup?.id ?? null}
                 gameMode={roundState.round.game_mode}
+                modePointsConfig={roundState.round.mode_points_config}
               />
             </div>
           </div>

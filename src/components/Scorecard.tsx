@@ -8,7 +8,7 @@ import { CourseChangeModal } from './CourseChangeModal';
 import { CourseChangeConfirmModal } from './CourseChangeConfirmModal';
 import { ScoreSymbol } from './ScoreSymbol';
 import { golfService } from '../services/golfService';
-import { getStrokesReceived } from '../utils/calculations';
+import { getStrokesReceived, type ModePointsConfig } from '../utils/calculations';
 import { competitionPosition, sortByResultAndHandicap } from '../utils/ranking';
 import { ChevronLeft, ChevronRight, Trophy, Lock, MapPin, Eye, EyeOff, Hand } from 'lucide-react';
 import { HandshakeModal } from './HandshakeModal';
@@ -168,6 +168,8 @@ interface ScorecardProps {
   groupId?: string | null;
   hoyo19Enabled?: boolean;
   gameMode?: GameMode;
+  /** Puntos de Sindicato/Parejas elegidos al crear la partida. */
+  modePointsConfig?: ModePointsConfig | null;
   decidedResult?: DecidedResult | null;
   /** Hoyos cerrados al quedar decidida la partida (no se pueden modificar). */
   decidedHoles?: number[] | null;
@@ -201,6 +203,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
   groupId = null,
   hoyo19Enabled,
   gameMode = 'stableford',
+  modePointsConfig = null,
   decidedResult = null,
   decidedHoles = null,
   onHoleChange,
@@ -777,6 +780,7 @@ export const Scorecard: React.FC<ScorecardProps> = ({
                 spanishHandsEnabled={spanishHandsEnabled}
                 enabledGamification={extraGamification.map(item => item.id)}
                 gameMode={gameMode}
+                modePointsConfig={modePointsConfig}
                 teamAssignments={gameMode === 'parejas' && players.length === 4 ? Object.fromEntries(players.map((p, i) => [p.id, i < 2 ? 0 : 1])) : undefined}
                 onScoreChange={(playerId, score) => {
                   onScoreChange(playerId, hole.hole_number, score);

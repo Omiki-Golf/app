@@ -15,6 +15,21 @@ import { trackExpressGameCreated } from '../services/expressTierGuard';
 import { getUserId } from '../utils/userId';
 import { CourseCatalogPicker } from './CourseCatalogPicker';
 import { getErrorMessage } from '../utils/errorMessage';
+import {
+  DEFAULT_PAREJAS_POINTS,
+  DEFAULT_SINDICATO_POINTS,
+  isValidParejasPoints,
+  isValidSindicatoPoints,
+  type ModePointsConfig,
+} from '../utils/calculations';
+
+// Los campos de puntos admiten coma o punto decimal.
+const toPointsText = (values: number[]) => values.map(value => String(value).replace('.', ','));
+const parsePoints = (text: string) => (text.trim() === '' ? NaN : Number(text.trim().replace(',', '.')));
+const isPointsText = (value: unknown, length: number): value is string[] =>
+  Array.isArray(value) && value.length === length && value.every(item => typeof item === 'string');
+const DEFAULT_SINDICATO_TEXT = toPointsText(DEFAULT_SINDICATO_POINTS);
+const DEFAULT_PAREJAS_TEXT = toPointsText([DEFAULT_PAREJAS_POINTS.best, DEFAULT_PAREJAS_POINTS.worst]);
 
 // Borrador de la última configuración elegida (campo y recorrido, hoyos, tramo y modalidad).
 // Se guarda en este dispositivo al cambiar cualquier opción, también si la partida no llega a crearse.
@@ -25,6 +40,8 @@ interface RoundSetupDraft {
   numHoles?: 9 | 18;
   holesRange?: '1-9' | '10-18';
   gameMode?: GameMode;
+  sindicatoPoints?: string[];
+  parejasPoints?: string[];
 }
 const GAME_MODES: GameMode[] = ['stableford', 'match', 'sindicato', 'parejas'];
 const isCostaAzaharCourse = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('costa azahar');
@@ -52,6 +69,54 @@ interface RoundSetupProps {
   planType?: 'express' | 'player' | 'team' | 'premium';
   onShowPlans?: (context?: 'express-limit' | 'express-modes') => void;
   messagesButton?: React.ReactNode;
+}
+
+interface ModePointsFieldsProps {
+  labels: string[];
+  values: string[];
+  valid: boolean;
+  isDefault: boolean;
+  help: string;
+  invalidText: string;
+  onChange: (values: string[]) => void;
+  onReset: () => void;
+}
+
+// Puntos que reparte cada hoyo en Sindicato (1º/2º/3º) o Parejas (mejor/peor bola).
+function ModePointsFields({ labels, values, valid, isDefault, help, invalidText, onChange, onReset }: ModePointsFieldsProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-card-2 p-3">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="text-xs font-semibold text-ink-2">{t('roundSetup.modePoints.title')}</span>
+        {!isDefault && (
+          <button type="button" onClick={onReset} className="text-xs font-semibold text-accent hover:underline">
+            {t('roundSetup.modePoints.reset')}
+          </button>
+        )}
+      </div>
+      <div className={`grid gap-2 ${labels.length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        {labels.map((label, index) => (
+          <label key={label} className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-3">{label}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={values[index]}
+              onChange={event => {
+                const next = [...values];
+                next[index] = event.target.value.replace(/[^0-9.,]/g, '').slice(0, 4);
+                onChange(next);
+              }}
+              className={`w-full rounded-md border px-2 py-2 text-center text-sm font-bold tabular-nums bg-card text-ink focus:outline-none focus:ring-2 focus:ring-accent ${valid ? 'border-line' : 'border-red-500'}`}
+            />
+          </label>
+        ))}
+      </div>
+      <p className={`text-xs mt-2 ${valid ? 'text-ink-3' : 'text-red-600'}`}>{valid ? help : invalidText}</p>
+    </div>
+  );
 }
 
 export const RoundSetup: React.FC<RoundSetupProps> = ({
@@ -99,6 +164,19 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [completedRounds, setCompletedRounds] = useState<Array<{ id: string; created_at: string; status: string }>>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [gameMode, setGameMode] = useState<GameMode>('stableford');
+  const [sindicatoPoints, setSindicatoPoints] = useState<string[]>(DEFAULT_SINDICATO_TEXT);
+  const [parejasPoints, setParejasPoints] = useState<string[]>(DEFAULT_PAREJAS_TEXT);
+  const sindicatoValues = sindicatoPoints.map(parsePoints);
+  const parejasValues = { best: parsePoints(parejasPoints[0]), worst: parsePoints(parejasPoints[1]) };
+  const sindicatoPointsValid = isValidSindicatoPoints(sindicatoValues);
+  const parejasPointsValid = isValidParejasPoints(parejasValues);
+  const effectiveGameMode: GameMode = groupStablefordOnly ? 'stableford' : gameMode;
+  const modePointsValid = effectiveGameMode === 'sindicato' ? sindicatoPointsValid
+    : effectiveGameMode === 'parejas' ? parejasPointsValid
+    : true;
+  const modePointsConfig: ModePointsConfig | null = effectiveGameMode === 'sindicato'
+    ? { sindicato: [sindicatoValues[0], sindicatoValues[1], sindicatoValues[2]] }
+    : effectiveGameMode === 'parejas' ? { parejas: parejasValues } : null;
 
   const [quickPlayRoundsCount, setQuickPlayRoundsCount] = useState<number | null>(null);
   const [draftReady, setDraftReady] = useState(false);
@@ -151,8 +229,11 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   useEffect(() => {
     if (!draftReady || draftModeApplied.current || isExpress || groupStablefordOnly) return;
     draftModeApplied.current = true;
-    const mode = readDraft(currentDraftKey).gameMode;
+    const draft = readDraft(currentDraftKey);
+    const mode = draft.gameMode;
     if (mode && GAME_MODES.includes(mode)) setGameMode(mode);
+    if (isPointsText(draft.sindicatoPoints, 3)) setSindicatoPoints(draft.sindicatoPoints);
+    if (isPointsText(draft.parejasPoints, 2)) setParejasPoints(draft.parejasPoints);
   }, [draftReady, isExpress, groupStablefordOnly, currentDraftKey]);
 
   useEffect(() => {
@@ -164,9 +245,12 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
       holesRange,
       // Con el plan aún sin cargar (Express por defecto) no se pisa la modalidad guardada.
       gameMode: isExpress && !draftModeApplied.current ? previous.gameMode ?? gameMode : gameMode,
+      // Hasta recuperar el borrador no se pisan los puntos guardados.
+      sindicatoPoints: draftModeApplied.current ? sindicatoPoints : previous.sindicatoPoints ?? sindicatoPoints,
+      parejasPoints: draftModeApplied.current ? parejasPoints : previous.parejasPoints ?? parejasPoints,
     };
     safeStorage.setItem(currentDraftKey, JSON.stringify(draft));
-  }, [draftReady, selectedCourse, numHoles, holesRange, gameMode, isExpress, currentDraftKey]);
+  }, [draftReady, selectedCourse, numHoles, holesRange, gameMode, sindicatoPoints, parejasPoints, isExpress, currentDraftKey]);
 
   const loadCourses = useCallback(async () => {
     try {
@@ -288,6 +372,10 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
   const proceedWithRoundCreation = async () => {
     if (!selectedCourse) return;
+    if (!modePointsValid) {
+      setError(t('roundSetup.modePoints.invalid'));
+      return;
+    }
     try {
       setLoading(true);
       setError('');
@@ -299,7 +387,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
         numHoles === 9 ? (selectedCourseHoleCount === 18 ? holesRange : '1-9') : undefined,
         undefined,
         groupStablefordOnly ? 'stableford' : gameMode,
-        currentGroup?.id ?? null
+        currentGroup?.id ?? null,
+        modePointsConfig
       );
 
       if (isExpress && !currentGroup) {
@@ -532,10 +621,28 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
                     <p className="text-xs text-ink-3 mt-2">{t('roundSetup.matchHelp')}</p>
                   )}
                   {gameMode === 'sindicato' && (
-                    <p className="text-xs text-ink-3 mt-2">{t('roundSetup.sindicatoHelp')}</p>
+                    <ModePointsFields
+                      labels={[t('roundSetup.modePoints.first'), t('roundSetup.modePoints.second'), t('roundSetup.modePoints.third')]}
+                      values={sindicatoPoints}
+                      valid={sindicatoPointsValid}
+                      isDefault={sindicatoValues.every((value, index) => value === DEFAULT_SINDICATO_POINTS[index])}
+                      onChange={setSindicatoPoints}
+                      onReset={() => setSindicatoPoints(DEFAULT_SINDICATO_TEXT)}
+                      help={t('roundSetup.sindicatoHelp', { points: sindicatoPoints.map(v => v.trim() || '?').join(' / ') })}
+                      invalidText={t('roundSetup.modePoints.sindicatoInvalid')}
+                    />
                   )}
                   {gameMode === 'parejas' && (
-                    <p className="text-xs text-ink-3 mt-2">{t('roundSetup.pairsHelp')}</p>
+                    <ModePointsFields
+                      labels={[t('roundSetup.modePoints.best'), t('roundSetup.modePoints.worst')]}
+                      values={parejasPoints}
+                      valid={parejasPointsValid}
+                      isDefault={parejasValues.best === DEFAULT_PAREJAS_POINTS.best && parejasValues.worst === DEFAULT_PAREJAS_POINTS.worst}
+                      onChange={setParejasPoints}
+                      onReset={() => setParejasPoints(DEFAULT_PAREJAS_TEXT)}
+                      help={t('roundSetup.pairsHelp', { best: parejasPoints[0].trim() || '?', worst: parejasPoints[1].trim() || '?' })}
+                      invalidText={t('roundSetup.modePoints.pairsInvalid')}
+                    />
                   )}
                   </>
                   )}
@@ -543,7 +650,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
                 <WriteButton
                   onClick={handleCreateRound}
-                  disabled={!selectedCourse || loading}
+                  disabled={!selectedCourse || loading || !modePointsValid}
                   className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-on-accent font-bold py-4 rounded-lg flex items-center justify-center gap-2 transition-colors mt-6"
                 >
                   {t('roundSetup.create')}

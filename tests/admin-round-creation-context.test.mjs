@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { defaultModePointsConfig } from '../src/utils/calculations.ts';
 
 const service = await readFile(new URL('../src/services/golfService.ts', import.meta.url), 'utf8');
 const setup = await readFile(new URL('../src/components/RoundSetup.tsx', import.meta.url), 'utf8');
@@ -30,6 +31,7 @@ function harness() {
     supabase: database,
     getRoundOwnerId: async () => 'creator',
     generateAccessCode: () => 'ABC123',
+    defaultModePointsConfig,
     storageUtils: { getCurrentGroupId() { throw new Error('Stale deleted group must not be used'); } },
   });
   vm.runInContext(script, context);
@@ -51,6 +53,16 @@ test('group creation uses the explicit current group and preserves pairs mode', 
   const round = await harness()('course', 18, false, undefined, undefined, 'parejas', 'selected-group');
   assert.equal(round.group_id, 'selected-group');
   assert.equal(round.game_mode, 'parejas');
+});
+
+test('Sindicato and Parejas store their points; other modes store none', async () => {
+  const create = harness();
+  assert.deepEqual((await create('course', 9, false, '1-9', undefined, 'sindicato', null)).mode_points_config, { sindicato: [6, 4, 2] });
+  assert.deepEqual((await create('course', 9, false, '1-9', undefined, 'parejas', null)).mode_points_config, { parejas: { best: 1, worst: 1 } });
+  const custom = { sindicato: [5, 3, 1] };
+  assert.deepEqual((await create('course', 9, false, '1-9', undefined, 'sindicato', null, custom)).mode_points_config, custom);
+  assert.equal((await create('course', 9, false, '1-9', undefined, 'match', null, custom)).mode_points_config, null);
+  assert.equal((await create('course', 9, false, '1-9', undefined, 'stableford', null)).mode_points_config, null);
 });
 
 test('setup passes its visible group explicitly instead of relying on device storage', () => {

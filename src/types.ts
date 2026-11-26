@@ -1,3 +1,5 @@
+import type { ModePointsConfig } from './utils/calculations';
+
 export interface GolfHole {
   id: string;
   course_id: string;
@@ -544,6 +546,8 @@ export interface GolfRound {
   tee_id?: string;
   manual_slope?: number;
   game_mode: GameMode;
+  /** Puntos elegidos al crear la partida (Sindicato/Parejas); null = reglamento antiguo. */
+  mode_points_config?: ModePointsConfig | null;
   status: 'active' | 'completed' | 'archived' | 'cancelled';
   reference_number: number;
   access_code: string;

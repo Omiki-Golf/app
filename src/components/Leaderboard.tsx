@@ -5,6 +5,7 @@ import { Trophy, Medal, Eye, RefreshCw, Hand } from 'lucide-react';
 import { golfService } from '../services/golfService';
 import { ThemeToggle } from './ThemeToggle';
 import { competitionPosition } from '../utils/ranking';
+import { formatParejasPoints, formatSindicatoPoints, type ModePointsConfig } from '../utils/calculations';
 import { GamificationBadge } from './GamificationBadge';
 
 import { PlayerName } from './PlayerName';
@@ -21,6 +22,8 @@ interface LeaderboardProps {
   hasGroup?: boolean;
   groupId?: string | null;
   gameMode?: GameMode;
+  /** Puntos de Sindicato/Parejas de la partida; null = reglamento antiguo. */
+  modePointsConfig?: ModePointsConfig | null;
   messagesButton?: React.ReactNode;
 }
 
@@ -38,6 +41,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
   hasGroup = false,
   groupId,
   gameMode = 'stableford',
+  modePointsConfig = null,
   messagesButton,
 }) => {
   const isModeScoring = gameMode !== 'stableford';
@@ -349,13 +353,13 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       {gameMode === 'sindicato' && (
                         <div className="bg-blue-50 p-3 rounded border border-blue-200">
                           <p className="font-semibold text-blue-900">Sindicato (3 jugadores)</p>
-                          <p className="text-xs text-blue-700">6 puntos por hoyo: 4/2/0, 3/3/0, o 4/1/1 segun el resultado.</p>
+                          <p className="text-xs text-blue-700">Por hoyo, {formatSindicatoPoints(modePointsConfig)} puntos al 1º, 2º y 3º. Los empatados se reparten a partes iguales los puntos de los puestos que ocupan.</p>
                         </div>
                       )}
                       {gameMode === 'parejas' && (
                         <div className="bg-blue-50 p-3 rounded border border-blue-200">
                           <p className="font-semibold text-blue-900">Parejas (2 vs 2)</p>
-                          <p className="text-xs text-blue-700">En cada hoyo, la pareja con la mejor bola neta gana 1 punto y la de mejor peor bola neta gana 0,5. Los empates no puntúan. Gana la pareja con más puntos.</p>
+                          <p className="text-xs text-blue-700">En cada hoyo, la pareja con la mejor bola neta gana {formatParejasPoints(modePointsConfig).best} y la de mejor peor bola neta gana {formatParejasPoints(modePointsConfig).worst}. Los empates no puntúan. Gana la pareja con más puntos.</p>
                         </div>
                       )}
                     </div>

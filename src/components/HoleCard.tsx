@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScoreChangeInput } from '../types';
 import { GolfHole, RoundPlayer, RoundScore, GameMode } from '../types';
-import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput } from '../utils/calculations';
+import { calculateScore, getStrokesReceived, calculateModePoints, ModeScoreInput, type ModePointsConfig } from '../utils/calculations';
 import { ChevronDown, Minus, Hand } from 'lucide-react';
 import { HoleInOneModal } from './HoleInOneModal';
 import { CongratulationsModal } from './CongratulationsModal';
@@ -26,6 +26,8 @@ interface HoleCardProps {
   /** Títulos extra del Pro-Shop activos en el grupo, en orden de catálogo. */
   enabledGamification?: string[];
   gameMode?: GameMode;
+  /** Puntos de Sindicato/Parejas de la partida; null = reglamento antiguo. */
+  modePointsConfig?: ModePointsConfig | null;
   teamAssignments?: Record<string, 0 | 1>;
   onScoreChange: (playerId: string, score: ScoreChangeInput | null) => void;
 }
@@ -83,6 +85,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
   spanishHandsEnabled,
   enabledGamification = [],
   gameMode = 'stableford',
+  modePointsConfig = null,
   teamAssignments = {},
   allHoleScores = {},
   onScoreChange,
@@ -141,7 +144,7 @@ export const HoleCard: React.FC<HoleCardProps> = ({
       if (!pscore) return { playerId: p.id, netStrokes: 999, abandoned: true, entered: false };
       return { playerId: p.id, netStrokes: pscore.abandoned ? 999 : pscore.net_strokes, abandoned: pscore.abandoned, entered: true };
     });
-    return calculateModePoints(gameMode, playerId, allScores, teamAssignments);
+    return calculateModePoints(gameMode, playerId, allScores, teamAssignments, modePointsConfig);
   };
   useEffect(() => {
     console.log('🎯 HoleCard: Players prop received:', players.map(p => ({ name: p.name, playing_handicap: p.playing_handicap })));

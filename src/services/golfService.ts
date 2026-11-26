@@ -30,7 +30,7 @@ import {
   HolePerformanceStatistics,
   BestCourseRoundStatistics,
 } from '../types';
-import { calculatePlayingHandicap, calculateScore } from '../utils/calculations';
+import { calculatePlayingHandicap, calculateScore, defaultModePointsConfig, type ModePointsConfig } from '../utils/calculations';
 import { getUserId } from '../utils/userId';
 import { storageUtils } from '../utils/storage';
 import { generateAccessCode } from '../utils/accessCode';
@@ -425,7 +425,8 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     holesRange?: '1-9' | '10-18',
     teeId?: string,
     gameMode: GameMode = 'stableford',
-    groupId: string | null = null
+    groupId: string | null = null,
+    modePointsConfig: ModePointsConfig | null = null
   ): Promise<GolfRound> {
     const userId = await getRoundOwnerId();
     // The server keeps the code private and replaces it if another active round already uses it.
@@ -444,6 +445,10 @@ async deleteAllRounds(groupId?: string): Promise<void> {
           use_slope: useSlope,
           tee_id: teeId || null,
           game_mode: gameMode,
+          // Solo Sindicato y Parejas guardan su reparto de puntos.
+          mode_points_config: gameMode === 'sindicato' || gameMode === 'parejas'
+            ? modePointsConfig ?? defaultModePointsConfig(gameMode)
+            : null,
           status: 'active',
           access_code: accessCode,
         },
