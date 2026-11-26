@@ -353,7 +353,7 @@ export const Leaderboard: React.FC<LeaderboardProps> = ({
                       {gameMode === 'sindicato' && (
                         <div className="bg-blue-50 p-3 rounded border border-blue-200">
                           <p className="font-semibold text-blue-900">Sindicato (3 jugadores)</p>
-                          <p className="text-xs text-blue-700">Por hoyo, {formatSindicatoPoints(modePointsConfig)} puntos al 1º, 2º y 3º. Los empatados se reparten a partes iguales los puntos de los puestos que ocupan.</p>
+                          <p className="text-xs text-blue-700">Por hoyo, {formatSindicatoPoints(modePointsConfig)} puntos a la mejor, la media y la peor bola neta. Si hay empate, se reparten a partes iguales los puntos de esos puestos.</p>
                         </div>
                       )}
                       {gameMode === 'parejas' && (

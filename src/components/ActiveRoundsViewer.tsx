@@ -103,9 +103,11 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
 
       setRounds(roundsWithDetails);
       listSnapshot.current = { loaded: true, ids: new Set(roundsWithDetails.map(item => item.round.id)) };
+      return roundsWithDetails.length;
     } catch (err) {
       setError('Error cargando partidas activas');
       console.error(err);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -129,6 +131,12 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
     };
   }, [currentGroup?.id, loadActiveRounds]);
 
+  // Tras archivar o eliminar la última partida no queda nada que hacer aquí: se vuelve atrás.
+  const reloadAfterRemoval = async () => {
+    const remaining = await loadActiveRounds();
+    if (remaining === 0) onBack();
+  };
+
   const handleArchiveRoundClick = async (roundId: string, sessionChoice?: 'same' | 'new') => {
     try {
       setLoading(true);
@@ -148,7 +156,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
         await golfService.archiveRound(roundId, sessionChoice ?? 'same');
       }
       else await golfService.archiveQuickPlayRound(roundId);
-      await loadActiveRounds();
+      await reloadAfterRemoval();
     } catch (err) {
       setError('Error al archivar la partida');
       console.error(err);
@@ -196,7 +204,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       setError('');
       await golfService.finishExpressRound(roundId);
       await golfService.archiveQuickPlayRound(roundId);
-      await loadActiveRounds();
+      await reloadAfterRemoval();
     } catch (err) {
       setError(deletionErrorMessage(err, 'No se pudo finalizar y archivar la partida'));
       await loadActiveRounds();
@@ -262,7 +270,7 @@ export const ActiveRoundsViewer: React.FC<ActiveRoundsViewerProps> = ({
       setError('');
       if (dismiss) await golfService.dismissQuickRound(roundId);
       else await golfService.deleteRound(roundId);
-      await loadActiveRounds();
+      await reloadAfterRemoval();
     } catch (err) {
       setError(deletionErrorMessage(err, 'Error eliminando la partida'));
       console.error(err);

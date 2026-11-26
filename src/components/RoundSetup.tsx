@@ -82,7 +82,7 @@ interface ModePointsFieldsProps {
   onReset: () => void;
 }
 
-// Puntos que reparte cada hoyo en Sindicato (1º/2º/3º) o Parejas (mejor/peor bola).
+// Puntos que reparte cada hoyo en Sindicato (mejor/media/peor bola) o Parejas (mejor/peor bola).
 function ModePointsFields({ labels, values, valid, isDefault, help, invalidText, onChange, onReset }: ModePointsFieldsProps) {
   const { t } = useTranslation();
   return (
@@ -163,9 +163,21 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   const [pinError, setPinError] = useState('');
   const [completedRounds, setCompletedRounds] = useState<Array<{ id: string; created_at: string; status: string }>>([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [gameMode, setGameMode] = useState<GameMode>('stableford');
-  const [sindicatoPoints, setSindicatoPoints] = useState<string[]>(DEFAULT_SINDICATO_TEXT);
-  const [parejasPoints, setParejasPoints] = useState<string[]>(DEFAULT_PAREJAS_TEXT);
+  // La modalidad y los puntos del borrador se leen ya en el primer render (están en este
+  // dispositivo), así la pantalla no muestra Stableford un instante antes de cambiar.
+  const [initialDraft] = useState(() => readDraft(draftKey(currentGroup?.id)));
+  const restoreModeAtMount = !isExpress && !groupStablefordOnly;
+  const [gameMode, setGameMode] = useState<GameMode>(() => (
+    restoreModeAtMount && initialDraft.gameMode && GAME_MODES.includes(initialDraft.gameMode)
+      ? initialDraft.gameMode
+      : 'stableford'
+  ));
+  const [sindicatoPoints, setSindicatoPoints] = useState<string[]>(() => (
+    isPointsText(initialDraft.sindicatoPoints, 3) ? initialDraft.sindicatoPoints : DEFAULT_SINDICATO_TEXT
+  ));
+  const [parejasPoints, setParejasPoints] = useState<string[]>(() => (
+    isPointsText(initialDraft.parejasPoints, 2) ? initialDraft.parejasPoints : DEFAULT_PAREJAS_TEXT
+  ));
   const sindicatoValues = sindicatoPoints.map(parsePoints);
   const parejasValues = { best: parsePoints(parejasPoints[0]), worst: parsePoints(parejasPoints[1]) };
   const sindicatoPointsValid = isValidSindicatoPoints(sindicatoValues);
@@ -180,7 +192,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
 
   const [quickPlayRoundsCount, setQuickPlayRoundsCount] = useState<number | null>(null);
   const [draftReady, setDraftReady] = useState(false);
-  const draftModeApplied = useRef(false);
+  const draftModeApplied = useRef(restoreModeAtMount);
   const currentDraftKey = draftKey(currentGroup?.id);
 
   const loadQuickPlayRoundsCount = useCallback(async () => {
@@ -225,7 +237,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
     loadCourseDetails();
   }, [selectedCourse, courses, numHoles]);
 
-  // La modalidad se recupera cuando se conoce el plan: Express solo permite Stableford.
+  // Si el plan se conoce después del primer render, la modalidad se recupera entonces:
+  // Express solo permite Stableford.
   useEffect(() => {
     if (!draftReady || draftModeApplied.current || isExpress || groupStablefordOnly) return;
     draftModeApplied.current = true;
