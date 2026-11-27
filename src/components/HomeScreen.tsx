@@ -1,6 +1,7 @@
 import { WriteButton } from '../context/ReadOnlyContext';
 import React, { useState } from 'react';
-import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical, Crown } from 'lucide-react';
+import { Zap, LogIn, Plus, Share2, User, Users, ChevronRight, FlaskConical, Crown, Swords } from 'lucide-react';
+import type { CupShortcut } from '../services/cupService';
 import { PlanType, UserProfile } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { ResetExpressRounds } from './ResetExpressRounds';
@@ -26,6 +27,9 @@ interface HomeScreenProps {
   /** Abre Planes con Team marcado (aviso de fin del Weekend de 3 meses para quien no es Team). */
   onContractTeam?: () => void;
   onOpenGroup?: (groupId: string) => void;
+  /** Copas abiertas donde gestiono o participo: espadas en la pastilla del grupo. */
+  cupShortcuts?: CupShortcut[];
+  onOpenCup?: (groupId: string, editionId: string) => void;
   onShowProfile: () => void;
   onShowAuth: () => void;
   onShowShare: () => void;
@@ -114,16 +118,38 @@ const shortcutSize: Record<ShortcutLevel, string> = {
 };
 
 /** Acceso directo a un grupo en Home. Creados y administrados van rellenos del color del nivel; los de miembro, solo con contorno. */
-function GroupShortcut({ group, level, wide, onOpen }: {
+function GroupShortcut({ group, level, wide, onOpen, cup, onOpenCup }: {
   group: ShortcutGroup;
   level: ShortcutLevel;
   wide?: boolean;
   onOpen?: (groupId: string) => void;
+  cup?: CupShortcut;
+  onOpenCup?: (groupId: string, editionId: string) => void;
 }) {
   const tier = groupTier(group);
   const tone = tierColors[tier];
   const style = level === 'member' ? `bg-card ${tone.outlineButton}` : `${tone.button} ${tone.border} shadow-card`;
   const crown = level === 'owner' ? 16 : 14;
+  if (cup && onOpenCup) {
+    // Copa contratada: doble anillo (borde del tier + anillo exterior) y espadas que abren la Copa.
+    const ring = tier === 'premium' ? 'ring-pink-400' : 'ring-amber-400';
+    const alert = cup.pending || cup.invited;
+    return <div className={`flex w-full min-w-0 items-center border-2 font-semibold ring-2 ring-offset-2 ring-offset-app ${ring} ${shortcutSize[level]} ${style} ${wide ? 'col-span-2' : ''}`}>
+      <WriteButton onClick={() => onOpen?.(group.id)} title={group.name} className="flex h-full min-w-0 flex-1 items-center gap-[inherit] text-left active:scale-[0.98]">
+        <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{group.name}</span>
+        {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
+        {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
+      </WriteButton>
+      <button type="button" onClick={() => onOpenCup(group.id, cup.edition_id)}
+        aria-label={`Copa Match Play de ${group.name}${cup.pending ? ': tienes partido pendiente' : cup.invited ? ': confirma tu participación' : ''}`}
+        title={cup.name} className="relative ml-1 shrink-0 rounded-full p-1 active:scale-95">
+        <Swords size={level === 'owner' ? 18 : 15} className={alert ? 'animate-pulse' : ''} aria-hidden="true" />
+        {alert && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-red-500" />}
+        {alert && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500" />}
+      </button>
+    </div>;
+  }
   return <WriteButton
     onClick={() => onOpen?.(group.id)}
     title={group.name}
@@ -173,6 +199,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   renewal,
   additionalRenewals = [],
   onSetAdditionalRenewal,
+  cupShortcuts = [],
+  onOpenCup,
 }) => {
   const { t } = useTranslation();
   const isExpress = planType === 'express';
@@ -180,6 +208,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   // Con Weekend el botón de crear grupo usa el naranja de Weekend en Planes.
   const weekend = weekendKindDays(createGroupKind);
   const sections = homeGroupSections(groupShortcuts);
+  const cupFor = (groupId: string) => cupShortcuts.find(cup => cup.group_id === groupId);
+  // Copas de grupos que no aparecen en Inicio (participantes invitados que no son miembros).
+  const otherCups = cupShortcuts.filter(cup => !groupShortcuts.some(group => group.id === cup.group_id));
   // Los Weekend que has creado van en su propia ficha, «Tus Weekends».
   const ownedGroups = sections.owned.filter(group => groupTier(group) !== 'weekend');
   const ownedWeekends = sections.owned.filter(group => groupTier(group) === 'weekend');
@@ -315,7 +346,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           {(ownedGroups.length > 0 || (canCreateGroup && !weekend)) && (
             <HomeSection title={t('home.groupsOwned')}>
               <div className="space-y-2">
-                {ownedGroups.map(group => <GroupShortcut key={group.id} group={group} level="owner" onOpen={onOpenGroup} />)}
+                {ownedGroups.map(group => <GroupShortcut key={group.id} group={group} level="owner" onOpen={onOpenGroup} cup={cupFor(group.id)} onOpenCup={onOpenCup} />)}
                 {canCreateGroup && !weekend && createButton}
               </div>
             </HomeSection>
@@ -325,7 +356,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <HomeSection title={t('home.groupsAdmin')}>
               <div className="grid grid-cols-2 gap-2">
                 {sections.admin.map((group, index) => (
-                  <GroupShortcut key={group.id} group={group} level="admin" wide={isWide(index, sections.admin.length)} onOpen={onOpenGroup} />
+                  <GroupShortcut key={group.id} group={group} level="admin" wide={isWide(index, sections.admin.length)} onOpen={onOpenGroup} cup={cupFor(group.id)} onOpenCup={onOpenCup} />
                 ))}
               </div>
             </HomeSection>
@@ -336,7 +367,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <div className="space-y-2">
                 {ownedWeekends.map(group => {
                   return <React.Fragment key={group.id}>
-                    <GroupShortcut group={group} level="owner" onOpen={onOpenGroup} />
+                    <GroupShortcut group={group} level="owner" onOpen={onOpenGroup} cup={cupFor(group.id)} onOpenCup={onOpenCup} />
                     {weekendLastWeek(group.weekend_mode_until, group.weekend_days) && (
                       <WeekendGroupNotice group={group} conversion={weekendConversion} onContractTeam={onContractTeam} onConvert={onConvertWeekend} />
                     )}
@@ -347,11 +378,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </HomeSection>
           )}
 
+          {otherCups.length > 0 && onOpenCup && (
+            <HomeSection title="Copas Match Play">
+              <div className="space-y-2">
+                {otherCups.map(cup => (
+                  <button key={cup.edition_id} type="button" onClick={() => onOpenCup(cup.group_id, cup.edition_id)}
+                    className="flex h-11 w-full items-center gap-2 rounded-xl border-2 border-amber-400 bg-card px-3 text-left text-sm font-semibold text-ink ring-2 ring-amber-300 ring-offset-2 ring-offset-app">
+                    <Swords size={16} className={cup.pending || cup.invited ? 'shrink-0 animate-pulse text-amber-500' : 'shrink-0 text-amber-500'} aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">{cup.name} · {cup.group_name}</span>
+                    {(cup.pending || cup.invited) && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" aria-label={cup.pending ? 'Partido pendiente' : 'Invitación pendiente'} />}
+                  </button>
+                ))}
+              </div>
+            </HomeSection>
+          )}
+
           {sections.member.length > 0 && (
             <HomeSection title={t('home.groupsMember')}>
               <div className="grid grid-cols-2 gap-2">
                 {sections.member.map((group, index) => (
-                  <GroupShortcut key={group.id} group={group} level="member" wide={isWide(index, sections.member.length)} onOpen={onOpenGroup} />
+                  <GroupShortcut key={group.id} group={group} level="member" wide={isWide(index, sections.member.length)} onOpen={onOpenGroup} cup={cupFor(group.id)} onOpenCup={onOpenCup} />
                 ))}
               </div>
             </HomeSection>

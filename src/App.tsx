@@ -42,6 +42,9 @@ import { nextGroupKind, weekendConversion } from './utils/groupCapacity';
 import { renewalNotice } from './utils/renewalNotice';
 import { GlobalMessagesButton } from './components/GlobalMessagesButton';
 import { ProShop } from './components/ProShop';
+import { CupScreen } from './components/cup/CupScreen';
+import { CupGroupCard } from './components/cup/CupGroupCard';
+import { cupService, isCupTieError, type CupShortcut } from './services/cupService';
 import { useSubscription } from './hooks/useSubscription';
 import { useLatestPlayingHandicap } from './hooks/useLatestPlayingHandicap';
 import { userService } from './services/userService';
@@ -55,7 +58,7 @@ const QuickPlayStatistics = lazy(() => import('./components/QuickPlayStatistics'
 const CareerStatistics = lazy(() => import('./components/CareerStatistics').then(module => ({ default: module.CareerStatistics })));
 const MyRoundStatistics = lazy(() => import('./components/MyRoundStatistics').then(module => ({ default: module.MyRoundStatistics })));
 
-type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics' | 'my-round-statistics';
+type ViewType = 'player-checkout' | 'main' | 'setup' | 'players' | 'scorecard' | 'leaderboard' | 'active-rounds' | 'viewer' | 'game-points' | 'statistics' | 'quickplay-statistics' | 'auth' | 'my-groups' | 'plans' | 'registration' | 'profile' | 'profile-details' | 'team-creation' | 'pro-shop' | 'career-statistics' | 'my-round-statistics' | 'cup';
 
 interface RoundState {
   round: GolfRound | null;
@@ -172,6 +175,10 @@ function App() {
   // Partida elegida en Mis partidas al abrir sus estadísticas: se recupera al volver.
   const [myRoundsSelectedId, setMyRoundsSelectedId] = useState<string | null>(null);
   const [myRoundsReturnView, setMyRoundsReturnView] = useState<ViewType | null>(null);
+  // Copa Match Play abierta (edición) y vista a la que se vuelve al salir.
+  const [cupEditionId, setCupEditionId] = useState<string | null>(null);
+  const [cupReturnView, setCupReturnView] = useState<ViewType>('main');
+  const [cupShortcuts, setCupShortcuts] = useState<CupShortcut[]>([]);
   const { planType, profile, subscription, loading: subscriptionLoading, refresh: refreshSubscription } = useSubscription(user?.id ?? null);
   // Plan Team/Premium propio (o prueba Team), sin contar el Weekend, que da un grupo aparte.
   const basePlanType = effectivePlan(subscription ? { ...subscription, weekend_mode_until: null } : null);
@@ -699,6 +706,14 @@ function App() {
     return () => { active = false; };
   }, [user?.id, currentView, homeGroupsVersion]);
 
+  // Espadas de la Copa en Inicio: gestores y participantes de una edición abierta.
+  useEffect(() => {
+    if (!user?.id || currentView !== 'main') return;
+    let active = true;
+    cupService.listShortcuts().then(list => { if (active) setCupShortcuts(list); }).catch(() => { if (active) setCupShortcuts([]); });
+    return () => { active = false; };
+  }, [user?.id, currentView, homeGroupsVersion]);
+
   // Mis grupos aparece en el perfil de cualquier miembro de un grupo, también con plan Player.
   useEffect(() => {
     if (!user?.id || currentView !== 'profile') return;
@@ -1075,6 +1090,29 @@ function App() {
     setAccessCodeError('');
   };
 
+  const openCup = async (groupId: string, editionId?: string | null, returnView: ViewType = currentViewRef.current) => {
+    try {
+      const target = editionId ?? (await cupService.getOverview(groupId)).open?.id ?? null;
+      if (!target) { setError('Este grupo no tiene una Copa abierta.'); return; }
+      setCupEditionId(target);
+      setCupReturnView(returnView === 'cup' ? 'main' : returnView);
+      setCurrentView('cup');
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message ? cause.message : 'No se ha podido abrir la Copa.');
+    }
+  };
+
+  const playCupRound = async (roundId: string, groupId: string) => {
+    const group = homeGroups.find(item => item.group.id === groupId)?.group;
+    if (group && currentGroup?.id !== group.id) {
+      const isCreator = await resolveGroupManager(group);
+      storageUtils.saveCurrentGroup(group.id, group.group_code, isCreator, storageUtils.hasLimitedAccess());
+      setCurrentGroup(group);
+      setIsGroupCreator(isCreator);
+    }
+    await handleJoinRound(roundId);
+  };
+
   const handleBackToMain = () => {
     storageUtils.clearActiveRound();
     setRoundState({
@@ -1096,6 +1134,12 @@ function App() {
 
   // Desde una partida de grupo se vuelve a la lista de partidas, no al inicio del grupo.
   const handleBackFromScorecard = () => {
+    if (roundState.round?.cup_match_id && cupEditionId) {
+      storageUtils.clearActiveRound();
+      setRoundState({ round: null, holes: [], players: [], scores: [], currentHole: 1, isCreator: false, hasEditAccess: false, courseName: '' });
+      setCurrentView('cup');
+      return;
+    }
     handleBackToMain();
     if (currentGroup) setCurrentView('active-rounds');
   };
@@ -1108,6 +1152,16 @@ function App() {
       const isQuickPlay = !roundState.round.group_id;
       await golfService.finishRound(roundState.round.id);
       storageUtils.clearActiveRound();
+
+      // Copa: el resultado se registra en la Copa (nunca se archiva en el grupo). Un empate
+      // tras 18 hoyos se completa en la Copa con la muerte súbita.
+      if (roundState.round.cup_match_id) {
+        try { await cupService.recordRound(roundState.round.id); }
+        catch (cause) { if (!isCupTieError(cause)) console.error('Error registrando la partida de Copa:', cause); }
+        setRoundState({ round: null, holes: [], players: [], scores: [], currentHole: 1, isCreator: false, hasEditAccess: false, courseName: '' });
+        setCurrentView(cupEditionId ? 'cup' : 'main');
+        return;
+      }
 
       if (isQuickPlay) {
         if (roundState.isCreator) setCurrentView('quickplay-statistics');
@@ -1147,7 +1201,7 @@ function App() {
   );
 
   const usesInlineMessages = currentView === 'main' || currentView === 'setup' || currentView === 'players' || currentView === 'scorecard' || currentView === 'leaderboard' || currentView === 'profile' || currentView === 'quickplay-statistics'
-    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-round-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points';
+    || currentView === 'profile-details' || currentView === 'career-statistics' || currentView === 'my-round-statistics' || currentView === 'my-groups' || currentView === 'pro-shop' || currentView === 'active-rounds' || currentView === 'statistics' || currentView === 'game-points' || currentView === 'cup';
   // Oferta de fin de prueba Team (días 25 a 30): cuenta como un aviso más en la campana.
   const teamOffer = teamTrialOfferActive(subscription) && subscription?.team_trial_ends_at
     ? { endsAt: new Date(subscription.team_trial_ends_at), onAccept: async () => {
@@ -1477,6 +1531,24 @@ function App() {
             onBack={() => setCurrentView('profile')}
             onPurchaseComplete={() => setCurrentView('profile')}
             onUpgradeTeam={() => { setReturnToProfile(false); setPlansContext('team'); setCurrentView('plans'); }}
+            onOpenCup={(groupId, editionId) => void openCup(groupId, editionId, 'pro-shop')}
+            messagesButton={inlineMessagesButton}
+          />
+        </div>
+      </>
+    );
+  }
+
+  if (currentView === 'cup' && user && cupEditionId) {
+    return withMessages(
+      <>
+        <IncognitoWarning />
+        <div className={isIncognito ? 'pt-10' : ''}>
+          <CupScreen
+            key={cupEditionId}
+            editionId={cupEditionId}
+            onBack={() => setCurrentView(cupReturnView)}
+            onPlayRound={(roundId, groupId) => void playCupRound(roundId, groupId)}
             messagesButton={inlineMessagesButton}
           />
         </div>
@@ -1613,6 +1685,8 @@ function App() {
               const selectedGroup = homeGroups.find(item => item.group.id === groupId)?.group;
               if (selectedGroup) void handleGroupJoined(selectedGroup);
             }}
+            cupShortcuts={cupShortcuts}
+            onOpenCup={(groupId, editionId) => void openCup(groupId, editionId, 'main')}
             onShowProfile={() => setCurrentView('profile')}
             onShowAuth={() => { setReturnToProfile(false); setPlansContext('default'); setCurrentView('plans'); }}
             onShowShare={() => setShowShareModal(true)}
@@ -1649,6 +1723,7 @@ function App() {
           onViewActiveRounds={() => setCurrentView('active-rounds')}
           onViewGamePoints={() => setCurrentView('game-points')}
           onViewStatistics={() => setCurrentView('statistics')}
+          cupCard={user ? <CupGroupCard groupId={currentGroup.id} onOpen={editionId => void openCup(currentGroup.id, editionId, 'main')} /> : undefined}
           onJoinWithCode={() => {
             setPendingRoundId(null);
             setShowAccessCodeModal(true);
@@ -1756,7 +1831,7 @@ function App() {
           groupCode={currentGroup?.group_code}
           groupId={currentGroup?.id}
           groupName={currentGroup?.name}
-          hoyo19Enabled={currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled}
+          hoyo19Enabled={!roundState.round.cup_match_id && (currentGroup?.group_code === 'DIVEND' || !!currentGroup?.hoyo_19_enabled)}
           gameMode={roundState.round.game_mode}
           modePointsConfig={roundState.round.mode_points_config}
           decidedResult={roundState.round.decided_result}

@@ -1,5 +1,5 @@
 import { checkedStripe, config, serviceClient, synchronize } from '../_shared/stripe.ts';
-import { allowedOrigin, checkoutIntent, fullDifferenceUpgradeWindow, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../_shared/stripe-domain.ts';
+import { allowedOrigin, checkoutIntent, samePlanPeriod, fullDifferenceUpgradeWindow, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../_shared/stripe-domain.ts';
 import { rateLimit } from '../_shared/admin.ts';
 
 Deno.serve(async req => {
@@ -56,7 +56,9 @@ Deno.serve(async req => {
       const subscription=await stripe.subscriptions.retrieve(currentSubscription.stripe_subscription_id,{expand:['latest_invoice']});
       if(subscription.livemode || subscription.metadata.app!=='omiki-sandbox' || subscription.metadata.user_id!==user.id || subscription.items.data.length!==1)
         throw new Error('Suscripción no válida para mejorar.');
-      if(!currentPrices.includes(subscription.items.data[0].price.id))
+      // Las suscripciones anteriores a la tarifa actual conservan su precio antiguo (otro ID):
+      // se acepta cualquier precio con la misma periodicidad de Stripe.
+      if(!samePlanPeriod(subscription.items.data[0].price,currentPrices,offer?['monthly','annual']:[intent.period]))
         return reply({error:'Elige la misma periodicidad que tu plan actual.'},409);
       const fullDifference=!offer && fullDifferenceUpgradeWindow(subscription.start_date);
       const difference=upgradeDifferenceCents(currentSubscription.plan_type,intent.plan,intent.period);

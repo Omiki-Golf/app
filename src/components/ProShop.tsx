@@ -2,7 +2,7 @@ import { WriteButton } from '../context/ReadOnlyContext';
 import { NavigationButton } from './NavigationButton';
 import { TopBar } from './TopBar';
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarDays, Check, Info, Save, ShoppingCart, UserPlus, Users, type LucideIcon } from 'lucide-react';
+import { Check, Info, Save, ShoppingCart, Swords, UserPlus, Users, type LucideIcon } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 import { notifyGamificationUpdated } from '../services/groupSettingsService';
 import { gamificationProduct } from '../data/gamification';
@@ -13,6 +13,8 @@ import { formatDisplayPrice } from '../utils/currency';
 import { useSubscription } from '../hooks/useSubscription';
 import { MAX_ADDITIONAL_GROUPS } from '../utils/groupCapacity';
 import { additionalGroupDate, loadAdditionalGroupSlots, setAdditionalGroupRenewal, type AdditionalGroupSlot } from '../services/additionalGroups';
+import { CUP_PRICE, CUP_TITLE, cupService, cupStatusLabel, type CupOverview } from '../services/cupService';
+import { getErrorMessage } from '../utils/errorMessage';
 
 interface ProShopProps {
   groupId: string | null;
@@ -23,6 +25,8 @@ interface ProShopProps {
   /** Abre Planes con Team marcado (oferta de pasar de la prueba a Team completo). */
   onUpgradeTeam?: () => void;
   messagesButton?: React.ReactNode;
+  /** Abre la Copa Match Play de un grupo (tras contratarla o desde su estado). */
+  onOpenCup?: (groupId: string, editionId: string) => void;
 }
 
 interface ShopItem {
@@ -60,14 +64,13 @@ const titles: ShopItem[] = [
 const addons: Addon[] = [
   { id: 'grupo-adicional', name: 'Grupo Adicional', icon: Users, price: 24.99, note: 'Hasta 2 grupos más', info: '¿Tienes varios grupos? Amigos del club, compañeros del trabajo, la familia. Cada uno con su propio ranking y jugadores independientes.' },
   { id: 'ampliacion-plantilla', name: 'Ampliación de Plantilla', icon: UserPlus, price: 19.99, note: '+12 jugadores sobre el base', info: 'Pasa de 20 a 32 jugadores registrados, con participación máxima de 16 a 24 en cada jornada.' },
-  { id: 'temporada-simultanea', name: 'Temporada Simultánea', icon: CalendarDays, price: 14.99, note: 'Próximamente: la configurarás cuando esté disponible', info: 'Dos clasificaciones al mismo tiempo dentro del mismo grupo. Liga anual y Match Play a la vez, o una Copa de verano paralela.' },
 ];
 
 // Precio escalonado de la web: 1,99 € el primer título de pago y 1 € más por cada uno adicional.
 const titlesPrice = (paidCount: number) => (paidCount === 0 ? 0 : 1.99 + (paidCount - 1));
 type OwnedGroup = { id: string; name: string; weekend: boolean; premium: boolean };
 
-export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, groupName: initialGroupName, userId, onBack, messagesButton, onUpgradeTeam }) => {
+export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, groupName: initialGroupName, userId, onBack, messagesButton, onUpgradeTeam, onOpenCup }) => {
   // Títulos y ampliaciones se contratan para el grupo elegido (Weekend incluido).
   // Grupo Adicional es de la cuenta. Lo ya pagado aparece marcado y no se puede retirar.
   const [ownedGroups, setOwnedGroups] = useState<OwnedGroup[]>([]);
@@ -263,7 +266,7 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
 
             <section aria-labelledby="amplia-team" className="space-y-2">
               <h2 id="amplia-team" className="text-lg font-bold text-ink">Amplía tu Team</h2>
-              <p className="text-xs text-ink-3">Plantilla y Temporada Simultánea son para {groupName || 'este grupo'}; Grupo Adicional, para tu cuenta.</p>
+              <p className="text-xs text-ink-3">Ampliación de Plantilla es para {groupName || 'este grupo'}; Grupo Adicional, para tu cuenta.</p>
               <div className="rounded-2xl border border-line bg-card shadow-card">
                 {addons.map((item, index) => {
                   const isAdditional = item.id === 'grupo-adicional';
@@ -317,11 +320,21 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
               {showTeamUpgrade && (
                 <div role="status" className="rounded-2xl border border-accent bg-accent-soft p-4 text-center">
                   <p className="text-sm font-semibold text-ink">Estás en la prueba Team</p>
-                  <p className="mt-1 text-xs text-ink-2">Pasa a Team completo para contratar Grupos Adicionales, Ampliar Plantilla y la Temporada Simultánea. Los títulos ya puedes contratarlos.</p>
+                  <p className="mt-1 text-xs text-ink-2">Pasa a Team completo para contratar Grupos Adicionales, Ampliar Plantilla y la Copa Match Play. Los títulos ya puedes contratarlos.</p>
                   {onUpgradeTeam && <button type="button" onClick={onUpgradeTeam} className="mt-3 w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover">Pasar a Team completo</button>}
                 </div>
               )}
             </section>
+
+            <CupShopCard
+              groupId={groupId}
+              groupName={groupName}
+              eligible={hasPaidTeamPlan && !selectedIsWeekend}
+              lockedNote={selectedIsWeekend ? 'Disponible para grupos Team o Premium' : isTeamTrial ? 'Disponible con Team completo' : 'Requiere un plan Team o Premium'}
+              money={money}
+              vatLabel={t('plans.vatIncluded')}
+              onOpenCup={onOpenCup}
+            />
 
             <section aria-label="Resumen" className="rounded-2xl border border-line bg-card p-4 shadow-card space-y-3">
               <div className="flex items-center gap-3">
@@ -348,12 +361,109 @@ export const ProShop: React.FC<ProShopProps> = ({ groupId: initialGroupId, group
               </WriteButton>
               {saved && <p role="status" className="text-center text-xs font-semibold text-accent-ink">Contratado para {groupName || 'el grupo elegido'}. Ya aparece marcado y no se puede retirar.</p>}
               {saveError && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{saveError}</p>}
-              <p className="text-xs text-ink-3">Los títulos y ampliaciones están desbloqueados para pruebas. La plantilla pasa a 32 jugadores, Grupo Adicional permite otro grupo (hasta 3 en total) y Temporada Simultánea queda guardada para cuando esté disponible.</p>
+              <p className="text-xs text-ink-3">Los títulos y ampliaciones están desbloqueados para pruebas. La plantilla pasa a 32 jugadores y Grupo Adicional permite otro grupo (hasta 3 en total). La Copa Match Play se contrata aparte, edición a edición.</p>
             </section>
           </div>
         )}
       </div>
     </div>
+  );
+};
+
+// Temporada Simultánea · Copa Match Play: 14,99 € por edición; una abierta como máximo por grupo.
+const CupShopCard: React.FC<{
+  groupId: string;
+  groupName?: string;
+  eligible: boolean;
+  lockedNote: string;
+  money: (value: number) => string;
+  vatLabel: string;
+  onOpenCup?: (groupId: string, editionId: string) => void;
+}> = ({ groupId, groupName, eligible, lockedNote, money, vatLabel, onOpenCup }) => {
+  const [overview, setOverview] = useState<CupOverview | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [buying, setBuying] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    setOverview(null); setLoadError(false); setConfirming(false); setError('');
+    cupService.getOverview(groupId)
+      .then(data => { if (!cancelled) setOverview(data); })
+      .catch(() => { if (!cancelled) setLoadError(true); });
+    return () => { cancelled = true; };
+  }, [groupId]);
+
+  const open = overview?.open ?? null;
+  const last = overview?.editions[0];
+  const buy = async () => {
+    setBuying(true); setError('');
+    try {
+      const { edition_id } = await cupService.purchase(groupId);
+      setConfirming(false);
+      if (onOpenCup) onOpenCup(groupId, edition_id);
+      else setOverview(await cupService.getOverview(groupId));
+    } catch (cause) {
+      setError(getErrorMessage(cause, 'No se ha podido contratar la Copa. Inténtalo de nuevo.'));
+      cupService.getOverview(groupId).then(setOverview).catch(() => undefined);
+    } finally { setBuying(false); }
+  };
+
+  return (
+    <section aria-labelledby="copa-match-play" className="space-y-2">
+      <h2 id="copa-match-play" className="text-lg font-bold text-ink">{CUP_TITLE}</h2>
+      <div className="rounded-2xl border-2 border-amber-400 bg-card p-4 shadow-card">
+        <div className="flex items-start gap-3">
+          <Swords size={22} className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-ink">Copa Match Play</p>
+              <InfoTrigger title={CUP_TITLE} text="Competición por eliminatorias 1 contra 1 en paralelo a la temporada del grupo. Sus resultados no cambian hándicaps, rankings, estadísticas ni premios del grupo. Cada compra habilita una edición." />
+            </div>
+            <p className="text-xs text-ink-3">Cuadro eliminatorio 1 contra 1 · {money(CUP_PRICE)} por edición, {vatLabel}</p>
+          </div>
+        </div>
+        <div className="mt-3 space-y-2 text-sm">
+          {loadError && <p className="text-xs text-ink-3">No se ha podido consultar la Copa de {groupName || 'este grupo'}. Vuelve a intentarlo más tarde.</p>}
+          {!overview && !loadError && <p role="status" className="text-xs text-ink-3">Consultando la Copa…</p>}
+          {overview && open && (
+            <>
+              <p className="rounded-xl bg-accent-soft px-3 py-2 text-xs font-semibold text-accent-ink">
+                {cupStatusLabel[open.status]}{open.stage ? ` · ${open.stage}` : ''} — Finalízala para contratar la siguiente edición.
+              </p>
+              {onOpenCup && <button type="button" onClick={() => onOpenCup(groupId, open.id)} className="w-full rounded-xl border-2 border-amber-400 px-4 py-2 font-semibold text-ink transition-colors hover:bg-card-2">
+                {open.status === 'active' || open.status === 'paused' ? 'Ir al cuadro actual' : 'Ir a la Copa'}
+              </button>}
+            </>
+          )}
+          {overview && !open && (
+            <>
+              {last && overview.is_owner && (
+                <p className="text-xs text-ink-3">
+                  Edición #{last.number} {last.status === 'finished' ? `finalizada${last.champion ? ` (Campeón: ${last.champion})` : ''}` : 'cancelada'}
+                </p>
+              )}
+              {!eligible || !overview.is_owner ? (
+                <p className="text-xs text-ink-3">{overview.is_owner ? lockedNote : 'Solo el propietario del grupo puede contratar la Copa.'}</p>
+              ) : confirming ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-ink-2">Se contratará la edición #{overview.next_number} para {groupName || 'este grupo'} por {money(CUP_PRICE)}, {vatLabel} (pago de prueba). Después se abrirá su configuración.</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" disabled={buying} onClick={() => setConfirming(false)} className="rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-2">Cancelar</button>
+                    <WriteButton type="button" disabled={buying} onClick={() => void buy()} className="rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-on-accent disabled:opacity-60">{buying ? 'Contratando…' : 'Confirmar'}</WriteButton>
+                  </div>
+                </div>
+              ) : (
+                <WriteButton type="button" disabled={!overview.can_purchase} onClick={() => setConfirming(true)} className="w-full rounded-xl bg-accent px-4 py-2.5 font-semibold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-60">
+                  {last ? `Contratar edición #${overview.next_number}` : `Contratar ${CUP_TITLE}`} ({money(CUP_PRICE)})
+                </WriteButton>
+              )}
+            </>
+          )}
+          {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
+        </div>
+      </div>
+    </section>
   );
 };
 

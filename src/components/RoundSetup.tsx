@@ -69,6 +69,8 @@ interface RoundSetupProps {
   planType?: 'express' | 'player' | 'team' | 'premium';
   onShowPlans?: (context?: 'express-limit' | 'express-modes') => void;
   messagesButton?: React.ReactNode;
+  /** Histórico de la Copa Match Play del grupo, bajo la tarjeta de Estadísticas. */
+  cupCard?: React.ReactNode;
 }
 
 interface ModePointsFieldsProps {
@@ -124,6 +126,7 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
   onViewActiveRounds,
   onViewGamePoints,
   onViewStatistics,
+  cupCard,
   onLeaveGroup,
   onBack,
   currentGroup,
@@ -792,6 +795,8 @@ export const RoundSetup: React.FC<RoundSetupProps> = ({
             </button>
           </div>
         )}
+
+        {currentGroup && cupCard}
 
         {/* Código de Grupo */}
         {currentGroup && !hasLimitedAccess && !isArchivedGroup && (

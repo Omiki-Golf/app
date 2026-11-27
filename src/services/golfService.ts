@@ -488,7 +488,8 @@ async deleteAllRounds(groupId?: string): Promise<void> {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
-    return groupId ? data || [] : this.withCodeQuickRounds(data || []);
+    // Las partidas de Copa Match Play se juegan y consultan desde la Copa, no en la lista del grupo.
+    return groupId ? (data || []).filter(round => !round.cup_match_id) : this.withCodeQuickRounds(data || []);
   },
 
   /** Tarjetas de un grupo creadas el mismo día (hora local) que `dateIso`: en juego, finalizadas o archivadas. */
@@ -505,7 +506,7 @@ async deleteAllRounds(groupId?: string): Promise<void> {
       .lt('created_at', end.toISOString())
       .order('created_at', { ascending: true });
     if (error) throw error;
-    return data || [];
+    return (data || []).filter(round => !round.cup_match_id);
   },
 
   /** Añade las partidas rápidas activas en las que se entró con el código; no rompe la lista si falla. */

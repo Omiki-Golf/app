@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { checkoutIntent, prices, allowedOrigin, fullDifferenceUpgradeWindow, subscriptionStatus, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../supabase/functions/_shared/stripe-domain.ts';
+import { checkoutIntent, prices, samePlanPeriod, allowedOrigin, fullDifferenceUpgradeWindow, subscriptionStatus, teamTrialOffer, teamTrialOfferActive, upgradeDifferenceCents } from '../supabase/functions/_shared/stripe-domain.ts';
 import { planCatalog } from '../src/data/planCatalog.ts';
 import { serverKeys, isServerRequest } from '../supabase/functions/_shared/server-credentials.ts';
 test('Stripe setup accepts only a provisioned server secret on apikey',()=>{
@@ -114,4 +114,13 @@ test('Team trial offer: only days 25-30 of an active Player trial, annual Team, 
  assert.match(checkout,/teamTrialOfferActive\(currentSubscription\)/,'el servidor comprueba la ventana');
  assert.match(checkout,/billing_cycle_anchor:'now'/);
  assert.match(checkout,/discounts:\[\{coupon:teamTrialOffer\.coupon\}\]/);
+});
+
+test('a legacy Player price keeps upgrading when its Stripe interval matches the chosen period',()=>{
+ const legacyAnnual={id:'price_legacy_player_2899',recurring:{interval:'year',interval_count:1}};
+ assert.equal(samePlanPeriod(legacyAnnual,['price_player_annual'],['annual']),true);
+ assert.equal(samePlanPeriod(legacyAnnual,['price_player_monthly'],['monthly']),false);
+ assert.equal(samePlanPeriod({id:'price_player_monthly',recurring:{interval:'month',interval_count:1}},['price_player_monthly'],['monthly']),true);
+ assert.equal(samePlanPeriod({id:'old_monthly',recurring:{interval:'month',interval_count:1}},['x'],['monthly','annual']),true);
+ assert.equal(samePlanPeriod({id:'quarterly',recurring:{interval:'month',interval_count:3}},['x'],['monthly']),false);
 });

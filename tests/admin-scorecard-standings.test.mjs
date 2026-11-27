@@ -88,7 +88,8 @@ test('the trophy button is round like the other top buttons', async () => {
 
 test('leaving a group round goes back to the list of rounds, not the group home', async () => {
   const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8');
-  assert.match(app, /const handleBackFromScorecard = \(\) => \{\s*handleBackToMain\(\);\s*if \(currentGroup\) setCurrentView\('active-rounds'\);/);
+  // Las partidas de Copa vuelven a la Copa; el resto de partidas de grupo, a la lista de partidas.
+  assert.match(app, /const handleBackFromScorecard = \(\) => \{\s*if \(roundState\.round\?\.cup_match_id && cupEditionId\) \{[\s\S]{0,300}?setCurrentView\('cup'\);\s*return;\s*\}\s*handleBackToMain\(\);\s*if \(currentGroup\) setCurrentView\('active-rounds'\);/);
   assert.match(app, /<Scorecard backDestination="back"/);
   assert.match(app, /onResetGame=\{handleBackFromScorecard\}/);
 });

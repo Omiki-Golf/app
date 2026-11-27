@@ -554,6 +554,9 @@ export interface GolfRound {
   created_at: string;
   updated_at: string;
   completed_at?: string | null;
+  /** Cruce de Copa Match Play al que pertenece la partida (no se archiva en el grupo). */
+  cup_match_id?: string | null;
+  cup_game_number?: number | null;
 }
 
 export interface RoundWithDetails {

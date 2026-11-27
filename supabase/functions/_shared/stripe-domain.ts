@@ -37,3 +37,9 @@ export function allowedOrigin(origin: string) {
 export function subscriptionStatus(status: string, invoicePaid: boolean) {
   return status === 'active' && invoicePaid ? 'active' : status === 'canceled' ? 'cancelled' : 'expired';
 }
+/** El precio actual de la suscripción es uno de los configurados o, si es de una tarifa anterior, tiene la periodicidad pedida. */
+export function samePlanPeriod(price: {id: string; recurring?: {interval?: string; interval_count?: number} | null}, configured: string[], periods: Period[]) {
+  if (configured.includes(price.id)) return true;
+  const interval = price.recurring?.interval;
+  return price.recurring?.interval_count === 1 && periods.some(period => interval === (period === 'annual' ? 'year' : 'month'));
+}
