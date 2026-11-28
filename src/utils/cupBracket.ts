@@ -4,6 +4,8 @@ export interface CupEntrant {
   id: string;
   playingHandicap: number;
   rank?: number;
+  /** Sin cuenta en la app (invitado): no puede llevar la tarjeta. Por defecto se considera registrado. */
+  guest?: boolean;
 }
 
 interface CupDraw {
@@ -22,17 +24,26 @@ export function generateCupBracket(entrants: readonly CupEntrant[], draw: CupDra
     throw new Error('La lista de participantes de Copa no es válida.');
   }
 
+  const guests = new Set(entrants.filter(player => player.guest).map(player => player.id));
+  if (guests.size > entrants.length - guests.size) {
+    throw new Error(`Hay más invitados sin cuenta (${guests.size}) que jugadores registrados (${entrants.length - guests.size}).`);
+  }
+
   const size = 2 ** Math.ceil(Math.log2(entrants.length));
   const byes = size - entrants.length;
   const slots = draw.method === 'manual'
     ? [...(draw.manualSlots ?? [])]
-    : automaticSlots(entrants, draw.method, byes, size);
+    : separateGuests(automaticSlots(entrants, draw.method, byes, size), guests);
 
   const assigned = slots.filter(id => id !== null);
   if (slots.length !== size || assigned.length !== ids.size ||
     new Set(assigned).size !== ids.size || assigned.some(id => !ids.has(id)) ||
     slots.some((id, index) => index % 2 === 0 && id === null && slots[index + 1] === null)) {
     throw new Error('Cada jugador debe ocupar una sola plaza y cada cruce debe tener un jugador.');
+  }
+  const guestPair = guestPairIndex(slots, guests);
+  if (guestPair >= 0) {
+    throw new Error(`El cruce ${guestPair + 1} enfrenta a dos invitados sin cuenta: cada cruce necesita al menos un jugador registrado.`);
   }
 
   const bracket: CupTie[] = [];
@@ -102,4 +113,41 @@ function automaticSlots(
     }
   }
   return slots;
+}
+
+const isGuestPair = (slots: readonly (string | null)[], pair: number, guests: ReadonlySet<string>) => {
+  const [a, b] = [slots[pair * 2], slots[pair * 2 + 1]];
+  return a !== null && b !== null && guests.has(a) && guests.has(b);
+};
+
+function guestPairIndex(slots: readonly (string | null)[], guests: ReadonlySet<string>) {
+  for (let pair = 0; pair < slots.length / 2; pair++) if (isGuestPair(slots, pair, guests)) return pair;
+  return -1;
+}
+
+/**
+ * Deshace los cruces entre dos invitados del sorteo automático: cambia uno de ellos por el
+ * jugador registrado del cruce más cercano cuyo compañero también es registrado, para que la
+ * siembra apenas cambie. Con invitados <= registrados siempre hay un cambio posible.
+ */
+function separateGuests(slots: (string | null)[], guests: ReadonlySet<string>): (string | null)[] {
+  const result = [...slots];
+  const pairs = result.length / 2;
+  for (let pair = 0; pair < pairs; pair++) {
+    if (!isGuestPair(result, pair, guests)) continue;
+    const guestSlot = pair * 2 + 1;
+    let best = -1;
+    for (let other = 0; other < pairs; other++) {
+      if (other === pair) continue;
+      for (const slot of [other * 2, other * 2 + 1]) {
+        const id = result[slot];
+        const partner = result[slot ^ 1];
+        // Un registrado cuyo compañero no sea invitado: al recibir al invitado, el cruce sigue siendo válido.
+        if (id === null || guests.has(id) || (partner !== null && guests.has(partner))) continue;
+        if (best < 0 || Math.abs(other - pair) < Math.abs((best >> 1) - pair)) best = slot;
+      }
+    }
+    if (best >= 0) [result[guestSlot], result[best]] = [result[best], result[guestSlot]];
+  }
+  return result;
 }

@@ -34,3 +34,35 @@ test('a Bo3 advances after two wins and an administrator can correct the next sl
   three[2].started = true;
   assert.throws(() => recordCupResult(three, '0-0', 3, score('a'), true));
 });
+
+const pairsOf = bracket => bracket.filter(tie => tie.id.startsWith('0-')).map(tie => tie.players);
+
+test('automatic draws never pair two guests without an account in the first round', () => {
+  for (let count = 4; count <= 32; count++) {
+    for (let guests = 0; guests <= Math.floor(count / 2); guests++) {
+      // Los invitados son los de PJ más alto y sin ranking: la siembra tendería a juntarlos.
+      const entrants = Array.from({ length: count }, (_, index) => ({
+        id: String(index + 1), playingHandicap: index, guest: index >= count - guests,
+        rank: index < count - guests ? index + 1 : undefined,
+      }));
+      const guestIds = new Set(entrants.filter(entrant => entrant.guest).map(entrant => entrant.id));
+      for (const method of ['random', 'ranking', 'handicap']) {
+        const bracket = generateCupBracket(entrants, { capacity: 32, method, bestOf: 1 });
+        const ids = pairsOf(bracket).flat().filter(Boolean);
+        assert.equal(new Set(ids).size, count, `${method} ${count}/${guests}: todos colocados una vez`);
+        for (const [a, b] of pairsOf(bracket)) {
+          assert.ok(!(a && b && guestIds.has(a) && guestIds.has(b)), `${method} ${count}/${guests}: ${a} vs ${b}`);
+        }
+      }
+    }
+  }
+});
+
+test('a draw with more guests than registered players or a manual guest pair is rejected', () => {
+  const entrants = ['a', 'b', 'c', 'd', 'e'].map((id, index) => ({ id, playingHandicap: 0, guest: index >= 2 }));
+  assert.throws(() => generateCupBracket(entrants, { capacity: 20, method: 'random', bestOf: 1 }), /más invitados/);
+  const balanced = ['a', 'b', 'c', 'd'].map((id, index) => ({ id, playingHandicap: 0, guest: index >= 2 }));
+  assert.throws(() => generateCupBracket(balanced, { capacity: 20, method: 'manual', bestOf: 1, manualSlots: ['a', 'b', 'c', 'd'] }), /cruce 2/);
+  const ok = generateCupBracket(balanced, { capacity: 20, method: 'manual', bestOf: 1, manualSlots: ['a', 'c', 'b', 'd'] });
+  assert.deepEqual(pairsOf(ok), [['a', 'c'], ['b', 'd']]);
+});

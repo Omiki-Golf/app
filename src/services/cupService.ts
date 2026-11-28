@@ -67,7 +67,7 @@ export interface CupGame {
   score: string;
   decisive_hole: number | null;
   round_id: string | null;
-  source: 'played' | 'corrected';
+  source: 'played' | 'corrected' | 'paper';
   recorded_at: string;
 }
 
@@ -163,6 +163,9 @@ export const cupService = {
   correctGame: (matchId: string, game: number, winner: string, score: string, decisiveHole: number | null) =>
     rpc<void>('correct_cup_game', { p_match: matchId, p_game: game, p_winner: winner, p_score: score, p_decisive_hole: decisiveHole }),
   awardMatch: (matchId: string, winner: string, note: string) => rpc<void>('award_cup_match', { p_match: matchId, p_winner: winner, p_note: note }),
+  /** Partido jugado en tarjeta de papel: lo anota el creador o un administrador. */
+  recordPaperGame: (matchId: string, winner: string, score: string, decisiveHole: number | null) =>
+    rpc<void>('record_cup_paper_game', { p_match: matchId, p_winner: winner, p_score: score, p_decisive_hole: decisiveHole }),
 };
 
 // --- Ayudas de presentación (sin acceso a datos) ---

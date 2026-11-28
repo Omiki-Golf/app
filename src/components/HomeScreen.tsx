@@ -130,23 +130,30 @@ function GroupShortcut({ group, level, wide, onOpen, cup, onOpenCup }: {
   const tone = tierColors[tier];
   const style = level === 'member' ? `bg-card ${tone.outlineButton}` : `${tone.button} ${tone.border} shadow-card`;
   const crown = level === 'owner' ? 16 : 14;
+  const content = <>
+    <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
+    <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
+    {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
+    {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
+  </>;
   if (cup && onOpenCup) {
-    // Copa contratada: doble anillo (borde del tier + anillo exterior) y espadas que abren la Copa.
+    // Copa contratada: dos botones. El grande abre el grupo; el pequeño, con espadas y anillo, abre la Copa.
     const ring = tier === 'premium' ? 'ring-pink-400' : 'ring-amber-400';
     const alert = cup.pending || cup.invited;
-    return <div className={`flex w-full min-w-0 items-center border-2 font-semibold ring-2 ring-offset-2 ring-offset-app ${ring} ${shortcutSize[level]} ${style} ${wide ? 'col-span-2' : ''}`}>
-      <WriteButton onClick={() => onOpen?.(group.id)} title={group.name} className="flex h-full min-w-0 flex-1 items-center gap-[inherit] text-left active:scale-[0.98]">
-        <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate">{group.name}</span>
-        {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
-        {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
+    const swords = level === 'owner' ? 20 : level === 'admin' ? 17 : 15;
+    const square = level === 'owner' ? 'w-[52px]' : level === 'admin' ? 'w-11' : 'w-9';
+    return <div className={`flex w-full min-w-0 items-center gap-2 ${wide ? 'col-span-2' : ''}`}>
+      <WriteButton onClick={() => onOpen?.(group.id)} title={group.name}
+        className={`flex min-w-0 flex-1 items-center border-2 font-semibold transition-all active:scale-[0.98] ${shortcutSize[level]} ${style}`}>
+        {content}
       </WriteButton>
       <button type="button" onClick={() => onOpenCup(group.id, cup.edition_id)}
         aria-label={`Copa Match Play de ${group.name}${cup.pending ? ': tienes partido pendiente' : cup.invited ? ': confirma tu participación' : ''}`}
-        title={cup.name} className="relative ml-1 shrink-0 rounded-full p-1 active:scale-95">
-        <Swords size={level === 'owner' ? 18 : 15} className={alert ? 'animate-pulse' : ''} aria-hidden="true" />
-        {alert && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-red-500" />}
-        {alert && <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-red-500" />}
+        title={cup.name}
+        className={`relative flex shrink-0 items-center justify-center border-2 ring-2 ring-offset-2 ring-offset-app transition-all active:scale-95 ${ring} ${shortcutSize[level]} ${square} !px-0 ${style}`}>
+        <Swords size={swords} className={alert ? 'animate-pulse' : ''} aria-hidden="true" />
+        {alert && <span aria-hidden="true" className="absolute -right-1 -top-1 h-3 w-3 animate-ping rounded-full bg-red-500" />}
+        {alert && <span aria-hidden="true" className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" />}
       </button>
     </div>;
   }
@@ -155,10 +162,7 @@ function GroupShortcut({ group, level, wide, onOpen, cup, onOpenCup }: {
     title={group.name}
     className={`flex w-full min-w-0 items-center border-2 font-semibold transition-all active:scale-[0.98] ${shortcutSize[level]} ${style} ${wide ? 'col-span-2' : ''}`}
   >
-    <Users className={`${level === 'owner' ? 'h-5 w-5' : 'h-4 w-4'} shrink-0`} aria-hidden="true" />
-    <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
-    {level === 'owner' && <span className="relative h-5 w-7 shrink-0" title="Creador" aria-label="Creador"><Crown size={crown} fill="currentColor" className="absolute left-0 top-1" /><Crown size={crown} fill="currentColor" className="absolute right-0 top-0" /></span>}
-    {level === 'admin' && <Crown size={crown} fill="currentColor" className="shrink-0" aria-label="Administrador" />}
+    {content}
   </WriteButton>;
 }
 

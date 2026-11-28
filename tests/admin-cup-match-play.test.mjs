@@ -5,6 +5,7 @@ import { generateCupBracket } from '../src/utils/cupBracket.ts';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 const migration = '../supabase/migrations/20261205100000_cup_match_play.sql';
+const guestMigration = '../supabase/migrations/20261207100000_cup_guest_pairing.sql';
 
 async function database() {
   const { PGlite } = await import('@electric-sql/pglite');
@@ -52,6 +53,7 @@ async function database() {
     CREATE FUNCTION guard_guest_participation() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
   `);
   await db.exec(await read(migration));
+  await db.exec(await read(guestMigration));
   await db.exec(`
     CREATE TRIGGER guard_group_round_stableford BEFORE INSERT OR UPDATE OF group_id, game_mode ON golf_rounds FOR EACH ROW EXECUTE FUNCTION guard_group_round_stableford();
     CREATE TRIGGER b_guest_participation BEFORE INSERT OR UPDATE OR DELETE ON round_players FOR EACH ROW EXECUTE FUNCTION guard_guest_participation();
@@ -318,4 +320,67 @@ test('optional registration: invited accounts confirm or decline before the draw
   assert.equal(cup.entrants.length, 4);
   assert.equal(cup.matches.length, 3);
   assert.equal(cup.edition.status, 'active');
+});
+
+test('guests without an account: never more than registered, never paired in the first round, played on paper', async () => {
+  const ctx = await database();
+  const { db, one, owner, members, outsider, course } = ctx;
+  const [ana] = members;
+  const before = await ctx.snapshot();
+  const { edition_id: id } = await ctx.purchase();
+  // Plantilla: Owner, Ana, Bea y Carlos con cuenta; Legado sin cuenta. Tres invitados más: 4 y 4.
+  for (const guest of ['G1', 'G2', 'G3']) await ctx.call(owner, 'SELECT public.add_cup_entrant($1,NULL,NULL,$2,10)', [id, guest]);
+  const extra = (await ctx.call(owner, "SELECT public.add_cup_entrant($1,NULL,NULL,'G4',10) AS r", [id])).rows[0].r;
+  let cup = await ctx.edition(id);
+  const ids = Object.fromEntries(cup.entrants.map(item => [item.name, item.id]));
+  const slotsWith = names => names.map(item => item && ids[item]);
+
+  // 5 invitados frente a 4 registrados: no hay cuadro posible.
+  await assert.rejects(ctx.call(owner, 'SELECT public.save_cup_draw($1,$2,$3)',
+    [id, 'manual', slotsWith(['Owner', 'Legado', 'Ana', null, 'G1', null, 'Bea', null, 'G2', null, 'Carlos', null, 'G3', null, 'G4', null])]),
+  /más invitados sin cuenta \(5\) que jugadores registrados \(4\)/);
+  await ctx.call(owner, 'SELECT public.remove_cup_entrant($1)', [extra]);
+
+  // Un cruce entre dos invitados se rechaza aunque el sorteo sea manual.
+  await assert.rejects(ctx.call(owner, 'SELECT public.save_cup_draw($1,$2,$3)',
+    [id, 'manual', slotsWith(['Owner', 'Ana', 'Legado', 'G1', 'Bea', 'G2', 'Carlos', 'G3'])]), /cruce 2 enfrenta a dos invitados/);
+
+  // Un sorteo preparado antes de esta regla tampoco se puede publicar.
+  await db.exec('ALTER TABLE cup_editions DISABLE TRIGGER a_cup_draw_guests');
+  await db.query("UPDATE cup_editions SET draw_method='manual', status='draw_ready', draw_slots=$2 WHERE id=$1",
+    [id, slotsWith(['Owner', 'Ana', 'Legado', 'G1', 'Bea', 'G2', 'Carlos', 'G3'])]);
+  await db.exec('ALTER TABLE cup_editions ENABLE TRIGGER a_cup_draw_guests');
+  await assert.rejects(ctx.call(owner, 'SELECT public.publish_cup_draw($1)', [id]), /dos invitados/);
+  await ctx.call(owner, 'SELECT public.discard_cup_draw($1)', [id]);
+
+  // Reparto válido: cada invitado frente a un registrado.
+  await ctx.call(owner, 'SELECT public.save_cup_draw($1,$2,$3)', [id, 'manual', slotsWith(['Owner', 'Legado', 'Ana', 'G1', 'Bea', 'G2', 'Carlos', 'G3'])]);
+  await ctx.call(owner, 'SELECT public.publish_cup_draw($1)', [id]);
+  cup = await ctx.edition(id);
+
+  // Los invitados ganan en papel y se cruzan en la siguiente ronda: solo un gestor anota el resultado.
+  const paper = (account, matchId, winner, score, hole = null) =>
+    ctx.call(account, 'SELECT public.record_cup_paper_game($1,$2,$3,$4)', [matchId, winner, score, hole]);
+  await assert.rejects(paper(ana, match(cup, '0-0').id, ids.Legado, '2&1'), /creador o un administrador/);
+  await assert.rejects(paper(outsider, match(cup, '0-0').id, ids.Legado, '2&1'), /creador o un administrador/);
+  await assert.rejects(paper(owner, match(cup, '0-0').id, ids.G1, '2&1'), /uno de los dos jugadores/);
+  await paper(owner, match(cup, '0-0').id, ids.Legado, '2&1');
+  await paper(owner, match(cup, '0-1').id, ids.G1, '1 UP', 19);
+  cup = await ctx.edition(id);
+  const semi = match(cup, '1-0');
+  assert.deepEqual([semi.entrant_a, semi.entrant_b], [ids.Legado, ids.G1]);
+  const game = cup.games.find(item => item.match_id === match(cup, '0-1').id);
+  assert.equal(game.source, 'paper');
+  assert.equal(game.decisive_hole, 19);
+  assert.equal(game.round_id ?? null, null);
+  await assert.rejects(paper(owner, match(cup, '0-0').id, ids.Legado, '2&1'), /no está pendiente/);
+
+  // Con una tarjeta abierta en la app no se anota en papel.
+  await ctx.call(owner, 'SELECT public.start_cup_game($1,$2,NULL)', [semi.id, course]);
+  await assert.rejects(paper(owner, semi.id, ids.G1, '3&2'), /en juego o pendiente/);
+  await db.query("UPDATE golf_rounds SET status='cancelled' WHERE cup_match_id=$1", [semi.id]);
+  await paper(owner, semi.id, ids.G1, '3&2');
+  assert.equal(match(await ctx.edition(id), '2-0').entrant_a, ids.G1);
+  assert.equal((await one("SELECT count(*)::int AS n FROM cup_audit WHERE action='cup.game.paper'")).n, 3);
+  assert.equal(await ctx.snapshot(), before, 'la Copa no toca hándicaps, rankings ni partidas archivadas');
 });

@@ -5,6 +5,7 @@ import { NavigationButton } from '../NavigationButton';
 import { ConfirmModal } from '../ConfirmModal';
 import { WriteButton } from '../../context/ReadOnlyContext';
 import { CourseCatalogPicker } from '../CourseCatalogPicker';
+import { SelectMenu } from '../SelectMenu';
 import { golfService } from '../../services/golfService';
 import {
   CUP_TITLE, cupMatchName, cupRoundCount, cupSeries, cupService, cupStatusLabel, isCupBye, isCupOpen, isCupPlayable, isCupTieError,
@@ -59,10 +60,8 @@ function StartGame({ match, groupId, onPlayRound }: { match: CupMatch; groupId: 
       <p className="text-xs text-ink-3">Match Play a 18 hoyos con los PJ de la Copa. Quien abre la tarjeta apunta y la finaliza.</p>
       <CourseCatalogPicker courses={courses} selectedCourseId={course} onSelect={setCourse} onUnavailable={() => setError('Este recorrido todavía no está incorporado a la base de datos.')} />
       {tees.length > 0 && (
-        <select aria-label="Recorrido de salida" value={tee} onChange={event => setTee(event.target.value)} className={input}>
-          <option value="">Barras de salida (opcional)</option>
-          {tees.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </select>
+        <SelectMenu ariaLabel="Barras de salida" value={tee} onChange={setTee}
+          options={[{ value: '', label: 'Barras de salida (opcional)' }, ...tees.map(item => ({ value: item.id, label: item.name }))]} />
       )}
       <WriteButton type="button" disabled={busy || !course} onClick={() => void start()} className={`${primary} w-full`}>
         <Play size={16} className="mr-1 inline" aria-hidden="true" />{busy ? 'Abriendo…' : 'Empezar partida'}
@@ -96,11 +95,9 @@ function RecordRound({ roundId, match, entrants, onChanged }: { roundId: string;
         <>
           <p className="text-xs text-ink-2">Empate tras 18 hoyos: se resuelve a muerte súbita. Indica quién la ganó y en qué hoyo.</p>
           <div className="grid grid-cols-[1fr_auto] gap-2">
-            <select aria-label="Ganador de la muerte súbita" value={winner} onChange={event => setWinner(event.target.value)} className={input}>
-              <option value="">Ganador…</option>
-              {[match.entrant_a, match.entrant_b].map(id => id && <option key={id} value={id}>{entrants.get(id)?.name}</option>)}
-            </select>
-            <input aria-label="Hoyo decisivo" inputMode="numeric" value={hole} onChange={event => setHole(event.target.value.replace(/\D/g, '').slice(0, 2))} className="w-20 rounded-lg border-2 border-line-2 bg-card px-2 py-2 text-center text-sm" />
+            <SelectMenu ariaLabel="Ganador de la muerte súbita" value={winner} onChange={setWinner} placeholder="Ganador…"
+              options={[match.entrant_a, match.entrant_b].flatMap(id => id ? [{ value: id, label: entrants.get(id)?.name ?? '' }] : [])} />
+            <input aria-label="Hoyo decisivo" inputMode="numeric" value={hole} onChange={event => setHole(event.target.value.replace(/\D/g, '').slice(0, 2))} className="w-20 rounded-2xl border border-line bg-card px-2 py-3 text-center text-sm shadow-card" />
           </div>
           <WriteButton type="button" disabled={busy || !winner || Number(hole) < 19 || Number(hole) > 40} onClick={() => void record(true)} className={`${primary} w-full`}>Registrar muerte súbita</WriteButton>
         </>
@@ -124,7 +121,7 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
   const openRound = view.rounds.find(round => round.match_id === match.id);
   const mine = Boolean(view.my_entrant_id && (match.entrant_a === view.my_entrant_id || match.entrant_b === view.my_entrant_id));
   const canPlay = view.edition.status === 'active' && isCupPlayable(match) && (mine || view.can_manage);
-  const [panel, setPanel] = useState<'none' | 'start' | 'correct' | 'award' | 'deadline'>('none');
+  const [panel, setPanel] = useState<'none' | 'start' | 'correct' | 'award' | 'deadline' | 'paper'>('none');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [gameNumber, setGameNumber] = useState(String(games[games.length - 1]?.game_number ?? 1));
@@ -143,7 +140,9 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
   const status = match.winner_entrant ? (isCupBye(match) ? 'Pase directo' : 'Finalizado')
     : openRound ? (openRound.status === 'active' ? 'En juego' : 'Pendiente de registrar')
     : isCupPlayable(match) ? 'Pendiente' : 'Esperando rival';
-  const entrantOption = (id: string | null) => id && <option key={id} value={id}>{entrants.get(id)?.name}</option>;
+  // Dos invitados sin cuenta no pueden llevar la tarjeta en la app: juegan en papel.
+  const guestMatch = Boolean(a && b && !a.has_account && !b.has_account);
+  const winnerOptions = [match.entrant_a, match.entrant_b].flatMap(id => id ? [{ value: id, label: entrants.get(id)?.name ?? '' }] : []);
 
   return (
     <article className={`space-y-3 rounded-2xl border-2 bg-card p-4 shadow-card ${mine ? 'border-amber-400' : 'border-line'}`}>
@@ -166,7 +165,7 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
         <ul className="space-y-1 text-xs text-ink-2">
           {games.map(game => <li key={game.id} className="flex justify-between gap-2 rounded-lg bg-card-2 px-2 py-1">
             <span>Partido {game.game_number}: {entrants.get(game.winner_entrant)?.name}</span>
-            <span className="tabular-nums">{game.score}{game.source === 'corrected' ? ' · corregido' : ''}</span>
+            <span className="tabular-nums">{game.score}{game.source === 'corrected' ? ' · corregido' : game.source === 'paper' ? ' · tarjeta en papel' : ''}</span>
           </li>)}
         </ul>
       )}
@@ -176,6 +175,11 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
         </p>
       )}
 
+      {guestMatch && isCupPlayable(match) && view.edition.status === 'active' && (
+        <p className="rounded-xl border border-dashed border-amber-400 bg-card-2 p-3 text-xs text-ink-2">
+          Partido entre invitados sin cuenta: juegan en tarjeta de papel y el creador o un administrador anota el resultado.
+        </p>
+      )}
       {showActions && openRound?.status === 'completed' && (openRound.mine || view.can_manage) && view.edition.status === 'active' && (
         <RecordRound roundId={openRound.id} match={match} entrants={entrants} onChanged={onChanged} />
       )}
@@ -194,6 +198,7 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
       {showActions && view.can_correct && (
         <div className="flex flex-wrap gap-2 border-t border-line pt-2 text-xs font-semibold">
           {games.length > 0 && <button type="button" className="text-accent-ink underline" onClick={() => setPanel(panel === 'correct' ? 'none' : 'correct')}>Corregir resultado</button>}
+          {isCupPlayable(match) && !openRound && view.edition.status === 'active' && <button type="button" className="text-accent-ink underline" onClick={() => { setWinner(''); setScore(''); setHole(''); setPanel(panel === 'paper' ? 'none' : 'paper'); }}>Anotar resultado (tarjeta en papel)</button>}
           {isCupPlayable(match) && !openRound && view.edition.status !== 'finished' && <button type="button" className="text-accent-ink underline" onClick={() => setPanel(panel === 'award' ? 'none' : 'award')}>Adjudicar sin jugar</button>}
           {isCupPlayable(match) && view.edition.status !== 'finished' && <button type="button" className="text-accent-ink underline" onClick={() => setPanel(panel === 'deadline' ? 'none' : 'deadline')}>Fecha límite</button>}
         </div>
@@ -202,12 +207,9 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
         <div className="space-y-2 rounded-xl bg-card-2 p-3">
           <p className="text-xs text-ink-3">Solo antes de que empiece el siguiente cruce afectado. Queda en la auditoría de la Copa.</p>
           <div className="grid grid-cols-2 gap-2">
-            <select aria-label="Partido a corregir" value={gameNumber} onChange={event => setGameNumber(event.target.value)} className={input}>
-              {games.map(game => <option key={game.id} value={game.game_number}>Partido {game.game_number}</option>)}
-            </select>
-            <select aria-label="Ganador correcto" value={winner} onChange={event => setWinner(event.target.value)} className={input}>
-              <option value="">Ganador…</option>{entrantOption(match.entrant_a)}{entrantOption(match.entrant_b)}
-            </select>
+            <SelectMenu ariaLabel="Partido a corregir" value={gameNumber} onChange={setGameNumber}
+              options={games.map(game => ({ value: String(game.game_number), label: `Partido ${game.game_number}` }))} />
+            <SelectMenu ariaLabel="Ganador correcto" value={winner} onChange={setWinner} placeholder="Ganador…" options={winnerOptions} />
             <input aria-label="Marcador" value={score} onChange={event => setScore(event.target.value)} placeholder="3&2, 1 UP…" className={input} />
             <input aria-label="Hoyo de desempate" inputMode="numeric" value={hole} onChange={event => setHole(event.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="Hoyo 19+ (opcional)" className={input} />
           </div>
@@ -215,12 +217,24 @@ function MatchCard({ view, match, total, entrants, onPlayRound, onChanged, showA
             onClick={() => void run(() => cupService.correctGame(match.id, Number(gameNumber), winner, score.trim(), hole ? Number(hole) : null), 'No se ha podido corregir el resultado.')}>Guardar corrección</WriteButton>
         </div>
       )}
+      {panel === 'paper' && (
+        <div className="space-y-2 rounded-xl bg-card-2 p-3">
+          <p className="text-xs text-ink-3">
+            {match.best_of === 3 ? `Partido ${games.length + 1} de la serie. ` : ''}Anota el resultado de la tarjeta en papel. Si quieres guardar la tarjeta hoyo a hoyo, usa «Jugar esta eliminatoria» y pásala a la app.
+          </p>
+          <SelectMenu ariaLabel="Ganador del partido" value={winner} onChange={setWinner} placeholder="Ganador…" options={winnerOptions} />
+          <div className="grid grid-cols-2 gap-2">
+            <input aria-label="Marcador" value={score} onChange={event => setScore(event.target.value)} placeholder="3&2, 1 UP…" className={input} />
+            <input aria-label="Hoyo de muerte súbita" inputMode="numeric" value={hole} onChange={event => setHole(event.target.value.replace(/\D/g, '').slice(0, 2))} placeholder="Hoyo 19+ (opcional)" className={input} />
+          </div>
+          <WriteButton type="button" disabled={busy || !winner || !score.trim() || (hole !== '' && (Number(hole) < 19 || Number(hole) > 40))} className={`${primary} w-full`}
+            onClick={() => void run(() => cupService.recordPaperGame(match.id, winner, score.trim(), hole ? Number(hole) : null), 'No se ha podido anotar el resultado.')}>Guardar resultado</WriteButton>
+        </div>
+      )}
       {panel === 'award' && (
         <div className="space-y-2 rounded-xl bg-card-2 p-3">
           <p className="text-xs text-ink-3">Para cruces que no se van a disputar. El ganador pasa de ronda.</p>
-          <select aria-label="Ganador adjudicado" value={winner} onChange={event => setWinner(event.target.value)} className={input}>
-            <option value="">Ganador…</option>{entrantOption(match.entrant_a)}{entrantOption(match.entrant_b)}
-          </select>
+          <SelectMenu ariaLabel="Ganador adjudicado" value={winner} onChange={setWinner} placeholder="Ganador…" options={winnerOptions} />
           <input aria-label="Motivo" value={note} onChange={event => setNote(event.target.value)} maxLength={200} placeholder="Motivo (opcional)" className={input} />
           <WriteButton type="button" disabled={busy || !winner} className={`${primary} w-full`}
             onClick={() => void run(() => cupService.awardMatch(match.id, winner, note), 'No se ha podido adjudicar el cruce.')}>Adjudicar</WriteButton>

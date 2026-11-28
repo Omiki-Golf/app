@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Pencil, Shuffle, Trash2, UserPlus, X } from 'lucide-react';
 import { WriteButton } from '../../context/ReadOnlyContext';
+import { SelectMenu } from '../SelectMenu';
 import { golfService } from '../../services/golfService';
 import { cupDrawLabel, cupService, type CupDrawMethod, type CupEntrant, type CupView } from '../../services/cupService';
 import { generateCupBracket } from '../../utils/cupBracket';
@@ -24,6 +25,21 @@ function useAction(onChanged: () => Promise<void>) {
     finally { setBusy(false); }
   };
   return { busy, error, setError, run };
+}
+
+/** Invitados sin cuenta frente a registrados: un cuadro no puede tener más de los primeros. */
+function GuestBalance({ entrants }: { entrants: readonly CupEntrant[] }) {
+  const guests = entrants.filter(entrant => !entrant.has_account).length;
+  const registered = entrants.length - guests;
+  if (guests === 0) return null;
+  const over = guests > registered;
+  return (
+    <p className={`rounded-lg px-3 py-2 text-xs ${over ? 'border border-red-300 bg-red-50 font-semibold text-red-700' : 'bg-card-2 text-ink-3'}`}>
+      Invitados sin cuenta: {guests} · Registrados: {registered}.{' '}
+      {over ? 'Añade jugadores registrados o quita invitados: no puede haber más invitados que registrados.'
+        : 'Cada cruce de primera ronda tendrá al menos un jugador registrado.'}
+    </p>
+  );
 }
 
 /** Jugadores de la edición: todos los ven; el creador y los administradores los editan antes de publicar. */
@@ -131,6 +147,7 @@ export function CupPlayers({ view, onChanged }: { view: CupView; onChanged: () =
           </div>
         </div>
       )}
+      {editable && <GuestBalance entrants={entrants.filter(entrant => entrant.registration !== 'declined')} />}
       {editable && full && <p className="text-xs text-ink-3">Has llegado al máximo de {capacity} jugadores{capacity === 20 ? ' (con Ampliación de Plantilla pasas a 32)' : ''}.</p>}
       {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</p>}
     </section>
@@ -214,12 +231,25 @@ export function CupSettings({ view, onChanged }: { view: CupView; onChanged: () 
       {edition.status === 'draft' && (
         <div className="space-y-2 border-t border-line pt-3">
           <p className="text-sm font-semibold text-ink">Inscripciones (opcional)</p>
-          <p className="text-xs text-ink-3">Las cuentas reciben un mensaje y confirman su participación. Quien no confirme queda fuera del cuadro.</p>
+          <p className="text-xs text-ink-3">Los jugadores con cuenta reciben un mensaje y confirman si juegan. Quien no confirme queda fuera del cuadro. Si no abres inscripciones, juegan todos los de la lista.</p>
+          <label htmlFor="cup-registration-deadline" className="block text-xs font-semibold text-ink-2">Fecha límite para confirmar (opcional)</label>
           <div className="flex gap-2">
-            <input aria-label="Fecha límite de inscripción" type="date" value={deadline} onChange={event => setDeadline(event.target.value)} className={input} />
-            <WriteButton type="button" disabled={busy} className={secondary}
-              onClick={() => void run(() => cupService.openRegistration(edition.id, deadline ? new Date(`${deadline}T23:59:59`).toISOString() : null), 'No se han podido abrir las inscripciones.')}>Abrir</WriteButton>
+            <div className="relative min-w-0 flex-1">
+              <input id="cup-registration-deadline" type="date" value={deadline} min={new Date().toISOString().slice(0, 10)}
+                onChange={event => setDeadline(event.target.value)} className={`${input} ${deadline ? 'pr-9' : 'text-transparent'}`} />
+              {/* El selector de fecha del móvil no muestra texto de ayuda: lo ponemos encima mientras está vacío. */}
+              {!deadline && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-ink-3">Sin fecha límite</span>}
+              {deadline && (
+                <button type="button" onClick={() => setDeadline('')} aria-label="Quitar la fecha límite"
+                  className="absolute inset-y-0 right-2 flex items-center text-ink-3 hover:text-ink"><X size={16} aria-hidden="true" /></button>
+              )}
+            </div>
+            <WriteButton type="button" disabled={busy} className={`${secondary} shrink-0 whitespace-nowrap`}
+              onClick={() => void run(() => cupService.openRegistration(edition.id, deadline ? new Date(`${deadline}T23:59:59`).toISOString() : null), 'No se han podido abrir las inscripciones.')}>Abrir inscripciones</WriteButton>
           </div>
+          <p className="text-xs text-ink-3">
+            {deadline ? `Podrán confirmar hasta el ${new Date(`${deadline}T12:00:00`).toLocaleDateString('es-ES')}.` : 'Sin fecha, pueden confirmar hasta que publiques el cuadro.'}
+          </p>
         </div>
       )}
       {edition.status === 'registration' && (
@@ -253,12 +283,15 @@ export function CupDraw({ view, onChanged }: { view: CupView; onChanged: () => P
 
   if (!view.can_manage) return null;
   const byId = new Map(entrants.map(entrant => [entrant.id, entrant]));
+  const guestCount = pool.filter(entrant => !entrant.has_account).length;
+  const tooManyGuests = guestCount > pool.length - guestCount;
+  const isGuest = (id: string | null | undefined) => Boolean(id && byId.get(id) && !byId.get(id)!.has_account);
 
   const generate = () => {
     if (!edition.draw_method) { setError('Elige la modalidad de emparejamiento antes de generar el cuadro.'); return; }
     try {
       const bracket = generateCupBracket(
-        pool.map(entrant => ({ id: entrant.id, playingHandicap: Number(entrant.playing_handicap), rank: view.current_ranks[entrant.id] ?? undefined })),
+        pool.map(entrant => ({ id: entrant.id, playingHandicap: Number(entrant.playing_handicap), rank: view.current_ranks[entrant.id] ?? undefined, guest: !entrant.has_account })),
         { capacity: view.capacity, method: edition.draw_method, bestOf: edition.best_of, finalBestOf: edition.final_best_of, thirdPlace: edition.third_place, manualSlots: manual });
       const slots = bracket.slice(0, size / 2).flatMap(tie => tie.players);
       void run(() => cupService.saveDraw(edition.id, edition.draw_method!, slots), 'No se ha podido guardar el sorteo.');
@@ -272,22 +305,38 @@ export function CupDraw({ view, onChanged }: { view: CupView; onChanged: () => P
     <section aria-labelledby="cup-draw" className="space-y-3 rounded-2xl border border-line bg-card p-4 shadow-card">
       <h2 id="cup-draw" className="text-lg font-bold text-ink">Cuadro de competición</h2>
       {pool.length < 4 && <p className="text-sm text-ink-3">Hacen falta al menos 4 jugadores confirmados.</p>}
+      <GuestBalance entrants={pool} />
       {edition.draw_method === 'manual' && edition.status !== 'draw_ready' && pool.length >= 4 && (
         <div className="space-y-2">
           <p className="text-xs text-ink-3">Coloca a cada jugador una vez. Un hueco vacío es un pase directo para su pareja.</p>
           {Array.from({ length: size / 2 }, (_, pair) => (
-            <div key={pair} className="grid grid-cols-[auto_1fr_auto_1fr] items-center gap-2 text-sm">
-              <span className="text-xs text-ink-3">{pair + 1}</span>
-              {[0, 1].map(side => (
-                <React.Fragment key={side}>
-                  {side === 1 && <span className="text-xs text-ink-3">vs</span>}
-                  <select aria-label={`Cruce ${pair + 1}, plaza ${side + 1}`} value={manual[pair * 2 + side] ?? ''} className={input}
-                    onChange={event => setManual(current => current.map((value, index) => index === pair * 2 + side ? (event.target.value || null) : value))}>
-                    <option value="">Pase directo</option>
-                    {pool.map(entrant => <option key={entrant.id} value={entrant.id}>{entrant.name}</option>)}
-                  </select>
-                </React.Fragment>
-              ))}
+            <div key={pair} className={`space-y-1.5 rounded-xl border bg-card-2 p-2.5 ${isGuest(manual[pair * 2]) && isGuest(manual[pair * 2 + 1]) ? 'border-red-400' : 'border-line'}`}>
+              <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-ink-3">Cruce {pair + 1}
+                {isGuest(manual[pair * 2]) && isGuest(manual[pair * 2 + 1]) && <span className="ml-1 normal-case tracking-normal text-red-600">· dos invitados sin cuenta</span>}</p>
+              <div className="grid gap-1.5 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                {[0, 1].map(side => {
+                  const slot = pair * 2 + side;
+                  return (
+                    <React.Fragment key={side}>
+                      {side === 1 && <span className="text-center text-xs font-semibold text-ink-3">vs</span>}
+                      <SelectMenu ariaLabel={`Cruce ${pair + 1}, plaza ${side + 1}`} value={manual[slot] ?? ''}
+                        onChange={value => setManual(current => current.map((item, index) => index === slot ? (value || null) : item))}
+                        options={[
+                          { value: '', label: <span className="italic text-ink-3">Pase directo</span> },
+                          ...pool.map(entrant => {
+                            // Indica si el jugador ya está colocado en otro hueco para no repetirlo.
+                            const placed = manual.findIndex((id, index) => id === entrant.id && index !== slot);
+                            return {
+                              value: entrant.id,
+                              label: <span className="flex items-center justify-between gap-2"><span className="truncate">{entrant.name}</span>
+                                {placed >= 0 && <span className="shrink-0 text-xs font-normal text-ink-3">en cruce {(placed >> 1) + 1}</span>}</span>,
+                            };
+                          }),
+                        ]} />
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
@@ -315,7 +364,7 @@ export function CupDraw({ view, onChanged }: { view: CupView; onChanged: () => P
           </div>
         </>
       ) : (
-        <WriteButton type="button" disabled={busy || pool.length < 4 || !edition.draw_method} className={`${primary} w-full`} onClick={generate}>
+        <WriteButton type="button" disabled={busy || pool.length < 4 || !edition.draw_method || tooManyGuests} className={`${primary} w-full`} onClick={generate}>
           Generar cuadro de competición
         </WriteButton>
       )}
