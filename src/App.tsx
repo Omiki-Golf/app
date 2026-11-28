@@ -11,6 +11,7 @@ import { accessCodeStorage } from './utils/accessCode';
 import { storageUtils } from './utils/storage';
 import { getUserId, isVerifiedLocalRoundCreator } from './utils/userId';
 import { canEditRoundScores } from './utils/roundEditing';
+import { setErrorReportingView } from './services/errorReporting';
 import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthContext
 import { RoundSetup } from './components/RoundSetup';
 import { PlayerSetup } from './components/PlayerSetup';
@@ -103,6 +104,8 @@ function App() {
   const initialViewFromLink: ViewType = planLink ? 'plans' : 'main';
   const [currentView, setCurrentViewState] = useState<ViewType>(initialViewFromLink);
   const currentViewRef = useRef<ViewType>(initialViewFromLink);
+  // La pantalla visible acompaña a los errores registrados por la ventana «Algo salió mal».
+  useEffect(() => { setErrorReportingView(currentView); }, [currentView]);
   const historyIndexRef = useRef(1);
   const historyViewsRef = useRef(new Map<number, ViewType>([[0, initialViewFromLink], [1, initialViewFromLink]]));
   const historyInitializedRef = useRef(false);
@@ -948,13 +951,18 @@ function App() {
       const denied = !!err && typeof err === 'object' && 'code' in err && err.code === '42501';
       setError(err && typeof err === 'object' && 'message' in err ? String(err.message) : 'No se ha guardado el golpe. Comprueba la conexión e inténtalo de nuevo.');
       if (denied) {
+        // Un rechazo puntual (sesión caducada al volver de segundo plano, cobertura) no quita el permiso
+        // a quien lo tiene: se renueva la sesión y se recalcula el acceso con el estado real de la partida.
         const roundId = editingRoundId;
-        setRoundState(prev => prev.round?.id === roundId ? { ...prev, hasEditAccess: false } : prev);
         if (roundId) {
           try {
+            await supabase.auth.refreshSession().catch(() => undefined);
             const fresh = await golfService.getRoundWithDetails(roundId);
-            if (fresh) setRoundState(prev => prev.round?.id === roundId ? { ...prev, round: fresh.round, scores: fresh.scores, hasEditAccess: false } : prev);
-          } catch { /* Keep the explicit denial and existing card on a network failure. */ }
+            if (fresh) setRoundState(prev => prev.round?.id === roundId ? {
+              ...prev, round: fresh.round, scores: fresh.scores,
+              hasEditAccess: canEditRoundScores(prev.isCreator, fresh.round.status, accessCodeStorage.hasAccessCode(roundId)),
+            } : prev);
+          } catch { /* Con un fallo de red se conserva la tarjeta y el acceso actuales. */ }
         }
       }
     }

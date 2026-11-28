@@ -4,21 +4,23 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { calculateModePoints } from '../src/utils/calculations.ts';
+import { canEditRoundScores } from '../src/utils/roundEditing.ts';
 
 const app=await readFile(new URL('../src/App.tsx',import.meta.url),'utf8');
 const method=app.slice(app.indexOf('  const handleScoreChange ='),app.indexOf('  const handleHolesUpdated ='));
 const script=ts.transpileModule(method+'\nglobalThis.changeScore=handleScoreChange;', {compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText;
-function harness(mode='stableford',error=null){
+function harness(mode='stableford',error=null,{isCreator=false,freshStatus='completed'}={}){
  const players=Array.from({length:mode==='parejas'?4:2},(_,i)=>({id:String(i),playing_handicap:i+4}));
  const scores=players.map((p,i)=>({id:'original-'+p.id,player_id:p.id,round_id:'round',hole_number:1,gross_strokes:i+5,net_strokes:i+5,strokes_received:0,stableford_points:1,mode_points:99,abandoned:false}));
- let state={round:{id:'round',game_mode:mode,status:'active'},hasEditAccess:true,players,scores};
+ let state={round:{id:'round',game_mode:mode,status:'active'},isCreator,hasEditAccess:true,players,scores};
  const inputState=state;const alerts=[];let sent;let refreshes=0;
- const context=vm.createContext({roundState:inputState,readOnly:false,console:{log(){},error(){}},calculateModePoints,accessCodeStorage:{getAccessCode:()=>null},
+ const context=vm.createContext({roundState:inputState,readOnly:false,console:{log(){},error(){}},calculateModePoints,canEditRoundScores,accessCodeStorage:{getAccessCode:()=>null,hasAccessCode:()=>false},
+  supabase:{auth:{async refreshSession(){return {};}}},
   setError:text=>alerts.push(text),setRoundState:fn=>{state=fn(state);},
   golfService:{
    async recordHoleScores(r,h,rows){if(error)throw error; sent=rows;return rows.map(s=>({...s,id:'persisted-'+s.player_id}));},
    async recordRoundDecision(){return null;},
-   async getRoundWithDetails(){refreshes++;return {round:{...inputState.round,status:'completed'},scores:inputState.scores};},
+   async getRoundWithDetails(){refreshes++;return {round:{...inputState.round,status:freshStatus},scores:inputState.scores};},
   }});
  vm.runInContext(script,context);
  return {change:context.changeScore,state:()=>state,sent:()=>sent,alerts,refreshes:()=>refreshes,players,scores};
@@ -41,6 +43,11 @@ test('server denial displays the reason, revokes editing and refreshes the canon
  await h.change('0',1,{grossStrokes:4,netStrokes:4});
  assert.equal(h.state().hasEditAccess,false);assert.equal(h.state().round.status,'completed');
  assert.equal(h.alerts.at(-1),'El creador ya ha finalizado esta partida.');assert.equal(h.refreshes(),1);
+});
+test('a passing denial never leaves the creator of an active round in read-only mode',async()=>{
+ const h=harness('parejas',{code:'42501',message:'Sesión caducada'},{isCreator:true,freshStatus:'active'});
+ await h.change('0',1,{grossStrokes:4,netStrokes:4});
+ assert.equal(h.state().hasEditAccess,true);assert.equal(h.state().round.status,'active');assert.equal(h.refreshes(),1);
 });
 test('network errors do not falsely revoke ownership or discard unsaved display data',async()=>{
  const h=harness('stableford',{message:'Sin conexión'});

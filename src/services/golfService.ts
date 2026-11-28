@@ -744,7 +744,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         const holes = await this.getCourseHoles(round.course_id, round.num_holes, round.holes_range);
 
         const [playersData, scoresData] = await Promise.all([
-          supabase.from('round_players'). select('*').eq('round_id', roundId),
+          // Las parejas se forman por orden de alta: el orden debe ser siempre el mismo.
+          supabase.from('round_players').select('*').eq('round_id', roundId).order('created_at', { ascending: true }).order('id', { ascending: true }),
           supabase.from('round_scores').select('*').eq('round_id', roundId),
         ]);
 
@@ -1457,7 +1458,8 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
       .from('round_players')
       .select('*')
       .eq('round_id', roundId)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true });
 
     if (error) {
       console.log('🔴 SERVICE: Error obteniendo players:', error);
@@ -1671,7 +1673,7 @@ async getAvailableRoundsForStats(limit?: number): Promise<Array<{ id: string; cr
         Object.entries(roundsByDate).map(async ([date, roundIds]) => {
           const standingsPromises = roundIds.map(async (roundId) => {
             const [playersData, scoresData] = await Promise.all([
-              supabase.from('round_players').select('*').eq('round_id', roundId),
+              supabase.from('round_players').select('*').eq('round_id', roundId).order('created_at', { ascending: true }).order('id', { ascending: true }),
               supabase.from('round_scores').select('*').eq('round_id', roundId),
             ]);
 

@@ -20,7 +20,6 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
     id: string | null;
     value: boolean;
   } | null>(null);
-  const [error, setError] = useState(false);
   useEffect(() => {
     let active = true,
       sequence = 0;
@@ -30,12 +29,12 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
         const value = userId ? await getReadOnly() : false;
         if (active && request === sequence) {
           setState({ id: userId, value });
-          setError(false);
         }
       } catch {
+        // Un corte de cobertura (habitual en el campo) no convierte la cuenta en solo lectura:
+        // se conserva el último valor conocido. La base de datos sigue imponiendo el bloqueo real.
         if (active && request === sequence) {
-          setState({ id: userId, value: true });
-          setError(true);
+          setState(prev => ({ id: userId, value: prev?.id === userId ? prev.value : false }));
         }
       }
     };
@@ -60,9 +59,7 @@ export function ReadOnlyProvider({ children }: { children: ReactNode }) {
           role="status"
           className="sticky top-0 z-[100] bg-amber-100 text-amber-950 p-3 text-center"
         >
-          {error
-            ? "No se pudo comprobar el permiso de escritura. Puedes consultar; vuelve a esta ventana para reintentar."
-            : "Cuenta en modo solo lectura. Puedes consultar tus datos, pero no modificarlos ni jugar."}
+          Cuenta en modo solo lectura. Puedes consultar tus datos, pero no modificarlos ni jugar.
         </p>
       )}
       {children}
