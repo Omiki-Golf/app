@@ -12,6 +12,7 @@ import { storageUtils } from './utils/storage';
 import { getUserId, isVerifiedLocalRoundCreator } from './utils/userId';
 import { canEditRoundScores } from './utils/roundEditing';
 import { setErrorReportingView } from './services/errorReporting';
+import { resumeHoleIndex } from './utils/resumeHole';
 import { useAuth } from './context/AuthContext'; // 👈 Importación del AuthContext
 import { RoundSetup } from './components/RoundSetup';
 import { PlayerSetup } from './components/PlayerSetup';
@@ -538,7 +539,8 @@ function App() {
               holes: roundData.holes,
               players: roundData.players,
               scores: roundData.scores,
-              currentHole: 1,
+              // Tras una recarga (también la automática por un fallo) se vuelve al hoyo pendiente.
+              currentHole: resumeHoleIndex(roundData.holes, roundData.players, roundData.scores),
               isCreator,
               hasEditAccess,
               courseName: course?.name || '',
@@ -810,7 +812,7 @@ function App() {
           holes: roundData.holes,
           players: roundData.players,
           scores: roundData.scores,
-          currentHole: 1,
+          currentHole: resumeHoleIndex(roundData.holes, roundData.players, roundData.scores),
           isCreator,
           hasEditAccess,
           courseName: course?.name || '',

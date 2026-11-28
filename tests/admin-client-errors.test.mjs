@@ -57,14 +57,28 @@ test('the table is closed: only the logging function is granted to app roles', a
   assert.equal(fn.a, true);
 });
 
-test('the error window reports the failure, recovers chunk errors and offers a retry', async () => {
+test('clients never see an error: the app reports it and reloads itself, waiting for coverage if needed', async () => {
   const boundary = await read('../src/components/ErrorBoundary.tsx');
   assert.match(boundary, /reportClientError\(error, errorInfo\.componentStack\)/);
-  assert.match(boundary, /isChunkLoadError\(error\)/);
   assert.match(boundary, /addEventListener\('online'/);
-  assert.match(boundary, /errorBoundary\.retry/);
+  assert.match(boundary, /OmikiLoadingScreen label=\{i18n\.t\('errorBoundary\.recovering'\)\}/);
+  assert.doesNotMatch(boundary, /error\.toString\(\)|⚠️|details/);
+  const i18n = await read('../src/i18n/index.ts');
+  assert.doesNotMatch(i18n, /Algo salió mal|error inesperado/);
   const { isChunkLoadError } = await import('../src/utils/chunkError.ts');
   assert.equal(isChunkLoadError(new TypeError('Failed to fetch dynamically imported module: /assets/Stats.js')), true);
   assert.equal(isChunkLoadError(new TypeError('Importing a module script failed.')), true);
   assert.equal(isChunkLoadError(new TypeError("Cannot read properties of undefined (reading 'name')")), false);
+});
+
+test('a reopened round resumes at the first hole that still needs a score', async () => {
+  const { resumeHoleIndex } = await import('../src/utils/resumeHole.ts');
+  const holes = [1, 2, 3].map(hole_number => ({ hole_number }));
+  const players = [{ id: 'a' }, { id: 'b' }];
+  const score = (player_id, hole_number, gross_strokes = 4, abandoned = false) => ({ player_id, hole_number, gross_strokes, abandoned });
+  assert.equal(resumeHoleIndex(holes, players, []), 1);
+  assert.equal(resumeHoleIndex(holes, players, [score('a', 1), score('b', 1), score('a', 2)]), 2);
+  assert.equal(resumeHoleIndex(holes, players, [score('a', 1), score('b', 1, 0, true), score('a', 2), score('b', 2)]), 3);
+  assert.equal(resumeHoleIndex(holes, players, holes.flatMap(h => players.map(p => score(p.id, h.hole_number)))), 3);
+  assert.equal(resumeHoleIndex([10, 11].map(hole_number => ({ hole_number })), players, [score('a', 10), score('b', 10)]), 2);
 });
