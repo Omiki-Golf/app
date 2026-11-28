@@ -6,6 +6,7 @@ import { generateCupBracket } from '../src/utils/cupBracket.ts';
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 const migration = '../supabase/migrations/20261205100000_cup_match_play.sql';
 const guestMigration = '../supabase/migrations/20261207100000_cup_guest_pairing.sql';
+const alertMigration = '../supabase/migrations/20261208100000_cup_manager_alerts.sql';
 
 async function database() {
   const { PGlite } = await import('@electric-sql/pglite');
@@ -54,6 +55,7 @@ async function database() {
   `);
   await db.exec(await read(migration));
   await db.exec(await read(guestMigration));
+  await db.exec(await read(alertMigration));
   await db.exec(`
     CREATE TRIGGER guard_group_round_stableford BEFORE INSERT OR UPDATE OF group_id, game_mode ON golf_rounds FOR EACH ROW EXECUTE FUNCTION guard_group_round_stableford();
     CREATE TRIGGER b_guest_participation BEFORE INSERT OR UPDATE OR DELETE ON round_players FOR EACH ROW EXECUTE FUNCTION guard_guest_participation();
@@ -383,4 +385,38 @@ test('guests without an account: never more than registered, never paired in the
   assert.equal(match(await ctx.edition(id), '2-0').entrant_a, ids.G1);
   assert.equal((await one("SELECT count(*)::int AS n FROM cup_audit WHERE action='cup.game.paper'")).n, 3);
   assert.equal(await ctx.snapshot(), before, 'la Copa no toca hándicaps, rankings ni partidas archivadas');
+});
+
+test('the Home red dot also warns the creator and admins when the cup needs managing', async () => {
+  const ctx = await database();
+  const { db, owner, members } = ctx;
+  const [ana] = members;
+  const { edition_id: id } = await ctx.purchase();
+  await ctx.call(owner, "SELECT public.add_cup_entrant($1,NULL,NULL,'G1',10)", [id]);
+  let cup = await ctx.edition(id);
+  const ids = Object.fromEntries(cup.entrants.map(item => [item.name, item.id]));
+  const shortcut = async account => (await ctx.call(account, 'SELECT public.list_my_cup_shortcuts() AS r')).rows[0].r
+    .find(item => item.edition_id === id);
+
+  assert.equal((await shortcut(owner)).manage, false, 'borrador sin nada que gestionar');
+  await ctx.call(owner, 'SELECT public.save_cup_draw($1,$2,$3)',
+    [id, 'manual', ['Owner', 'Legado', 'Ana', 'G1', 'Bea', null, 'Carlos', null].map(item => item && ids[item])]);
+  assert.equal((await shortcut(owner)).manage, true, 'cuadro preparado sin publicar');
+  assert.equal((await shortcut(ana)).manage, false, 'un participante no gestiona');
+
+  await ctx.call(owner, 'SELECT public.publish_cup_draw($1)', [id]);
+  await db.query('UPDATE cup_matches SET deadline = NULL WHERE edition_id = $1', [id]);
+  assert.equal((await shortcut(owner)).manage, false);
+  cup = await ctx.edition(id);
+  await db.query("UPDATE cup_matches SET deadline = now() - interval '1 day' WHERE id = $1", [match(cup, '0-0').id]);
+  assert.equal((await shortcut(owner)).manage, true, 'plazo vencido');
+  await db.query('UPDATE cup_matches SET deadline = NULL WHERE edition_id = $1', [id]);
+
+  // Los dos invitados ganan y se cruzan: hay que anotar su partido en papel.
+  const paper = (matchId, winner) => ctx.call(owner, "SELECT public.record_cup_paper_game($1,$2,'2&1',NULL)", [matchId, winner]);
+  await paper(match(cup, '0-0').id, ids.Legado);
+  await paper(match(cup, '0-1').id, ids.G1);
+  assert.equal((await shortcut(owner)).manage, true, 'cruce entre invitados pendiente');
+  await paper(match(await ctx.edition(id), '1-0').id, ids.G1);
+  assert.equal((await shortcut(owner)).manage, false, 'anotado: no queda nada que gestionar');
 });

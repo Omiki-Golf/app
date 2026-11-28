@@ -109,6 +109,8 @@ export interface CupShortcut {
   group_name: string;
   pending: boolean;
   invited: boolean;
+  /** Creador o administrador con algo que gestionar (sorteo, resultados, plazos, cruces en papel). */
+  manage?: boolean;
 }
 
 export interface CupRecordResult { game_id: string; winner: string; score: string; replayed: boolean }

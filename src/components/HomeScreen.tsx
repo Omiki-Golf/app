@@ -139,7 +139,7 @@ function GroupShortcut({ group, level, wide, onOpen, cup, onOpenCup }: {
   if (cup && onOpenCup) {
     // Copa contratada: dos botones. El grande abre el grupo; el pequeño, con espadas y anillo, abre la Copa.
     const ring = tier === 'premium' ? 'ring-pink-400' : 'ring-amber-400';
-    const alert = cup.pending || cup.invited;
+    const alert = cup.pending || cup.invited || Boolean(cup.manage);
     const swords = level === 'owner' ? 20 : level === 'admin' ? 17 : 15;
     const square = level === 'owner' ? 'w-[52px]' : level === 'admin' ? 'w-11' : 'w-9';
     return <div className={`flex w-full min-w-0 items-center gap-2 ${wide ? 'col-span-2' : ''}`}>
@@ -148,7 +148,7 @@ function GroupShortcut({ group, level, wide, onOpen, cup, onOpenCup }: {
         {content}
       </WriteButton>
       <button type="button" onClick={() => onOpenCup(group.id, cup.edition_id)}
-        aria-label={`Copa Match Play de ${group.name}${cup.pending ? ': tienes partido pendiente' : cup.invited ? ': confirma tu participación' : ''}`}
+        aria-label={`Copa Match Play de ${group.name}${cup.pending ? ': tienes partido pendiente' : cup.invited ? ': confirma tu participación' : cup.manage ? ': hay tareas de la Copa por gestionar' : ''}`}
         title={cup.name}
         className={`relative flex shrink-0 items-center justify-center border-2 ring-2 ring-offset-2 ring-offset-app transition-all active:scale-95 ${ring} ${shortcutSize[level]} ${square} !px-0 ${style}`}>
         <Swords size={swords} className={alert ? 'animate-pulse' : ''} aria-hidden="true" />
@@ -388,9 +388,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {otherCups.map(cup => (
                   <button key={cup.edition_id} type="button" onClick={() => onOpenCup(cup.group_id, cup.edition_id)}
                     className="flex h-11 w-full items-center gap-2 rounded-xl border-2 border-amber-400 bg-card px-3 text-left text-sm font-semibold text-ink ring-2 ring-amber-300 ring-offset-2 ring-offset-app">
-                    <Swords size={16} className={cup.pending || cup.invited ? 'shrink-0 animate-pulse text-amber-500' : 'shrink-0 text-amber-500'} aria-hidden="true" />
+                    <Swords size={16} className={cup.pending || cup.invited || cup.manage ? 'shrink-0 animate-pulse text-amber-500' : 'shrink-0 text-amber-500'} aria-hidden="true" />
                     <span className="min-w-0 flex-1 truncate">{cup.name} · {cup.group_name}</span>
-                    {(cup.pending || cup.invited) && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" aria-label={cup.pending ? 'Partido pendiente' : 'Invitación pendiente'} />}
+                    {(cup.pending || cup.invited || cup.manage) && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" aria-label={cup.pending ? 'Partido pendiente' : cup.invited ? 'Invitación pendiente' : 'Tareas pendientes'} />}
                   </button>
                 ))}
               </div>
